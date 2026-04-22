@@ -1,0 +1,123 @@
+<UserControl x:Class="SunnyNet.Wpf.Controls.HexViewControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             SizeChanged="HexViewControl_SizeChanged"
+             PreviewKeyDown="HexViewControl_PreviewKeyDown"
+             Focusable="True">
+    <Border Background="{StaticResource SurfaceBrush}"
+            BorderBrush="{StaticResource DividerBrush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            SnapsToDevicePixels="True">
+        <Border.ContextMenu>
+            <ContextMenu Opened="HexContextMenu_Opened">
+                <MenuItem x:Name="CopySelectedHexMenuItem" Header="复制选中 HEX" InputGestureText="Ctrl+Shift+C" Click="CopySelectedHex_Click" />
+                <MenuItem x:Name="CopySelectedTextMenuItem" Header="复制选中文本" InputGestureText="Ctrl+Alt+C" Click="CopySelectedText_Click" />
+                <MenuItem x:Name="CopySelectedLinesMenuItem" Header="复制选中全部" InputGestureText="Ctrl+C" Click="CopySelectedLines_Click" />
+                <Separator />
+                <MenuItem Header="复制全部 HEX" Click="CopyAllHex_Click" />
+                <MenuItem Header="复制全部文本" Click="CopyAllText_Click" />
+                <MenuItem Header="复制全部内容" Click="CopyAllLines_Click" />
+                <Separator />
+                <MenuItem x:Name="ClearSelectionMenuItem" Header="清除选中" Click="ClearSelection_Click" />
+            </ContextMenu>
+        </Border.ContextMenu>
+        <Grid TextOptions.TextFormattingMode="Display"
+              TextOptions.TextRenderingMode="ClearType">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <DockPanel Grid.Row="0"
+                       Margin="12,10,12,8"
+                       LastChildFill="True">
+                <StackPanel Orientation="Horizontal">
+                    <Border Padding="10,4"
+                            Background="{StaticResource AccentSoftBrush}"
+                            BorderBrush="{StaticResource DividerBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                        <TextBlock x:Name="SummaryTextBlock"
+                                   Foreground="{StaticResource AccentBrush}"
+                                   Text="HEX 数据" />
+                    </Border>
+                    <Border x:Name="SelectionInfoBorder"
+                            Margin="8,0,0,0"
+                            Padding="10,4"
+                            Background="#EEF5FF"
+                            BorderBrush="#BDD4FB"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Visibility="Collapsed">
+                        <TextBlock x:Name="SelectionInfoTextBlock"
+                                   Foreground="{StaticResource AccentStrongBrush}"
+                                   TextTrimming="CharacterEllipsis"
+                                   Text="起始 00000000 · 结束 00000000 · 长度 0 Bytes" />
+                    </Border>
+                </StackPanel>
+            </DockPanel>
+
+            <Grid Grid.Row="1" ClipToBounds="True">
+                <ScrollViewer x:Name="BodyScrollViewer"
+                              HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Auto"
+                              Focusable="False">
+                    <Grid x:Name="HexLayoutGrid"
+                          Background="{StaticResource SurfaceBrush}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition x:Name="OffsetColumn" Width="92" />
+                            <ColumnDefinition Width="1" />
+                            <ColumnDefinition x:Name="HexColumn" Width="420" />
+                            <ColumnDefinition Width="1" />
+                            <ColumnDefinition x:Name="AsciiColumn" Width="220" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0" Background="#F6F8FC">
+                            <StackPanel x:Name="OffsetRowsPanel" Margin="0,10,0,10" />
+                        </Border>
+
+                        <Border Grid.Column="1" Background="{StaticResource DividerBrush}" />
+
+                        <Border Grid.Column="2"
+                                Background="{StaticResource SurfaceBrush}"
+                                MouseLeftButtonDown="HexRegion_MouseLeftButtonDown"
+                                MouseMove="HexRegion_MouseMove"
+                                MouseLeftButtonUp="HexRegion_MouseLeftButtonUp"
+                                LostMouseCapture="HexRegion_LostMouseCapture">
+                            <StackPanel x:Name="HexRowsPanel" Margin="0,10,0,10" />
+                        </Border>
+
+                        <Border Grid.Column="3" Background="{StaticResource DividerBrush}" />
+
+                        <Border Grid.Column="4"
+                                Background="{StaticResource SurfaceBrush}"
+                                MouseLeftButtonDown="AsciiRegion_MouseLeftButtonDown"
+                                MouseMove="AsciiRegion_MouseMove"
+                                MouseLeftButtonUp="AsciiRegion_MouseLeftButtonUp"
+                                LostMouseCapture="AsciiRegion_LostMouseCapture">
+                            <StackPanel x:Name="AsciiRowsPanel" Margin="0,10,0,10" />
+                        </Border>
+                    </Grid>
+                </ScrollViewer>
+
+                <Border x:Name="EmptyPanel"
+                        Background="#F8FAFD"
+                        IsHitTestVisible="False">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock HorizontalAlignment="Center"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="22"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   Text="&#xE7C3;" />
+                        <TextBlock x:Name="EmptyTextBlock"
+                                   Margin="0,8,0,0"
+                                   HorizontalAlignment="Center"
+                                   Style="{StaticResource CaptionTextStyle}"
+                                   Text="无十六进制数据" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

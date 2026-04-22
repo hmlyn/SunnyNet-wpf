@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <BackendDir>$(MSBuildThisFileDirectory)..\..\backend\</BackendDir>
+    <ZigExe>$(MSBuildThisFileDirectory)..\..\_toolchain\zig-x86_64-windows-0.15.2\zig.exe</ZigExe>
+  </PropertyGroup>
+
+  <Target Name="BuildGoBackend" BeforeTargets="Build" Condition="'$(DesignTimeBuild)' != 'true'">
+    <MakeDir Directories="$(TargetDir)backend" />
+    <Error Condition="!Exists('$(ZigExe)')" Text="缺少 Zig 工具链：$(ZigExe)" />
+    <Exec Command="set CC=$(ZigExe) cc -target x86_64-windows-gnu &amp;&amp; set CXX=$(ZigExe) c++ -target x86_64-windows-gnu &amp;&amp; go build -tags cshared -buildmode=c-shared -o &quot;$(TargetDir)backend\SunnyNetBridge.dll&quot; ." WorkingDirectory="$(BackendDir)" />
+  </Target>
+
+</Project>

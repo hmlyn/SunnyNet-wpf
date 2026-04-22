@@ -1,0 +1,75 @@
+<Window x:Class="SunnyNet.Wpf.Windows.CertificateGuideWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="证书安装教程"
+        Width="960"
+        Height="640"
+        MinWidth="780"
+        MinHeight="520"
+        Background="{StaticResource WindowBackgroundBrush}"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Style="{StaticResource CardBorderStyle}">
+            <Grid Margin="22,18">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="证书安装教程" />
+                    <TextBlock Margin="0,6,0,0"
+                               Style="{StaticResource DialogSubtitleTextStyle}"
+                               Text="HTTPS 抓包前需要信任 SunnyNet CA。不同设备按下方步骤安装并启用代理。" />
+                </StackPanel>
+                <Border Grid.Column="1" Style="{StaticResource BadgeBorderStyle}">
+                    <TextBlock Text="{Binding RunningPort, StringFormat=端口 {0}}" />
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="1"
+                Margin="0,16,0,0"
+                Style="{StaticResource CardBorderStyle}">
+            <TabControl Margin="14">
+                <TabItem Header="Windows">
+                    <StackPanel Margin="8">
+                        <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="Windows 安装步骤" />
+                        <TextBlock Margin="0,12,0,0"
+                                   Style="{StaticResource DialogSubtitleTextStyle}"
+                                   Text="1. 打开“程序设置 → SSL 证书”，点击“安装默认证书”。&#x0a;2. 信任后让系统代理指向 SunnyNet 监听端口。&#x0a;3. 若浏览器仍不信任，请重启浏览器后再试。" />
+                        <Border Margin="0,18,0,0"
+                                Padding="16,12"
+                                Background="{StaticResource AccentSoftBrush}"
+                                CornerRadius="8">
+                            <TextBlock Foreground="{StaticResource AccentBrush}"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
+                                       Text="{Binding RunningPort, StringFormat=当前运行端口：{0}}" />
+                        </Border>
+                    </StackPanel>
+                </TabItem>
+                <TabItem Header="Android">
+                    <TextBlock Margin="8"
+                               Style="{StaticResource DialogSubtitleTextStyle}"
+                               Text="导出默认证书并安装到 Android 用户证书存储区，然后将 Wi-Fi 代理指向这台 Windows 机器的 SunnyNet 端口。Android 7+ 的部分应用默认不信任用户证书，需要应用本身允许用户 CA。" />
+                </TabItem>
+                <TabItem Header="iOS">
+                    <TextBlock Margin="8"
+                               Style="{StaticResource DialogSubtitleTextStyle}"
+                               Text="导入 CA 后，进入“设置 → 通用 → 关于本机 → 证书信任设置”，对 SunnyNet CA 开启完全信任，再配置 Wi-Fi HTTP 代理。" />
+                </TabItem>
+                <TabItem Header="MacOS">
+                    <TextBlock Margin="8"
+                               Style="{StaticResource DialogSubtitleTextStyle}"
+                               Text="将导出的 CA 证书导入“钥匙串访问”，在证书详情中将信任设置改为“始终信任”，然后配置系统或浏览器代理。" />
+                </TabItem>
+            </TabControl>
+        </Border>
+    </Grid>
+</Window>

@@ -1,0 +1,64 @@
+<UserControl x:Class="SunnyNet.Wpf.Controls.HtmlPreviewControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:SunnyNet.Wpf.Controls">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Grid.Row="0" Margin="0,0,0,8" LastChildFill="False">
+            <Border Padding="2"
+                    HorizontalAlignment="Left"
+                    Background="{StaticResource SurfaceAltBrush}"
+                    BorderBrush="{StaticResource DividerBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                <StackPanel Orientation="Horizontal">
+                    <ToggleButton x:Name="PreviewButton"
+                                  IsChecked="True"
+                                  Style="{StaticResource SegmentedToggleButtonStyle}"
+                                  Click="PreviewButton_Click"
+                                  Content="预览" />
+                    <ToggleButton x:Name="SourceButton"
+                                  Style="{StaticResource SegmentedToggleButtonStyle}"
+                                  Click="SourceButton_Click"
+                                  Content="源码" />
+                </StackPanel>
+            </Border>
+
+            <Border DockPanel.Dock="Right"
+                    Margin="8,0,0,0"
+                    Padding="10,4"
+                    Background="{StaticResource AccentSoftBrush}"
+                    BorderBrush="{StaticResource DividerBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                <TextBlock x:Name="SummaryTextBlock"
+                           Foreground="{StaticResource AccentBrush}"
+                           Text="无 HTML 内容" />
+            </Border>
+
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button Margin="0,0,8,0" Click="Refresh_Click" Content="刷新" />
+                <Button Click="CopySource_Click" Content="复制源码" />
+            </StackPanel>
+        </DockPanel>
+
+        <Border x:Name="PreviewPanel"
+                Grid.Row="1"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource DividerBrush}"
+                BorderThickness="1"
+                CornerRadius="8">
+            <WebBrowser x:Name="HtmlBrowser" />
+        </Border>
+
+        <controls:HttpSyntaxTextBox x:Name="SourceViewer"
+                                    Grid.Row="1"
+                                    Visibility="Collapsed"
+                                    SourceText="{Binding HtmlText, RelativeSource={RelativeSource AncestorType=controls:HtmlPreviewControl}}"
+                                    HighlightMode="Body" />
+    </Grid>
+</UserControl>

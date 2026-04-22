@@ -1,0 +1,67 @@
+<UserControl x:Class="SunnyNet.Wpf.Controls.JsonTreeViewControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:SunnyNet.Wpf.Controls">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Grid.Row="0" Margin="0,0,0,8" LastChildFill="False">
+            <Border Padding="2"
+                    HorizontalAlignment="Left"
+                    Background="{StaticResource SurfaceAltBrush}"
+                    BorderBrush="{StaticResource DividerBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                <StackPanel Orientation="Horizontal">
+                    <ToggleButton x:Name="TreeButton"
+                                  IsChecked="True"
+                                  Style="{StaticResource SegmentedToggleButtonStyle}"
+                                  Click="TreeButton_Click"
+                                  Content="树视图" />
+                    <ToggleButton x:Name="RawButton"
+                                  Style="{StaticResource SegmentedToggleButtonStyle}"
+                                  Click="RawButton_Click"
+                                  Content="原文" />
+                </StackPanel>
+            </Border>
+
+            <Border DockPanel.Dock="Right"
+                    Padding="10,4"
+                    Margin="8,0,0,0"
+                    Background="{StaticResource AccentSoftBrush}"
+                    BorderBrush="{StaticResource DividerBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                <TextBlock x:Name="SummaryTextBlock"
+                           Foreground="{StaticResource AccentBrush}"
+                           Text="JSON" />
+            </Border>
+
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button Margin="0,0,8,0" Click="ExpandAll_Click" Content="展开全部" />
+                <Button Margin="0,0,8,0" Click="CollapseAll_Click" Content="折叠" />
+                <Button Click="CopyJson_Click" Content="复制" />
+            </StackPanel>
+        </DockPanel>
+
+        <Border Grid.Row="1"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource DividerBrush}"
+                BorderThickness="1"
+                CornerRadius="8">
+            <Grid>
+                <TreeView x:Name="JsonTree"
+                          Padding="10"
+                          Background="Transparent"
+                          BorderThickness="0" />
+                <controls:HttpSyntaxTextBox x:Name="FallbackViewer"
+                                            Visibility="Collapsed"
+                                            SourceText="{Binding JsonText, RelativeSource={RelativeSource AncestorType=controls:JsonTreeViewControl}}"
+                                            HighlightMode="Json" />
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

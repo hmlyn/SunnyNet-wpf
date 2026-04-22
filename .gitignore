@@ -1,0 +1,42 @@
+# Visual Studio / Rider
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# .NET / WPF build output
+bin/
+obj/
+Debug/
+Release/
+x64/
+x86/
+TestResults/
+*.pdb
+*.ilk
+
+# NuGet
+packages/
+*.nupkg
+*.snupkg
+
+# Go build output
+/backend/*.exe
+/backend/*.dll
+/backend/*.h
+/backend/*.a
+/backend/*.lib
+
+# Local reference sources and toolchains
+_source/
+_toolchain/
+
+# Logs and OS files
+*.log
+*.tmp
+*.cache
+Thumbs.db
+Desktop.ini

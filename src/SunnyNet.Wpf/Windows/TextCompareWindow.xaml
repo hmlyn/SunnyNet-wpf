@@ -1,0 +1,83 @@
+<Window x:Class="SunnyNet.Wpf.Windows.TextCompareWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="文本对比"
+        Width="1080"
+        Height="660"
+        MinWidth="840"
+        MinHeight="520"
+        Background="{StaticResource WindowBackgroundBrush}"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Style="{StaticResource CardBorderStyle}">
+            <StackPanel Margin="22,18">
+                <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="文本对比" />
+                <TextBlock Margin="0,6,0,0"
+                           Style="{StaticResource DialogSubtitleTextStyle}"
+                           Text="左右粘贴请求、响应或脚本文本，便于快速人工对比差异。" />
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="1" Margin="0,16,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource CardBorderStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="48" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border Background="{StaticResource SurfaceAltBrush}"
+                            BorderBrush="{StaticResource DividerBrush}"
+                            BorderThickness="0,0,0,1"
+                            CornerRadius="8,8,0,0">
+                        <TextBlock Margin="16,0" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="左侧文本" />
+                    </Border>
+                    <TextBox Grid.Row="1"
+                             Margin="12"
+                             AcceptsReturn="True"
+                             VerticalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Auto"
+                             FontFamily="Consolas, Microsoft YaHei UI"
+                             TextWrapping="NoWrap" />
+                </Grid>
+            </Border>
+
+            <GridSplitter Grid.Column="1"
+                          Width="12"
+                          HorizontalAlignment="Stretch" />
+
+            <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="48" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border Background="{StaticResource SurfaceAltBrush}"
+                            BorderBrush="{StaticResource DividerBrush}"
+                            BorderThickness="0,0,0,1"
+                            CornerRadius="8,8,0,0">
+                        <TextBlock Margin="16,0" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="右侧文本" />
+                    </Border>
+                    <TextBox Grid.Row="1"
+                             Margin="12"
+                             AcceptsReturn="True"
+                             VerticalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Auto"
+                             FontFamily="Consolas, Microsoft YaHei UI"
+                             TextWrapping="NoWrap" />
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

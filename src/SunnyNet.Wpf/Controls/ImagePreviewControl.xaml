@@ -1,0 +1,101 @@
+<UserControl x:Class="SunnyNet.Wpf.Controls.ImagePreviewControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="210" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <Border Margin="0,0,10,0"
+                Padding="14"
+                Background="{StaticResource SurfaceAltBrush}"
+                BorderBrush="{StaticResource DividerBrush}"
+                BorderThickness="1"
+                CornerRadius="8">
+            <StackPanel>
+                <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="图片信息" />
+                <Border Margin="0,12,0,0"
+                        Padding="10,8"
+                        Background="{StaticResource SurfaceBrush}"
+                        BorderBrush="{StaticResource DividerBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource CaptionTextStyle}" Text="类型" />
+                        <TextBlock x:Name="TypeValueTextBlock"
+                                   Margin="0,4,0,0"
+                                   FontWeight="SemiBold"
+                                   Text="unknown" />
+                    </StackPanel>
+                </Border>
+                <Border Margin="0,8,0,0"
+                        Padding="10,8"
+                        Background="{StaticResource SurfaceBrush}"
+                        BorderBrush="{StaticResource DividerBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource CaptionTextStyle}" Text="尺寸" />
+                        <TextBlock x:Name="SizeValueTextBlock"
+                                   Margin="0,4,0,0"
+                                   FontWeight="SemiBold"
+                                   Text="-" />
+                    </StackPanel>
+                </Border>
+                <Border Margin="0,8,0,0"
+                        Padding="10,8"
+                        Background="{StaticResource SurfaceBrush}"
+                        BorderBrush="{StaticResource DividerBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource CaptionTextStyle}" Text="大小" />
+                        <TextBlock x:Name="LengthValueTextBlock"
+                                   Margin="0,4,0,0"
+                                   FontWeight="SemiBold"
+                                   Text="0 Bytes" />
+                    </StackPanel>
+                </Border>
+                <ComboBox x:Name="StretchModeBox"
+                          Margin="0,16,0,0"
+                          SelectionChanged="StretchModeBox_SelectionChanged">
+                    <ComboBoxItem Content="居中显示" Tag="Uniform" IsSelected="True" />
+                    <ComboBoxItem Content="拉伸显示" Tag="Fill" />
+                    <ComboBoxItem Content="原始比例" Tag="None" />
+                </ComboBox>
+                <Button x:Name="SaveButton"
+                        Margin="0,12,0,0"
+                        Click="SaveButton_Click"
+                        Content="保存图片" />
+                <TextBlock x:Name="InfoTextBlock"
+                           Margin="0,12,0,0"
+                           Style="{StaticResource DialogSubtitleTextStyle}"
+                           Text="暂无图片" />
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Column="1"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource DividerBrush}"
+                BorderThickness="1"
+                CornerRadius="8">
+            <Grid>
+                <TextBlock x:Name="EmptyTextBlock"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Style="{StaticResource CaptionTextStyle}"
+                           Text="暂无图片内容" />
+                <ScrollViewer x:Name="ImageScrollViewer"
+                              Visibility="Collapsed"
+                              HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Auto">
+                    <Image x:Name="PreviewImage"
+                           Stretch="Uniform"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center" />
+                </ScrollViewer>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

@@ -1,0 +1,43 @@
+<UserControl x:Class="SunnyNet.Wpf.Controls.RequestBodyView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:SunnyNet.Wpf.Controls">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border x:Name="ModeBar"
+                Margin="0,0,0,8"
+                Padding="2"
+                HorizontalAlignment="Left"
+                Background="{StaticResource SurfaceAltBrush}"
+                BorderBrush="{StaticResource DividerBrush}"
+                BorderThickness="1"
+                CornerRadius="8">
+            <StackPanel Orientation="Horizontal">
+                <ToggleButton x:Name="RawButton"
+                              IsChecked="True"
+                              Style="{StaticResource SegmentedToggleButtonStyle}"
+                              Click="RawButton_Click"
+                              Content="Raw" />
+                <ToggleButton x:Name="UrlEncodedButton"
+                              Style="{StaticResource SegmentedToggleButtonStyle}"
+                              Click="UrlEncodedButton_Click"
+                              Content="UrlEncode" />
+            </StackPanel>
+        </Border>
+
+        <controls:HttpSyntaxTextBox x:Name="RawViewer"
+                                    Grid.Row="1"
+                                    SourceText="{Binding RawText, RelativeSource={RelativeSource AncestorType=controls:RequestBodyView}}"
+                                    HighlightMode="Body" />
+
+        <controls:NameValueTableControl x:Name="UrlEncodedGrid"
+                                        Grid.Row="1"
+                                        Visibility="Collapsed"
+                                        Rows="{Binding UrlEncodedRows, RelativeSource={RelativeSource AncestorType=controls:RequestBodyView}}"
+                                        EmptyText="无 UrlEncode 参数" />
+    </Grid>
+</UserControl>
