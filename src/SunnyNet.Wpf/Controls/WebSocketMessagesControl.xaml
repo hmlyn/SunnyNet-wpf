@@ -1,0 +1,1435 @@
+<UserControl x:Class="SunnyNet.Wpf.Controls.WebSocketMessagesControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:SunnyNet.Wpf.Controls"
+             xmlns:models="clr-namespace:SunnyNet.Wpf.Models"
+             PreviewKeyDown="WebSocketMessagesControl_PreviewKeyDown">
+    <UserControl.Resources>
+        <Style x:Key="WebSocketFrameItemStyle" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="ItemBorder"
+                                Padding="0"
+                                Background="Transparent"
+                                BorderBrush="Transparent"
+                                BorderThickness="0">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="#F7FAFE" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="#EEF4FF" />
+                                <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#D7E4FB" />
+                                <Setter TargetName="ItemBorder" Property="BorderThickness" Value="0" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="WebSocketFlowHeaderTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="WebSocketFlowCellTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+
+        <Style x:Key="WebSocketFlowMonoCellTextStyle" TargetType="TextBlock" BasedOn="{StaticResource WebSocketFlowCellTextStyle}">
+            <Setter Property="FontFamily" Value="Consolas, Microsoft YaHei UI" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+            <Setter Property="FontSize" Value="11.5" />
+        </Style>
+
+        <Style x:Key="WebSocketFlowDirectionTextStyle" TargetType="TextBlock" BasedOn="{StaticResource WebSocketFlowCellTextStyle}">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Icon}" Value="上行">
+                    <Setter Property="Foreground" Value="{StaticResource SuccessBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Icon}" Value="下行">
+                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Icon}" Value="websocket_connect">
+                    <Setter Property="Foreground" Value="#7B4DE0" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Icon}" Value="websocket_close">
+                    <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="WebSocketFlowTypeTextStyle" TargetType="TextBlock" BasedOn="{StaticResource WebSocketFlowCellTextStyle}">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Type}" Value="Text">
+                    <Setter Property="Foreground" Value="{StaticResource SuccessBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Type}" Value="Binary">
+                    <Setter Property="Foreground" Value="{StaticResource WarningBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Type}" Value="Ping">
+                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Type}" Value="Pong">
+                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Type}" Value="Close">
+                    <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Icon}" Value="websocket_connect">
+                    <Setter Property="Foreground" Value="#7B4DE0" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Icon}" Value="websocket_close">
+                    <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="WebSocketPayloadSideTabItemStyle" TargetType="TabItem">
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="Margin" Value="0,0,0,3" />
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="TabBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="Transparent"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                SnapsToDevicePixels="True">
+                            <Grid>
+                                <Border x:Name="ActiveLine"
+                                        Width="3"
+                                        Margin="0,7,0,7"
+                                        HorizontalAlignment="Left"
+                                        Background="Transparent"
+                                        CornerRadius="2" />
+                                <ContentPresenter Margin="{TemplateBinding Padding}"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"
+                                                  ContentSource="Header" />
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="TabBorder" Property="Background" Value="{StaticResource SurfaceHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="TabBorder" Property="Background" Value="{StaticResource SurfaceBrush}" />
+                                <Setter TargetName="TabBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                <Setter TargetName="ActiveLine" Property="Background" Value="{StaticResource AccentBrush}" />
+                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="WebSocketPayloadSideTabControlStyle" TargetType="TabControl">
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource DividerBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabControl">
+                        <Grid KeyboardNavigation.TabNavigation="Local"
+                              SnapsToDevicePixels="True">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="82" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0"
+                                    Margin="0,0,8,0"
+                                    Padding="4"
+                                    Background="{StaticResource SurfaceAltBrush}"
+                                    BorderBrush="{StaticResource DividerBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="9">
+                                <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                              VerticalScrollBarVisibility="Auto"
+                                              Focusable="False">
+                                    <StackPanel Orientation="Vertical"
+                                                IsItemsHost="True"
+                                                KeyboardNavigation.TabIndex="1" />
+                                </ScrollViewer>
+                            </Border>
+
+                            <Border Grid.Column="1"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="8">
+                                <ContentPresenter x:Name="PART_SelectedContentHost"
+                                                  Margin="{TemplateBinding Padding}"
+                                                  ContentSource="SelectedContent"
+                                                  SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
+                            </Border>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="WebSocketCompactChipBorderStyle" TargetType="Border">
+            <Setter Property="Margin" Value="0,0,6,4" />
+            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource DividerBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="7" />
+        </Style>
+
+        <Style x:Key="WebSocketDirectionBadgeBorderStyle" TargetType="Border">
+            <Setter Property="Background" Value="#EEF4FF" />
+            <Setter Property="BorderBrush" Value="#D8E7FF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Icon}" Value="上行">
+                    <Setter Property="Background" Value="#EAF8F1" />
+                    <Setter Property="BorderBrush" Value="#CBE9D8" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Icon}" Value="下行">
+                    <Setter Property="Background" Value="#EEF4FF" />
+                    <Setter Property="BorderBrush" Value="#D8E7FF" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Icon}" Value="websocket_connect">
+                    <Setter Property="Background" Value="#F3EDFF" />
+                    <Setter Property="BorderBrush" Value="#E2D7FF" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Icon}" Value="websocket_close">
+                    <Setter Property="Background" Value="#FDECEC" />
+                    <Setter Property="BorderBrush" Value="#F7CDCF" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="WebSocketDirectionBadgeTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Icon}" Value="上行">
+                    <Setter Property="Foreground" Value="{StaticResource SuccessBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Icon}" Value="下行">
+                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Icon}" Value="websocket_connect">
+                    <Setter Property="Foreground" Value="#7B4DE0" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Icon}" Value="websocket_close">
+                    <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="WebSocketTypeBadgeBorderStyle" TargetType="Border">
+            <Setter Property="Background" Value="#F7F9FC" />
+            <Setter Property="BorderBrush" Value="#E2E8F0" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Type}" Value="Text">
+                    <Setter Property="Background" Value="#ECFDF3" />
+                    <Setter Property="BorderBrush" Value="#CFEEDB" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Type}" Value="Binary">
+                    <Setter Property="Background" Value="#FFF6E8" />
+                    <Setter Property="BorderBrush" Value="#FFE2B7" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Type}" Value="Ping">
+                    <Setter Property="Background" Value="#EEF4FF" />
+                    <Setter Property="BorderBrush" Value="#D8E7FF" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Type}" Value="Pong">
+                    <Setter Property="Background" Value="#EEF4FF" />
+                    <Setter Property="BorderBrush" Value="#D8E7FF" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Type}" Value="Close">
+                    <Setter Property="Background" Value="#FDECEC" />
+                    <Setter Property="BorderBrush" Value="#F7CDCF" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="WebSocketTypeBadgeTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Type}" Value="Text">
+                    <Setter Property="Foreground" Value="{StaticResource SuccessBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Type}" Value="Binary">
+                    <Setter Property="Foreground" Value="{StaticResource WarningBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Type}" Value="Ping">
+                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Type}" Value="Pong">
+                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Type}" Value="Close">
+                    <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="WebSocketFrameAccentStyle" TargetType="Border">
+            <Setter Property="Background" Value="#6AA6FF" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Icon}" Value="上行">
+                    <Setter Property="Background" Value="#34B36B" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Icon}" Value="下行">
+                    <Setter Property="Background" Value="#4D7FFF" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Type}" Value="Binary">
+                    <Setter Property="Background" Value="#E8A23B" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Type}" Value="Ping">
+                    <Setter Property="Background" Value="#5F8DF6" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Type}" Value="Pong">
+                    <Setter Property="Background" Value="#4D7FFF" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Type}" Value="Close">
+                    <Setter Property="Background" Value="#E66C73" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Icon}" Value="websocket_connect">
+                    <Setter Property="Background" Value="#9367F0" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Icon}" Value="websocket_close">
+                    <Setter Property="Background" Value="#E66C73" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="WebSocketFrameGroupBadgeStyle" TargetType="Border">
+            <Setter Property="Background" Value="#F3F6FA" />
+            <Setter Property="BorderBrush" Value="#E2E8F0" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Type}" Value="Text">
+                    <Setter Property="Background" Value="#F0FAF5" />
+                    <Setter Property="BorderBrush" Value="#D2ECDD" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Type}" Value="Binary">
+                    <Setter Property="Background" Value="#FFF7E9" />
+                    <Setter Property="BorderBrush" Value="#FFE2B7" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Type}" Value="Ping">
+                    <Setter Property="Background" Value="#EEF4FF" />
+                    <Setter Property="BorderBrush" Value="#D8E7FF" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Type}" Value="Pong">
+                    <Setter Property="Background" Value="#EEF4FF" />
+                    <Setter Property="BorderBrush" Value="#D8E7FF" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Type}" Value="Close">
+                    <Setter Property="Background" Value="#FDECEC" />
+                    <Setter Property="BorderBrush" Value="#F7CDCF" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="WebSocketInfoChipBorderStyle" TargetType="Border">
+            <Setter Property="Margin" Value="0,0,8,8" />
+            <Setter Property="Padding" Value="10,5" />
+            <Setter Property="Background" Value="{StaticResource SurfaceAltBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource DividerBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+        </Style>
+
+        <Style x:Key="WebSocketSideSectionStyle" TargetType="Border">
+            <Setter Property="Margin" Value="0,0,0,12" />
+            <Setter Property="Padding" Value="12" />
+            <Setter Property="Background" Value="{StaticResource SurfaceAltBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource DividerBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+        </Style>
+
+        <Style x:Key="SearchChipButtonStyle" TargetType="Button" BasedOn="{StaticResource ToolbarButtonStyle}">
+            <Setter Property="Margin" Value="0,0,6,6" />
+            <Setter Property="Padding" Value="9,4" />
+            <Setter Property="MinHeight" Value="26" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+            <Setter Property="Background" Value="#F7FAFD" />
+            <Setter Property="BorderBrush" Value="#E3EAF4" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border x:Name="SummaryPanel"
+                Grid.Row="0"
+                Margin="0,0,0,10"
+                Padding="12,10"
+                Background="{StaticResource SurfaceAltBrush}"
+                BorderBrush="{StaticResource DividerBrush}"
+                BorderThickness="1"
+                CornerRadius="10">
+            <DockPanel LastChildFill="False">
+                <StackPanel Orientation="Horizontal">
+                    <Border Padding="10,5"
+                            Background="{StaticResource SurfaceBrush}"
+                            BorderBrush="{StaticResource DividerBrush}"
+                            BorderThickness="1"
+                            CornerRadius="9">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource CaptionTextStyle}" Text="总帧" />
+                            <TextBlock x:Name="TotalFramesTextBlock"
+                                       Margin="8,0,0,0"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       FontWeight="SemiBold"
+                                       Text="0" />
+                        </StackPanel>
+                    </Border>
+                    <Border Margin="8,0,0,0"
+                            Padding="10,5"
+                            Background="#EAF8F1"
+                            BorderBrush="#CBE9D8"
+                            BorderThickness="1"
+                            CornerRadius="9">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource CaptionTextStyle}" Text="上行" />
+                            <TextBlock x:Name="UpstreamFramesTextBlock"
+                                       Margin="8,0,0,0"
+                                       Foreground="{StaticResource SuccessBrush}"
+                                       FontWeight="SemiBold"
+                                       Text="0" />
+                        </StackPanel>
+                    </Border>
+                    <Border Margin="8,0,0,0"
+                            Padding="10,5"
+                            Background="#EEF4FF"
+                            BorderBrush="#D8E7FF"
+                            BorderThickness="1"
+                            CornerRadius="9">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource CaptionTextStyle}" Text="下行" />
+                            <TextBlock x:Name="DownstreamFramesTextBlock"
+                                       Margin="8,0,0,0"
+                                       Foreground="{StaticResource AccentBrush}"
+                                       FontWeight="SemiBold"
+                                       Text="0" />
+                        </StackPanel>
+                    </Border>
+                    <Border Margin="8,0,0,0"
+                            Padding="10,5"
+                            Background="#ECFDF3"
+                            BorderBrush="#CFEEDB"
+                            BorderThickness="1"
+                            CornerRadius="9">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource CaptionTextStyle}" Text="文本帧" />
+                            <TextBlock x:Name="TextFramesTextBlock"
+                                       Margin="8,0,0,0"
+                                       Foreground="{StaticResource SuccessBrush}"
+                                       FontWeight="SemiBold"
+                                       Text="0" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <TextBlock DockPanel.Dock="Right"
+                           VerticalAlignment="Center"
+                           Style="{StaticResource CaptionTextStyle}"
+                           Text="控制帧专用展示 / Protobuf 解析 / 编辑重放" />
+            </DockPanel>
+        </Border>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="FlowColumn" Width="336" />
+                <ColumnDefinition x:Name="SplitterColumn" Width="10" />
+                <ColumnDefinition x:Name="InspectorColumn" Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border x:Name="FlowPanel"
+                    Grid.Column="0"
+                    Background="{StaticResource SurfaceBrush}"
+                    BorderBrush="{StaticResource DividerBrush}"
+                    BorderThickness="1"
+                    CornerRadius="10">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Border Margin="10,10,10,6"
+                            Padding="10,7"
+                            Background="{StaticResource SurfaceAltBrush}"
+                            BorderBrush="{StaticResource DividerBrush}"
+                            BorderThickness="1"
+                            CornerRadius="10">
+                        <DockPanel LastChildFill="False">
+                            <TextBlock VerticalAlignment="Center"
+                                       Style="{StaticResource SectionTitleTextStyle}"
+                                       Text="消息流" />
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                <Button x:Name="SearchToggleButton"
+                                        Margin="0,0,8,0"
+                                        Style="{StaticResource HeaderIconButtonStyle}"
+                                        ToolTip="搜索 / 筛选 (Ctrl+F)"
+                                        Visibility="Collapsed"
+                                        Click="ToggleSearchPopup_Click">
+                                    <Grid Width="14" Height="14">
+                                        <TextBlock x:Name="SearchToggleGlyphTextBlock"
+                                                   Style="{StaticResource GlyphTextStyle}"
+                                                   Text="&#xE721;" />
+                                        <Ellipse x:Name="SearchActiveDot"
+                                                 Width="6"
+                                                 Height="6"
+                                                 Margin="0,0,-2,-2"
+                                                 HorizontalAlignment="Right"
+                                                 VerticalAlignment="Bottom"
+                                                 Fill="{StaticResource AccentBrush}"
+                                                 Visibility="Collapsed" />
+                                    </Grid>
+                                </Button>
+                                <Border Padding="10,4"
+                                        Background="{StaticResource AccentSoftBrush}"
+                                        BorderBrush="{StaticResource DividerBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="8">
+                                    <TextBlock x:Name="FlowSummaryTextBlock"
+                                               Foreground="{StaticResource AccentBrush}"
+                                               FontWeight="SemiBold"
+                                               Text="0 帧" />
+                                </Border>
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+
+                    <Grid Grid.Row="1">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="30" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <Border Grid.Row="0"
+                                Margin="8,0,8,0"
+                                Padding="10,0"
+                                Background="#F7FAFD"
+                                BorderBrush="{StaticResource DividerBrush}"
+                                BorderThickness="1,1,1,0"
+                                CornerRadius="8,8,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="66" />
+                                    <ColumnDefinition Width="104" />
+                                    <ColumnDefinition Width="60" />
+                                    <ColumnDefinition Width="70" />
+                                    <ColumnDefinition Width="82" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource WebSocketFlowHeaderTextStyle}" Text="#" />
+                                <TextBlock Grid.Column="1" Style="{StaticResource WebSocketFlowHeaderTextStyle}" Text="时间" />
+                                <TextBlock Grid.Column="2" Style="{StaticResource WebSocketFlowHeaderTextStyle}" Text="方向" />
+                                <TextBlock Grid.Column="3" Style="{StaticResource WebSocketFlowHeaderTextStyle}" Text="类型" />
+                                <TextBlock Grid.Column="4" Style="{StaticResource WebSocketFlowHeaderTextStyle}" Text="长度" />
+                                <TextBlock Grid.Column="5" Style="{StaticResource WebSocketFlowHeaderTextStyle}" Text="消息摘要" />
+                            </Grid>
+                        </Border>
+
+                        <ListBox x:Name="FramesList"
+                                 Grid.Row="1"
+                                 Margin="8,0,8,8"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 ItemContainerStyle="{StaticResource WebSocketFrameItemStyle}"
+                                 PreviewMouseRightButtonDown="FramesList_PreviewMouseRightButtonDown"
+                                 ScrollViewer.CanContentScroll="True"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 SelectionChanged="FramesList_SelectionChanged">
+                            <ListBox.ContextMenu>
+                                <ContextMenu Opened="FramesContextMenu_Opened">
+                                    <MenuItem x:Name="CopyFrameSummaryMenuItem" Header="复制帧摘要" Click="CopySelectedFrameSummary_Click" />
+                                    <MenuItem x:Name="CopyFrameTextMenuItem" Header="复制消息文本" Click="CopySelectedFrameText_Click" />
+                                    <MenuItem x:Name="CopyFrameJsonMenuItem" Header="复制 JSON" Click="CopySelectedFrameJson_Click" />
+                                    <MenuItem x:Name="CopyFrameHexMenuItem" Header="复制消息 HEX" Click="CopySelectedFrameHex_Click" />
+                                    <Separator />
+                                    <MenuItem x:Name="JumpToLatestMenuItem" Header="定位到最新消息" Click="JumpToLatest_Click" />
+                                </ContextMenu>
+                            </ListBox.ContextMenu>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate DataType="{x:Type models:SocketEntry}">
+                                    <Border BorderBrush="{Binding SearchBorderBrush}"
+                                            BorderThickness="0,0,0,1">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="{Binding CardBackground}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                                        <Setter Property="Background" Value="#F7FAFE" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                                        <Setter Property="Background" Value="#EEF4FF" />
+                                                        <Setter Property="BorderBrush" Value="#D7E4FB" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <Grid Height="38" Margin="10,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="66" />
+                                                <ColumnDefinition Width="104" />
+                                                <ColumnDefinition Width="60" />
+                                                <ColumnDefinition Width="70" />
+                                                <ColumnDefinition Width="82" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Style="{StaticResource WebSocketFlowMonoCellTextStyle}"
+                                                       Text="{Binding CompactIndex}" />
+                                            <TextBlock Grid.Column="1"
+                                                       Style="{StaticResource WebSocketFlowMonoCellTextStyle}"
+                                                       Text="{Binding TimeLabel}" />
+                                            <TextBlock Grid.Column="2"
+                                                       Style="{StaticResource WebSocketFlowDirectionTextStyle}"
+                                                       Text="{Binding DirectionLabel}" />
+                                            <TextBlock Grid.Column="3"
+                                                       Style="{StaticResource WebSocketFlowTypeTextStyle}"
+                                                       Text="{Binding FlowTypeLabel}" />
+                                            <TextBlock Grid.Column="4"
+                                                       Style="{StaticResource WebSocketFlowMonoCellTextStyle}"
+                                                       Text="{Binding LengthLabel}" />
+                                            <TextBlock Grid.Column="5"
+                                                       Style="{StaticResource WebSocketFlowCellTextStyle}"
+                                                       ToolTip="{Binding PreviewText}"
+                                                       TextTrimming="CharacterEllipsis">
+                                                <TextBlock.Inlines>
+                                                    <Run Text="{Binding FrameTitle, Mode=OneWay}" FontWeight="SemiBold" />
+                                                    <Run Foreground="{StaticResource TextSecondaryBrush}" Text=" · " />
+                                                    <Run Foreground="{StaticResource TextSecondaryBrush}" Text="{Binding PreviewText, Mode=OneWay}" />
+                                                </TextBlock.Inlines>
+                                            </TextBlock>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <Border x:Name="FramesEmptyPanel"
+                                Grid.RowSpan="2"
+                                Margin="8,0,8,8"
+                                Background="#F8FAFD"
+                                CornerRadius="10"
+                                IsHitTestVisible="False">
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock HorizontalAlignment="Center"
+                                           FontFamily="Segoe MDL2 Assets"
+                                           FontSize="22"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Text="&#xE701;" />
+                                <TextBlock x:Name="FramesEmptyTitleTextBlock"
+                                           Margin="0,8,0,0"
+                                           HorizontalAlignment="Center"
+                                           Style="{StaticResource CaptionTextStyle}"
+                                           Text="暂无 WebSocket 消息" />
+                                <TextBlock x:Name="FramesEmptyHintTextBlock"
+                                           Margin="0,6,0,0"
+                                           HorizontalAlignment="Center"
+                                           Style="{StaticResource CaptionTextStyle}"
+                                           Text="等待消息进入列表" />
+                                </StackPanel>
+                        </Border>
+
+                        <Border x:Name="SearchFlyoutPanel"
+                                Grid.RowSpan="2"
+                                Width="328"
+                                Margin="0,8,8,0"
+                                Padding="10"
+                                Panel.ZIndex="20"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Top"
+                                Background="{StaticResource SurfaceBrush}"
+                                BorderBrush="{StaticResource DividerBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10"
+                                Visibility="Collapsed">
+                            <StackPanel>
+                                <DockPanel LastChildFill="False">
+                                    <StackPanel>
+                                        <TextBlock VerticalAlignment="Center"
+                                                   Style="{StaticResource SectionTitleTextStyle}"
+                                                   Text="快速筛选" />
+                                        <TextBlock Margin="0,3,0,0"
+                                                   Style="{StaticResource CaptionTextStyle}"
+                                                   Text="只在需要时展开，不占用消息流高度" />
+                                    </StackPanel>
+                                    <StackPanel DockPanel.Dock="Right"
+                                                Orientation="Horizontal"
+                                                VerticalAlignment="Top">
+                                        <Border Margin="0,0,8,0"
+                                                Padding="8,3"
+                                                Background="#F7FAFD"
+                                                BorderBrush="#E3EAF4"
+                                                BorderThickness="1"
+                                                CornerRadius="7">
+                                            <TextBlock Style="{StaticResource CaptionTextStyle}" Text="Ctrl+F" />
+                                        </Border>
+                                        <Button Style="{StaticResource HeaderIconButtonStyle}"
+                                                Click="CloseSearchPopup_Click">
+                                            <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE711;" />
+                                        </Button>
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Background="{StaticResource SurfaceAltBrush}"
+                                            BorderBrush="{StaticResource DividerBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="8">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Margin="10,0,8,0"
+                                                       VerticalAlignment="Center"
+                                                       FontFamily="Segoe MDL2 Assets"
+                                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                                       Text="&#xE721;" />
+                                            <Grid Grid.Column="1">
+                                                <TextBox x:Name="SearchTextBox"
+                                                         Padding="0,8,8,8"
+                                                         Background="Transparent"
+                                                         BorderThickness="0"
+                                                         TextChanged="SearchTextBox_TextChanged" />
+                                                <TextBlock Margin="0,0,8,0"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                                           IsHitTestVisible="False"
+                                                           Text="搜索内容 / 时间 / opcode / 序号">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Text, ElementName=SearchTextBox}" Value="">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Grid>
+                                        </Grid>
+                                    </Border>
+                                    <Button Grid.Column="1"
+                                            Margin="8,0,0,0"
+                                            Style="{StaticResource HeaderIconButtonStyle}"
+                                            ToolTip="清空搜索"
+                                            Click="ClearFilters_Click">
+                                        <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE894;" />
+                                    </Button>
+                                </Grid>
+
+                                <TextBlock Margin="0,10,0,0"
+                                           Style="{StaticResource CaptionTextStyle}"
+                                           Text="消息类型" />
+                                <WrapPanel Margin="0,6,0,0">
+                                    <ToggleButton x:Name="AllFilterButton"
+                                                  Tag="All"
+                                                  IsChecked="True"
+                                                  MinHeight="26"
+                                                  Padding="9,4"
+                                                  FontSize="12"
+                                                  Style="{StaticResource SegmentedToggleButtonStyle}"
+                                                  Click="KindFilterToggle_Click"
+                                                  Content="全部" />
+                                    <ToggleButton x:Name="TextFilterButton"
+                                                  Tag="Text"
+                                                  MinHeight="26"
+                                                  Padding="9,4"
+                                                  FontSize="12"
+                                                  Style="{StaticResource SegmentedToggleButtonStyle}"
+                                                  Click="KindFilterToggle_Click"
+                                                  Content="文本帧" />
+                                    <ToggleButton x:Name="BinaryFilterButton"
+                                                  Tag="Binary"
+                                                  MinHeight="26"
+                                                  Padding="9,4"
+                                                  FontSize="12"
+                                                  Style="{StaticResource SegmentedToggleButtonStyle}"
+                                                  Click="KindFilterToggle_Click"
+                                                  Content="二进制" />
+                                    <ToggleButton x:Name="ControlFilterButton"
+                                                  Tag="Control"
+                                                  MinHeight="26"
+                                                  Padding="9,4"
+                                                  FontSize="12"
+                                                  Style="{StaticResource SegmentedToggleButtonStyle}"
+                                                  Click="KindFilterToggle_Click"
+                                                  Content="控制帧" />
+                                </WrapPanel>
+
+                                <TextBlock Margin="0,10,0,0"
+                                           Style="{StaticResource CaptionTextStyle}"
+                                           Text="方向 / 快捷条件" />
+                                <WrapPanel Margin="0,6,0,0">
+                                    <ToggleButton x:Name="SendDirectionFilterButton"
+                                                  Tag="Send"
+                                                  MinHeight="26"
+                                                  Padding="9,4"
+                                                  FontSize="12"
+                                                  Style="{StaticResource SegmentedToggleButtonStyle}"
+                                                  Click="DirectionFilterToggle_Click"
+                                                  Content="发送" />
+                                    <ToggleButton x:Name="ReceiveDirectionFilterButton"
+                                                  Tag="Receive"
+                                                  MinHeight="26"
+                                                  Padding="9,4"
+                                                  FontSize="12"
+                                                  Style="{StaticResource SegmentedToggleButtonStyle}"
+                                                  Click="DirectionFilterToggle_Click"
+                                                  Content="接收" />
+                                    <ToggleButton x:Name="ManualReplayFilterButton"
+                                                  Tag="Manual"
+                                                  MinHeight="26"
+                                                  Padding="9,4"
+                                                  FontSize="12"
+                                                  Style="{StaticResource SegmentedToggleButtonStyle}"
+                                                  Click="QuickFilterToggle_Click"
+                                                  Content="手动重放" />
+                                    <ToggleButton x:Name="NonEmptyFilterButton"
+                                                  Tag="NonEmpty"
+                                                  MinHeight="26"
+                                                  Padding="9,4"
+                                                  FontSize="12"
+                                                  Style="{StaticResource SegmentedToggleButtonStyle}"
+                                                  Click="QuickFilterToggle_Click"
+                                                  Content="有载荷" />
+                                </WrapPanel>
+
+                                <StackPanel x:Name="RecentSearchPanel"
+                                            Margin="0,10,0,0"
+                                            Visibility="Collapsed">
+                                    <DockPanel LastChildFill="False">
+                                        <TextBlock VerticalAlignment="Center"
+                                                   Style="{StaticResource CaptionTextStyle}"
+                                                   Text="最近搜索" />
+                                        <Button DockPanel.Dock="Right"
+                                                Padding="8,2"
+                                                Style="{StaticResource SearchChipButtonStyle}"
+                                                Click="ClearRecentSearch_Click"
+                                                Content="清空" />
+                                    </DockPanel>
+                                    <WrapPanel x:Name="RecentSearchWrapPanel"
+                                               Margin="0,6,0,0" />
+                                </StackPanel>
+
+                                <Border Margin="0,10,0,0"
+                                        Padding="10,8"
+                                        Background="#F8FAFD"
+                                        BorderBrush="#E8EEF6"
+                                        BorderThickness="1"
+                                        CornerRadius="8">
+                                    <StackPanel>
+                                        <TextBlock x:Name="FilterStateTextBlock"
+                                                   Style="{StaticResource CaptionTextStyle}"
+                                                   Text="当前显示全部消息" />
+                                        <TextBlock x:Name="SearchHintTextBlock"
+                                                   Margin="0,4,0,0"
+                                                   Style="{StaticResource CaptionTextStyle}"
+                                                   Text="Enter 记录搜索，Esc 关闭面板" />
+                                    </StackPanel>
+                                </Border>
+
+                                <DockPanel Margin="0,10,0,0" LastChildFill="False">
+                                    <TextBlock VerticalAlignment="Center"
+                                               Style="{StaticResource CaptionTextStyle}"
+                                               Text="筛选会实时更新消息流" />
+                                    <Button DockPanel.Dock="Right"
+                                            Padding="10,4"
+                                            Click="CloseSearchPopup_Click"
+                                            Content="完成" />
+                                </DockPanel>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <GridSplitter x:Name="FlowInspectorSplitter"
+                          Grid.Column="1"
+                          Width="10"
+                          HorizontalAlignment="Stretch" />
+
+            <Border x:Name="InspectorPanel"
+                    Grid.Column="2"
+                    Background="{StaticResource SurfaceBrush}"
+                    BorderBrush="{StaticResource DividerBrush}"
+                    BorderThickness="1"
+                    CornerRadius="10">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="38" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0"
+                            Background="{StaticResource SurfaceAltBrush}"
+                            BorderBrush="{StaticResource DividerBrush}"
+                            BorderThickness="0,0,0,1"
+                            CornerRadius="10,10,0,0">
+                        <Grid x:Name="SelectedMetaPanel" Margin="12,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <Grid VerticalAlignment="Center"
+                                  ClipToBounds="True">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="SelectedTitleTextBlock"
+                                           VerticalAlignment="Center"
+                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           TextTrimming="CharacterEllipsis"
+                                           Text="请选择一条消息" />
+                                <TextBlock x:Name="SelectedSubtitleTextBlock"
+                                           Grid.Column="1"
+                                           Margin="10,1,0,0"
+                                           VerticalAlignment="Center"
+                                           Style="{StaticResource CaptionTextStyle}"
+                                           TextTrimming="CharacterEllipsis"
+                                           Text="下方显示完整消息内容与重放操作" />
+                            </Grid>
+
+                            <StackPanel Grid.Column="1"
+                                         Orientation="Horizontal"
+                                         VerticalAlignment="Center">
+                                <Border x:Name="SelectedDirectionBadge"
+                                        Margin="8,0,6,0"
+                                        Padding="7,1"
+                                        Style="{StaticResource WebSocketDirectionBadgeBorderStyle}">
+                                    <TextBlock x:Name="SelectedDirectionTextBlock"
+                                               Style="{StaticResource WebSocketDirectionBadgeTextStyle}"
+                                               Text="消息" />
+                                </Border>
+                                <Border x:Name="SelectedTypeBadge"
+                                        Margin="0,0,6,0"
+                                        Padding="7,1"
+                                        Style="{StaticResource WebSocketTypeBadgeBorderStyle}">
+                                    <TextBlock x:Name="SelectedTypeTextBlock"
+                                               Style="{StaticResource WebSocketTypeBadgeTextStyle}"
+                                               Text="Text" />
+                                </Border>
+                                <Border Padding="7,1"
+                                        Background="{StaticResource SurfaceBrush}"
+                                        BorderBrush="{StaticResource DividerBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="8">
+                                    <TextBlock x:Name="SelectedLengthTextBlock"
+                                               Style="{StaticResource CaptionTextStyle}"
+                                               Text="0 B" />
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Grid Grid.Row="1" MinHeight="0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" MaxHeight="250" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <Border Grid.Row="0"
+                                Margin="10,5,10,4"
+                                Padding="8,5"
+                                Background="{StaticResource SurfaceAltBrush}"
+                                BorderBrush="{StaticResource DividerBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <DockPanel LastChildFill="True">
+                                    <TextBlock DockPanel.Dock="Left"
+                                               Margin="0,0,6,0"
+                                               VerticalAlignment="Center"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               Text="消息类型" />
+                                    <WrapPanel>
+                                        <Border Style="{StaticResource WebSocketCompactChipBorderStyle}">
+                                            <TextBlock x:Name="PayloadKindTextBlock"
+                                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                                       Text="消息类型 · 待选择" />
+                                        </Border>
+                                        <Border Style="{StaticResource WebSocketCompactChipBorderStyle}">
+                                            <TextBlock x:Name="PayloadPreviewModeTextBlock"
+                                                       Foreground="{StaticResource AccentBrush}"
+                                                       Text="预览模式 · 待选择" />
+                                        </Border>
+                                        <Border Style="{StaticResource WebSocketCompactChipBorderStyle}">
+                                            <TextBlock x:Name="PayloadStatusTextBlock"
+                                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                                       Text="载荷状态 · 等待选择" />
+                                        </Border>
+                                    </WrapPanel>
+                                </DockPanel>
+
+                                <TextBlock x:Name="PayloadHintTextBlock"
+                                           Grid.Row="1"
+                                           Margin="0,0,0,0"
+                                           Style="{StaticResource CaptionTextStyle}"
+                                           Text="选择消息后查看内容、修改并重放。"
+                                           TextTrimming="CharacterEllipsis" />
+
+                                <Border x:Name="SpecialFrameCard"
+                                        Grid.Row="2"
+                                        Margin="0,4,0,0"
+                                        Padding="6,5"
+                                        Background="{StaticResource SurfaceBrush}"
+                                        BorderBrush="{StaticResource DividerBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="8"
+                                        Visibility="Collapsed">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border x:Name="SpecialFrameIconBorder"
+                                                Width="38"
+                                                Height="38"
+                                                Background="#EEF4FF"
+                                                BorderBrush="#D8E7FF"
+                                                BorderThickness="1"
+                                                CornerRadius="8">
+                                            <TextBlock x:Name="SpecialFrameGlyphTextBlock"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{StaticResource AccentBrush}"
+                                                       FontFamily="Consolas, Microsoft YaHei UI"
+                                                       FontSize="11"
+                                                       FontWeight="Bold"
+                                                       Text="PING" />
+                                        </Border>
+
+                                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                            <TextBlock x:Name="SpecialFrameTitleTextBlock"
+                                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                                       FontWeight="SemiBold"
+                                                       Text="控制帧" />
+                                            <TextBlock x:Name="SpecialFrameDescriptionTextBlock"
+                                                       Margin="0,2,0,0"
+                                                       Style="{StaticResource CaptionTextStyle}"
+                                                       Text="当前帧会在这里显示专用说明。"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <WrapPanel Margin="0,3,0,0">
+                                                <Border Style="{StaticResource WebSocketCompactChipBorderStyle}">
+                                                    <TextBlock x:Name="SpecialFrameChipOneTextBlock"
+                                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                                               Text="字段一" />
+                                                </Border>
+                                                <Border Style="{StaticResource WebSocketCompactChipBorderStyle}">
+                                                    <TextBlock x:Name="SpecialFrameChipTwoTextBlock"
+                                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                                               Text="字段二" />
+                                                </Border>
+                                                <Border Style="{StaticResource WebSocketCompactChipBorderStyle}">
+                                                    <TextBlock x:Name="SpecialFrameChipThreeTextBlock"
+                                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                                               Text="字段三" />
+                                                </Border>
+                                            </WrapPanel>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <Border Grid.Row="1"
+                                Margin="10,0,10,8"
+                                Padding="8"
+                                Background="{StaticResource SurfaceBrush}"
+                                BorderBrush="{StaticResource DividerBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8">
+                            <Grid MinHeight="0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <TextBlock FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           Text="消息内容" />
+                                <Grid Grid.Row="1"
+                                      MinHeight="0"
+                                      Margin="0,8,0,0">
+                                    <Grid x:Name="PayloadEmptyPanel">
+                                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock HorizontalAlignment="Center"
+                                                       FontFamily="Segoe MDL2 Assets"
+                                                       FontSize="22"
+                                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                                       Text="&#xE70F;" />
+                                            <TextBlock Margin="0,8,0,0"
+                                                       HorizontalAlignment="Center"
+                                                       Style="{StaticResource SectionTitleTextStyle}"
+                                                       Text="选择消息查看详情" />
+                                            <TextBlock Margin="0,4,0,0"
+                                                       HorizontalAlignment="Center"
+                                                       Style="{StaticResource CaptionTextStyle}"
+                                                       Text="支持原文、JSON、Protobuf 和 HEX 预览" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <TabControl x:Name="PayloadTabs"
+                                                ItemContainerStyle="{StaticResource WebSocketPayloadSideTabItemStyle}"
+                                                Style="{StaticResource WebSocketPayloadSideTabControlStyle}"
+                                                Visibility="Collapsed">
+                                        <TabItem x:Name="PayloadRawTab" Header="原文">
+                                            <controls:HttpSyntaxTextBox x:Name="PayloadRawViewer"
+                                                                        HorizontalScrollBarVisibility="Disabled"
+                                                                        HighlightMode="Body">
+                                                <controls:HttpSyntaxTextBox.ContextMenu>
+                                                    <ContextMenu Opened="PayloadContextMenu_Opened">
+                                                        <MenuItem x:Name="CopyCurrentTextMenuItem" Header="复制当前文本" Click="CopySelectedFrameText_Click" />
+                                                        <MenuItem x:Name="CopyCurrentJsonMenuItem" Header="复制当前 JSON" Click="CopySelectedFrameJson_Click" />
+                                                        <MenuItem x:Name="CopyCurrentHexMenuItem" Header="复制当前 HEX" Click="CopySelectedFrameHex_Click" />
+                                                    </ContextMenu>
+                                                </controls:HttpSyntaxTextBox.ContextMenu>
+                                            </controls:HttpSyntaxTextBox>
+                                        </TabItem>
+                                        <TabItem x:Name="PayloadJsonTab" Header="JSON视图">
+                                            <controls:JsonTreeViewControl x:Name="PayloadJsonViewer" />
+                                        </TabItem>
+                                        <TabItem x:Name="PayloadProtobufTab" Header="Protobuf">
+                                            <Grid>
+                                                <controls:JsonTreeViewControl x:Name="PayloadProtobufViewer" />
+                                                <Border x:Name="PayloadProtobufEmptyPanel"
+                                                        Background="#F8FAFD"
+                                                        IsHitTestVisible="False">
+                                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                        <TextBlock HorizontalAlignment="Center"
+                                                                   FontFamily="Segoe MDL2 Assets"
+                                                                   FontSize="22"
+                                                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                                                   Text="&#xE943;" />
+                                                        <TextBlock x:Name="PayloadProtobufStatusTextBlock"
+                                                                   Margin="0,8,0,0"
+                                                                   HorizontalAlignment="Center"
+                                                                   Style="{StaticResource CaptionTextStyle}"
+                                                                   Text="点击下方“解析 Protobuf”开始解析当前载荷" />
+                                                    </StackPanel>
+                                                </Border>
+                                            </Grid>
+                                        </TabItem>
+                                        <TabItem x:Name="PayloadHexTab" Header="HEX视图">
+                                            <controls:HexViewControl x:Name="PayloadHexViewer"
+                                                                     EmptyText="当前消息无二进制内容" />
+                                        </TabItem>
+                                    </TabControl>
+                                </Grid>
+                            </Grid>
+                        </Border>
+
+                        <Border Grid.Row="2"
+                                Margin="10,0,10,8"
+                                Padding="8"
+                                Background="{StaticResource SurfaceAltBrush}"
+                                BorderBrush="{StaticResource DividerBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <DockPanel LastChildFill="False">
+                                    <TextBlock VerticalAlignment="Center"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               Text="消息重放" />
+                                    <StackPanel DockPanel.Dock="Right"
+                                                Orientation="Horizontal"
+                                                VerticalAlignment="Center">
+                                        <Button MinHeight="26"
+                                                Padding="10,3"
+                                                Content="回填当前帧"
+                                                Click="FillFromSelectedFrame_Click" />
+                                        <Button Margin="8,0,0,0"
+                                                MinHeight="26"
+                                                Padding="10,3"
+                                                Content="发送重放"
+                                                Click="ReplaySend_Click" />
+                                    </StackPanel>
+                                </DockPanel>
+
+                                    <Grid Grid.Row="1" Margin="0,8,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="2*" />
+                                            <ColumnDefinition Width="10" />
+                                            <ColumnDefinition Width="228" />
+                                        </Grid.ColumnDefinitions>
+
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel>
+                                            <TextBlock Style="{StaticResource CaptionTextStyle}" Text="方向" />
+                                            <ComboBox x:Name="ReplayDirectionComboBox"
+                                                      Margin="0,4,0,0">
+                                                <ComboBoxItem Content="发送到服务端" Tag="Server" />
+                                                <ComboBoxItem Content="发送到客户端" Tag="Client" />
+                                            </ComboBox>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Style="{StaticResource CaptionTextStyle}" Text="类型" />
+                                            <ComboBox x:Name="ReplayWsTypeComboBox"
+                                                      Margin="0,4,0,0"
+                                                      SelectionChanged="ReplayWsTypeComboBox_SelectionChanged">
+                                                <ComboBoxItem Content="Text" Tag="Text" />
+                                                <ComboBoxItem Content="Binary" Tag="Binary" />
+                                                <ComboBoxItem Content="Ping" Tag="Ping" />
+                                                <ComboBoxItem Content="Pong" Tag="Pong" />
+                                                <ComboBoxItem Content="Close" Tag="Close" />
+                                            </ComboBox>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="4">
+                                            <TextBlock Style="{StaticResource CaptionTextStyle}" Text="编码" />
+                                            <ComboBox x:Name="ReplayEncodingComboBox"
+                                                      Margin="0,4,0,0"
+                                                      SelectionChanged="ReplayEncodingComboBox_SelectionChanged">
+                                                <ComboBoxItem Content="UTF8 文本" Tag="UTF8" />
+                                                <ComboBoxItem Content="HEX" Tag="HEX" />
+                                                <ComboBoxItem Content="Base64" Tag="Base64" />
+                                                <ComboBoxItem Content="GBK 文本" Tag="GBK" />
+                                            </ComboBox>
+                                        </StackPanel>
+
+                                        <TextBlock x:Name="ReplayHintTextBlock"
+                                                   Grid.Row="1"
+                                                   Grid.ColumnSpan="5"
+                                                   Margin="0,6,0,0"
+                                                   Style="{StaticResource CaptionTextStyle}"
+                                                   Text="文本帧默认 UTF8，二进制与控制帧默认 HEX。"
+                                                   TextTrimming="CharacterEllipsis" />
+
+                                        <TextBox x:Name="ReplayEditorTextBox"
+                                                 Grid.Row="2"
+                                                 Grid.ColumnSpan="5"
+                                                 Height="70"
+                                                 Margin="0,5,0,0"
+                                                 AcceptsReturn="True"
+                                                 AcceptsTab="True"
+                                                 FontFamily="Consolas, Microsoft YaHei UI"
+                                                 FontSize="12"
+                                                 HorizontalScrollBarVisibility="Disabled"
+                                                 TextChanged="ReplayEditorTextBox_TextChanged"
+                                                 TextWrapping="Wrap"
+                                                 VerticalScrollBarVisibility="Auto" />
+
+                                        <Border Grid.Row="3"
+                                                Grid.ColumnSpan="5"
+                                                Margin="0,4,0,0"
+                                                Padding="8,3"
+                                                Background="{StaticResource SurfaceBrush}"
+                                                BorderBrush="{StaticResource DividerBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="7">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock VerticalAlignment="Center"
+                                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                                           FontSize="12"
+                                                           Text="状态" />
+                                                <TextBlock x:Name="ReplayEditorStatusTextBlock"
+                                                           Grid.Column="1"
+                                                           Margin="8,0,8,0"
+                                                           VerticalAlignment="Center"
+                                                           Style="{StaticResource CaptionTextStyle}"
+                                                           Text="等待选择消息后填充编辑区。"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <TextBlock x:Name="ReplayActionStatusTextBlock"
+                                                           Grid.Column="2"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{StaticResource AccentBrush}"
+                                                           FontSize="12"
+                                                           Text=""
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </Grid>
+                                        </Border>
+                                    </Grid>
+
+                                    <Border Grid.Column="2"
+                                            Padding="8"
+                                            Background="{StaticResource SurfaceBrush}"
+                                            BorderBrush="{StaticResource DividerBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="8">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+
+                                            <DockPanel LastChildFill="False">
+                                                <TextBlock VerticalAlignment="Center"
+                                                           FontSize="12"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                                           Text="Protobuf" />
+                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                                    <Button MinHeight="26"
+                                                            Padding="7,2"
+                                                            Content="解析"
+                                                            Click="ParseProtobuf_Click" />
+                                                    <Button Margin="6,0,0,0"
+                                                            MinHeight="26"
+                                                            Padding="7,2"
+                                                            Content="清空"
+                                                            Click="ClearProtobuf_Click" />
+                                                </StackPanel>
+                                            </DockPanel>
+
+                                            <Grid Grid.Row="1" Margin="0,8,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="6" />
+                                                    <ColumnDefinition Width="28" />
+                                                    <ColumnDefinition Width="6" />
+                                                    <ColumnDefinition Width="46" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox x:Name="ProtoSchemaPathTextBox"
+                                                         MinHeight="26"
+                                                         Padding="8,3"
+                                                         ToolTip="支持包含 .proto / .pb 描述文件的目录，也支持单个 .proto / .pb 文件" />
+                                                <Button Grid.Column="2"
+                                                        MinHeight="26"
+                                                        Padding="0"
+                                                        Content="…"
+                                                        ToolTip="选择目录"
+                                                        Click="BrowseProtoSchemaDirectory_Click" />
+                                                <Button Grid.Column="4"
+                                                        MinHeight="26"
+                                                        Padding="7,2"
+                                                        Content="导入"
+                                                        Click="ImportProtoSchema_Click" />
+                                            </Grid>
+
+                                            <Grid Grid.Row="2" Margin="0,6,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="42" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock VerticalAlignment="Center"
+                                                           Style="{StaticResource CaptionTextStyle}"
+                                                           Text="类型" />
+                                                <ComboBox x:Name="ProtoMessageTypeComboBox"
+                                                          Grid.Column="1"
+                                                          MinHeight="26"
+                                                          IsEditable="True"
+                                                          IsTextSearchEnabled="True"
+                                                          MaxDropDownHeight="260" />
+                                            </Grid>
+
+                                            <Grid Grid.Row="3" Margin="0,6,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="42" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock VerticalAlignment="Center"
+                                                           Style="{StaticResource CaptionTextStyle}"
+                                                           Text="跳过" />
+                                                <TextBox x:Name="ProtobufSkipTextBox"
+                                                         Grid.Column="1"
+                                                         MinHeight="26"
+                                                         Padding="8,3"
+                                                         Text="0" />
+                                            </Grid>
+
+                                            <TextBlock x:Name="ParserStatusTextBlock"
+                                                       Grid.Row="4"
+                                                       Margin="0,6,0,0"
+                                                       Style="{StaticResource CaptionTextStyle}"
+                                                       Text="可导入 .proto / .pb 结构后选择消息类型解析。"
+                                                       TextWrapping="Wrap" />
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

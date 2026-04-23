@@ -13,6 +13,11 @@
     <ZigExe>$(MSBuildThisFileDirectory)..\..\_toolchain\zig-x86_64-windows-0.15.2\zig.exe</ZigExe>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+
   <Target Name="BuildGoBackend" BeforeTargets="Build" Condition="'$(DesignTimeBuild)' != 'true'">
     <MakeDir Directories="$(TargetDir)backend" />
     <Error Condition="!Exists('$(ZigExe)')" Text="缺少 Zig 工具链：$(ZigExe)" />

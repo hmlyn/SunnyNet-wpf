@@ -6,6 +6,7 @@ namespace SunnyNet.Wpf.Models;
 public sealed class SessionDetail : ViewModelBase
 {
     private bool _hasSelection;
+    private bool _isSocketSession;
     private string _requestMethod = "";
     private string _requestUrl = "";
     private string _requestHeaders = "";
@@ -37,6 +38,7 @@ public sealed class SessionDetail : ViewModelBase
     private int _responseStateCode;
     private string _responseStateText = "";
     private string _summary = "请选择一个会话";
+    private SocketEntry? _selectedSocketEntry;
 
     public bool HasSelection
     {
@@ -224,10 +226,22 @@ public sealed class SessionDetail : ViewModelBase
         set => SetProperty(ref _responseStateText, value);
     }
 
+    public bool IsSocketSession
+    {
+        get => _isSocketSession;
+        set => SetProperty(ref _isSocketSession, value);
+    }
+
     public string Summary
     {
         get => _summary;
         set => SetProperty(ref _summary, value);
+    }
+
+    public SocketEntry? SelectedSocketEntry
+    {
+        get => _selectedSocketEntry;
+        set => SetProperty(ref _selectedSocketEntry, value);
     }
 
     public ObservableCollection<SocketEntry> SocketEntries { get; } = new();
@@ -281,7 +295,9 @@ public sealed class SessionDetail : ViewModelBase
         ResponseImageType = "";
         ResponseStateCode = 0;
         ResponseStateText = "";
+        IsSocketSession = false;
         Summary = "请选择一个会话";
+        SelectedSocketEntry = null;
         SocketEntries.Clear();
         RequestHeaderRows.Clear();
         RequestQueryRows.Clear();

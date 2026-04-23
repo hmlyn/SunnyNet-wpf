@@ -40,6 +40,13 @@ func GetWorkingState() bool {
 	return A
 }
 
+func errorText(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
 func event(command string, args *JSON.SyJson) any {
 	switch command {
 	case "设置断点模式":
@@ -674,7 +681,7 @@ func event(command string, args *JSON.SyJson) any {
 			} else if SendType == "GBK" {
 				_Bytes = Utf8ToGBK(_tmp1)
 			}
-			if len(_Bytes) < 1 {
+			if len(_Bytes) < 1 && !IsWs {
 				CallJs("弹出错误提示", "发送失败:无有效的发送的数据")
 				return false
 			}
@@ -707,6 +714,12 @@ func event(command string, args *JSON.SyJson) any {
 			MessageType := 2
 			if wsType == "Text" {
 				MessageType = 1
+			} else if wsType == "Close" {
+				MessageType = 8
+			} else if wsType == "Ping" {
+				MessageType = 9
+			} else if wsType == "Pong" {
+				MessageType = 10
 			}
 			SendBool := false
 			if direction == "Server" {
@@ -1147,6 +1160,23 @@ func event(command string, args *JSON.SyJson) any {
 		skip := getInt(args.GetData("skip"))
 		pb := Resource.Bs64ToBs(args.GetData("Data"))
 		return _PbToJson(pb, skip)
+	case "protobufImportSchema":
+		messages, directory, err := importProtobufSchema(args.GetData("Directory"))
+		return map[string]any{
+			"Ok":        err == nil,
+			"Directory": directory,
+			"Messages":  messages,
+			"Error":     errorText(err),
+		}
+	case "protobufToJsonBySchema":
+		skip := getInt(args.GetData("skip"))
+		pb := Resource.Bs64ToBs(args.GetData("Data"))
+		jsonText, err := protobufToJsonBySchema(pb, skip, args.GetData("Directory"), args.GetData("MessageType"))
+		return map[string]any{
+			"Ok":    err == nil,
+			"Json":  jsonText,
+			"Error": errorText(err),
+		}
 	case "断点点击":
 		Theology := getInt(args.GetData("Theology"))
 		NextBreak := getInt(args.GetData("NextBreak"))

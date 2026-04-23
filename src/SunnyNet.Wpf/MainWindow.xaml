@@ -11,7 +11,8 @@
         WindowStyle="None"
         ResizeMode="CanResize"
         Background="{StaticResource WindowBackgroundBrush}"
-        Foreground="{StaticResource TextPrimaryBrush}">
+        Foreground="{StaticResource TextPrimaryBrush}"
+        PreviewKeyDown="MainWindow_PreviewKeyDown">
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="0" ResizeBorderThickness="8" CornerRadius="0" GlassFrameThickness="0" />
     </shell:WindowChrome.WindowChrome>
@@ -103,7 +104,13 @@
                                     <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="清空" />
                                 </StackPanel>
                             </Button>
-                            <Button Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}" ToolTip="清空全部过滤条件">
+                            <Button Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}" Click="Find_Click" ToolTip="搜索/查找 (Ctrl+F)">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE721;" />
+                                    <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="查找" />
+                                </StackPanel>
+                            </Button>
+                            <Button Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}" Click="ClearFilters_Click" ToolTip="清空全部过滤条件">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE71C;" />
                                     <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="清筛选" />
@@ -164,12 +171,197 @@
 
             <Grid x:Name="WorkspaceGrid" Grid.Row="2" Margin="12,0,12,12" Background="Transparent">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="3*" MinWidth="460" />
+                    <ColumnDefinition x:Name="WorkspaceSessionColumn" Width="2*" MinWidth="420" />
                     <ColumnDefinition Width="10" />
-                    <ColumnDefinition Width="2*" MinWidth="480" />
+                    <ColumnDefinition x:Name="WorkspaceDetailColumn" Width="3*" MinWidth="520" />
                 </Grid.ColumnDefinitions>
 
                 <Border x:Name="SessionListPanel" Grid.Column="0" Style="{StaticResource CardBorderStyle}">
+                    <Border.Resources>
+                        <Style x:Key="StructureLinkButtonStyle" TargetType="{x:Type Button}">
+                            <Setter Property="Background" Value="Transparent" />
+                            <Setter Property="BorderBrush" Value="Transparent" />
+                            <Setter Property="BorderThickness" Value="0" />
+                            <Setter Property="Padding" Value="2,0" />
+                            <Setter Property="Cursor" Value="Hand" />
+                            <Setter Property="Focusable" Value="False" />
+                            <Setter Property="Foreground" Value="#2AA96B" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="{x:Type Button}">
+                                        <ContentPresenter HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"
+                                                          TextElement.Foreground="{TemplateBinding Foreground}" />
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                        <Style x:Key="StructureExpanderStyle" TargetType="{x:Type Expander}">
+                            <Setter Property="Margin" Value="0,0,0,6" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="{x:Type Expander}">
+                                        <StackPanel>
+                                            <ToggleButton x:Name="HeaderSite"
+                                                          Background="Transparent"
+                                                          BorderBrush="Transparent"
+                                                          BorderThickness="0"
+                                                          Focusable="False"
+                                                          IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}"
+                                                          Padding="0,1,0,3">
+                                                <DockPanel LastChildFill="False">
+                                                    <TextBlock x:Name="Chevron"
+                                                               VerticalAlignment="Center"
+                                                               FontFamily="Segoe MDL2 Assets"
+                                                               FontSize="11"
+                                                               Foreground="#2D3C50"
+                                                               Text="&#xE70D;" />
+                                                    <ContentPresenter Margin="6,0,0,0"
+                                                                      VerticalAlignment="Center"
+                                                                      RecognizesAccessKey="True"
+                                                                      ContentSource="Header"
+                                                                      TextElement.Foreground="#24364A"
+                                                                      TextElement.FontSize="13"
+                                                                      TextElement.FontWeight="SemiBold" />
+                                                </DockPanel>
+                                            </ToggleButton>
+                                            <ContentPresenter x:Name="ExpandSite"
+                                                              Margin="14,0,0,1"
+                                                              Visibility="Collapsed"
+                                                              Focusable="False" />
+                                        </StackPanel>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger SourceName="HeaderSite" Property="IsChecked" Value="True">
+                                                <Setter TargetName="Chevron" Property="Text" Value="&#xE70E;" />
+                                                <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                        <Style x:Key="StructureListBoxItemStyle" TargetType="{x:Type ListBoxItem}">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="Margin" Value="0" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="{x:Type ListBoxItem}">
+                                        <Border x:Name="ItemBorder"
+                                                Margin="0,0,0,1"
+                                                Padding="4,2"
+                                                Background="Transparent"
+                                                BorderBrush="Transparent"
+                                                BorderThickness="0"
+                                                CornerRadius="3">
+                                            <ContentPresenter />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="ItemBorder" Property="Background" Value="#F5F8FC" />
+                                            </Trigger>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="ItemBorder" Property="Background" Value="#EAF7EF" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                        <Style x:Key="StructureListBoxStyle" TargetType="{x:Type ListBox}">
+                            <Setter Property="Background" Value="Transparent" />
+                            <Setter Property="BorderThickness" Value="0" />
+                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+                            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled" />
+                            <Setter Property="ItemContainerStyle" Value="{StaticResource StructureListBoxItemStyle}" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="{x:Type ListBox}">
+                                        <Border Background="Transparent">
+                                            <ScrollViewer Focusable="False" CanContentScroll="True">
+                                                <ItemsPresenter />
+                                            </ScrollViewer>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                        <DataTemplate x:Key="ProcessFilterItemTemplate">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="16" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock VerticalAlignment="Center"
+                                           FontFamily="Segoe MDL2 Assets"
+                                           FontSize="11"
+                                           Foreground="#8AA9C8"
+                                           Text="&#xE7F8;" />
+                                <TextBlock Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           FontSize="11"
+                                           Foreground="#6F7F93"
+                                           Text="{Binding Name}"
+                                           TextTrimming="CharacterEllipsis" />
+                            </Grid>
+                        </DataTemplate>
+                        <DataTemplate x:Key="DomainFilterItemTemplate">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="16" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock VerticalAlignment="Center"
+                                           FontFamily="Segoe MDL2 Assets"
+                                           FontSize="11"
+                                           Foreground="#8AA9C8"
+                                           Text="&#xE774;" />
+                                <TextBlock Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           FontSize="11"
+                                           Foreground="#6F7F93"
+                                           Text="{Binding Name}"
+                                           TextTrimming="CharacterEllipsis" />
+                            </Grid>
+                        </DataTemplate>
+                        <Style x:Key="FavoriteCellButtonStyle" TargetType="{x:Type Button}">
+                            <Setter Property="Background" Value="Transparent" />
+                            <Setter Property="BorderBrush" Value="Transparent" />
+                            <Setter Property="BorderThickness" Value="0" />
+                            <Setter Property="Width" Value="22" />
+                            <Setter Property="Height" Value="22" />
+                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="Cursor" Value="Hand" />
+                            <Setter Property="Focusable" Value="False" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="{x:Type Button}">
+                                        <Border x:Name="FavoriteButtonBorder"
+                                                Width="{TemplateBinding Width}"
+                                                Height="{TemplateBinding Height}"
+                                                Background="Transparent"
+                                                CornerRadius="11">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="FavoriteButtonBorder" Property="Background" Value="{StaticResource SurfaceAltBrush}" />
+                                            </Trigger>
+                                            <Trigger Property="IsPressed" Value="True">
+                                                <Setter TargetName="FavoriteButtonBorder" Property="Background" Value="{StaticResource AccentSoftBrush}" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                        <Style x:Key="SessionFavoriteHeaderStyle" TargetType="{x:Type DataGridColumnHeader}" BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
+                            <Setter Property="HorizontalContentAlignment" Value="Center" />
+                            <Setter Property="Padding" Value="0,5" />
+                        </Style>
+                    </Border.Resources>
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="48" />
@@ -223,36 +415,240 @@
                             </DockPanel>
                         </Border>
 
-                        <DataGrid x:Name="SessionsGrid"
-                                  Grid.Row="1"
-                                  Margin="0"
-                                  ItemsSource="{Binding Sessions}"
-                                  SelectedItem="{Binding SelectedSession, Mode=TwoWay}"
-                                  AutoGenerateColumns="False"
-                                  SelectionMode="Extended"
-                                  SelectionUnit="FullRow"
-                                  CanUserAddRows="False"
-                                  CanUserDeleteRows="False"
-                                  EnableRowVirtualization="True"
-                                  CellEditEnding="SessionsGrid_CellEditEnding">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn x:Name="IndexColumn" Header="序号" Binding="{Binding Index}" Width="80" IsReadOnly="True" />
-                                <DataGridTextColumn x:Name="MethodColumn" Header="方式" Binding="{Binding Method}" Width="90" IsReadOnly="True" ElementStyle="{StaticResource MethodCellTextStyle}" />
-                                <DataGridTextColumn x:Name="StateColumn" Header="状态" Binding="{Binding State}" Width="80" IsReadOnly="True" />
-                                <DataGridTextColumn x:Name="UrlColumn" Header="请求地址" Binding="{Binding Url}" Width="2*" IsReadOnly="True" />
-                                <DataGridTextColumn x:Name="LengthColumn" Header="响应长度" Binding="{Binding ResponseLength}" Width="120" IsReadOnly="True" />
-                                <DataGridTextColumn x:Name="TypeColumn" Header="响应类型" Binding="{Binding ResponseType}" Width="120" IsReadOnly="True" />
-                                <DataGridTextColumn x:Name="ProcessColumn" Header="进程" Binding="{Binding Process}" Width="110" IsReadOnly="True" />
-                                <DataGridTextColumn x:Name="NotesColumn" Header="注释" Binding="{Binding Notes, UpdateSourceTrigger=PropertyChanged}" Width="170" />
-                            </DataGrid.Columns>
-                        </DataGrid>
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition x:Name="SessionFilterColumn" Width="190" MinWidth="164" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition x:Name="SessionTableColumn" Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0"
+                                    Background="{StaticResource SurfaceBrush}"
+                                    BorderBrush="{StaticResource DividerBrush}"
+                                    BorderThickness="0,0,1,0"
+                                    CornerRadius="0,0,0,8">
+                                <Grid Margin="12,12,10,10">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="8" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+
+                                    <DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="False">
+                                        <Button DockPanel.Dock="Right"
+                                                Style="{StaticResource StructureLinkButtonStyle}"
+                                                Click="ClearFilters_Click"
+                                                ToolTip="清空进程、域名与搜索高亮">
+                                            <TextBlock FontSize="12" Text="清除过滤" />
+                                        </Button>
+                                        <StackPanel>
+                                            <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="结构视图" />
+                                        </StackPanel>
+                                    </DockPanel>
+
+                                    <DockPanel Grid.Row="1" Margin="0,0,0,2" LastChildFill="False">
+                                        <ToggleButton DockPanel.Dock="Right"
+                                                      Background="Transparent"
+                                                      BorderBrush="Transparent"
+                                                      BorderThickness="0"
+                                                      Padding="0"
+                                                      IsChecked="{Binding ShowFavoritesOnly, Mode=TwoWay}"
+                                                      Click="FavoritesOnlyToggleButton_Click">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock FontSize="13"
+                                                           Foreground="#D8A900"
+                                                           Text="★" />
+                                                <TextBlock Margin="4,0,0,0"
+                                                           VerticalAlignment="Center"
+                                                           FontSize="12"
+                                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                                           Text="仅看收藏" />
+                                            </StackPanel>
+                                        </ToggleButton>
+                                    </DockPanel>
+
+                                    <ScrollViewer Grid.Row="3"
+                                                  VerticalScrollBarVisibility="Auto"
+                                                  HorizontalScrollBarVisibility="Disabled"
+                                                  Focusable="False">
+                                        <StackPanel>
+                                            <Expander Style="{StaticResource StructureExpanderStyle}" IsExpanded="True">
+                                                <Expander.Header>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock FontSize="13"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="#24364A"
+                                                                   Text="应用程序" />
+                                                        <TextBlock Margin="4,0,0,0"
+                                                                   VerticalAlignment="Center"
+                                                                   FontSize="12"
+                                                                   Foreground="#6DAA82"
+                                                                   Text="{Binding ProcessFilters.Count, Mode=OneWay, StringFormat=({0})}" />
+                                                    </StackPanel>
+                                                </Expander.Header>
+                                                <ListBox x:Name="ProcessFilterListBox"
+                                                         Style="{StaticResource StructureListBoxStyle}"
+                                                         ItemTemplate="{StaticResource ProcessFilterItemTemplate}"
+                                                         ItemsSource="{Binding ProcessFilters}"
+                                                         SelectionMode="Multiple"
+                                                         PreviewKeyDown="ProcessFilterListBox_PreviewKeyDown"
+                                                         SelectionChanged="ProcessFilterListBox_SelectionChanged" />
+                                            </Expander>
+
+                                            <Expander Style="{StaticResource StructureExpanderStyle}" IsExpanded="True">
+                                                <Expander.Header>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock FontSize="13"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="#24364A"
+                                                                   Text="域名" />
+                                                        <TextBlock Margin="4,0,0,0"
+                                                                   VerticalAlignment="Center"
+                                                                   FontSize="12"
+                                                                   Foreground="#6DAA82"
+                                                                   Text="{Binding DomainFilters.Count, Mode=OneWay, StringFormat=({0})}" />
+                                                    </StackPanel>
+                                                </Expander.Header>
+                                                <ListBox x:Name="DomainFilterListBox"
+                                                         Style="{StaticResource StructureListBoxStyle}"
+                                                         ItemTemplate="{StaticResource DomainFilterItemTemplate}"
+                                                         ItemsSource="{Binding DomainFilters}"
+                                                         SelectionMode="Multiple"
+                                                         PreviewKeyDown="DomainFilterListBox_PreviewKeyDown"
+                                                         SelectionChanged="DomainFilterListBox_SelectionChanged" />
+                                            </Expander>
+                                        </StackPanel>
+                                    </ScrollViewer>
+                                </Grid>
+                            </Border>
+
+                            <GridSplitter Grid.Column="1"
+                                          x:Name="SessionFilterSplitter"
+                                          Width="8"
+                                          HorizontalAlignment="Stretch"
+                                          ResizeDirection="Columns"
+                                          ResizeBehavior="PreviousAndNext"
+                                          DragCompleted="LayoutSplitter_DragCompleted"
+                                          Background="Transparent" />
+
+                            <DataGrid x:Name="SessionsGrid"
+                                      Grid.Column="2"
+                                      Margin="0"
+                                      RowHeight="26"
+                                      ColumnHeaderHeight="30"
+                                      FontSize="12"
+                                      ItemsSource="{Binding SessionsView}"
+                                      SelectedItem="{Binding SelectedSession, Mode=TwoWay}"
+                                      AutoGenerateColumns="False"
+                                      SelectionMode="Extended"
+                                      SelectionUnit="FullRow"
+                                      CanUserAddRows="False"
+                                      CanUserDeleteRows="False"
+                                      EnableRowVirtualization="True"
+                                      CellEditEnding="SessionsGrid_CellEditEnding">
+                                <DataGrid.Resources>
+                                    <Style x:Key="SessionGridCellStyle" TargetType="{x:Type DataGridCell}" BasedOn="{StaticResource {x:Type DataGridCell}}">
+                                        <Setter Property="Padding" Value="8,2" />
+                                        <Setter Property="MinHeight" Value="26" />
+                                        <Setter Property="VerticalContentAlignment" Value="Center" />
+                                    </Style>
+                                    <Style x:Key="SessionIndexCellStyle" TargetType="{x:Type DataGridCell}" BasedOn="{StaticResource SessionGridCellStyle}">
+                                        <Setter Property="Padding" Value="0,2,8,2" />
+                                    </Style>
+                                    <Style x:Key="SessionIndexHeaderStyle" TargetType="{x:Type DataGridColumnHeader}" BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
+                                        <Setter Property="Padding" Value="20,5,8,5" />
+                                    </Style>
+                                    <Style x:Key="SessionIndexTextStyle" TargetType="{x:Type TextBlock}">
+                                        <Setter Property="Margin" Value="0" />
+                                        <Setter Property="VerticalAlignment" Value="Center" />
+                                        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                    </Style>
+                                    <Style x:Key="SessionMethodTextStyle" TargetType="{x:Type TextBlock}" BasedOn="{StaticResource MethodCellTextStyle}">
+                                        <Setter Property="Margin" Value="0" />
+                                        <Setter Property="HorizontalAlignment" Value="Left" />
+                                    </Style>
+                                    <Style x:Key="SessionStateTextStyle" TargetType="{x:Type TextBlock}">
+                                        <Setter Property="VerticalAlignment" Value="Center" />
+                                        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                        <Setter Property="Foreground" Value="{Binding StatusBrush}" />
+                                    </Style>
+                                    <Style x:Key="SessionTextCellTextStyle" TargetType="{x:Type TextBlock}">
+                                        <Setter Property="VerticalAlignment" Value="Center" />
+                                        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                    </Style>
+                                    <Style x:Key="SessionNotesEditingStyle" TargetType="{x:Type TextBox}">
+                                        <Setter Property="VerticalContentAlignment" Value="Center" />
+                                        <Setter Property="Padding" Value="0" />
+                                    </Style>
+                                </DataGrid.Resources>
+                                <DataGrid.CellStyle>
+                                    <StaticResource ResourceKey="SessionGridCellStyle" />
+                                </DataGrid.CellStyle>
+                                <DataGrid.RowStyle>
+                                    <Style TargetType="{x:Type DataGridRow}" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                        <Setter Property="MinHeight" Value="26" />
+                                        <Setter Property="Background" Value="{Binding RowBackground}" />
+                                    </Style>
+                                </DataGrid.RowStyle>
+                                <DataGrid.Columns>
+                                    <DataGridTemplateColumn x:Name="IndexColumn" Header="序号" Width="82" IsReadOnly="True" CellStyle="{StaticResource SessionIndexCellStyle}" HeaderStyle="{StaticResource SessionIndexHeaderStyle}">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Margin="16,0,0,0"
+                                                            Orientation="Horizontal"
+                                                            VerticalAlignment="Center">
+                                                    <Ellipse Width="7"
+                                                             Height="7"
+                                                             VerticalAlignment="Center"
+                                                             Fill="{Binding StatusBrush}"
+                                                             ToolTip="{Binding StatusIconToolTip}" />
+                                                    <TextBlock Margin="8,0,0,0"
+                                                               Style="{StaticResource SessionIndexTextStyle}"
+                                                               Text="{Binding Index}" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTemplateColumn x:Name="FavoriteColumn"
+                                                            Header="★"
+                                                            Width="42"
+                                                            SortMemberPath="IsFavorite"
+                                                            IsReadOnly="True"
+                                                            HeaderStyle="{StaticResource SessionFavoriteHeaderStyle}">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Button Style="{StaticResource FavoriteCellButtonStyle}"
+                                                        Click="FavoriteSession_Click"
+                                                        ToolTip="{Binding FavoriteToolTip}">
+                                                    <TextBlock FontSize="15"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{Binding FavoriteBrush}"
+                                                               Text="{Binding FavoriteGlyph}" />
+                                                </Button>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn x:Name="MethodColumn" Header="方式" Binding="{Binding DisplayMethod}" Width="62" IsReadOnly="True" ElementStyle="{StaticResource SessionMethodTextStyle}" />
+                                    <DataGridTextColumn x:Name="StateColumn" Header="状态" Binding="{Binding State}" Width="68" IsReadOnly="True" ElementStyle="{StaticResource SessionStateTextStyle}" />
+                                    <DataGridTextColumn x:Name="UrlColumn" Header="请求地址" Binding="{Binding Url}" Width="4*" IsReadOnly="True" ElementStyle="{StaticResource SessionTextCellTextStyle}" />
+                                    <DataGridTextColumn x:Name="LengthColumn" Header="响应长度" Binding="{Binding ResponseLength}" Width="96" IsReadOnly="True" ElementStyle="{StaticResource SessionTextCellTextStyle}" />
+                                    <DataGridTextColumn x:Name="TypeColumn" Header="响应类型" Binding="{Binding ResponseType}" Width="104" IsReadOnly="True" ElementStyle="{StaticResource SessionTextCellTextStyle}" />
+                                    <DataGridTextColumn x:Name="ProcessColumn" Header="进程" Binding="{Binding Process}" Width="92" IsReadOnly="True" ElementStyle="{StaticResource SessionTextCellTextStyle}" />
+                                    <DataGridTextColumn x:Name="NotesColumn" Header="注释" Binding="{Binding Notes, UpdateSourceTrigger=PropertyChanged}" Width="140" ElementStyle="{StaticResource SessionTextCellTextStyle}" EditingElementStyle="{StaticResource SessionNotesEditingStyle}" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
                     </Grid>
                 </Border>
 
-                <GridSplitter x:Name="WorkspaceSplitter" Grid.Column="1" Width="10" HorizontalAlignment="Stretch" />
+                <GridSplitter x:Name="WorkspaceSplitter" Grid.Column="1" Width="10" HorizontalAlignment="Stretch" DragCompleted="LayoutSplitter_DragCompleted" />
 
                 <Grid x:Name="DetailHostGrid" Grid.Column="2">
-                    <Border x:Name="RequestDataPanel" Background="Transparent" BorderThickness="0">
+                    <Border x:Name="RequestDataPanel"
+                            Background="Transparent"
+                            BorderThickness="0">
                         <Grid x:Name="RequestResponseGrid">
                             <Grid.RowDefinitions>
                                 <RowDefinition x:Name="RequestPanelRow" Height="*" />
@@ -260,10 +656,12 @@
                                 <RowDefinition x:Name="ResponsePanelRow" Height="*" />
                             </Grid.RowDefinitions>
 
-                            <Border x:Name="RequestSectionBorder" Grid.Row="0" Style="{StaticResource PanelSectionBorderStyle}">
+                            <Border x:Name="RequestSectionBorder"
+                                    Grid.Row="0"
+                                    Style="{StaticResource PanelSectionBorderStyle}">
                                 <Grid>
                                     <Grid.RowDefinitions>
-                                        <RowDefinition Height="48" />
+                                        <RowDefinition Height="42" />
                                         <RowDefinition Height="*" />
                                     </Grid.RowDefinitions>
 
@@ -272,7 +670,7 @@
                                             BorderBrush="{StaticResource DividerBrush}"
                                             BorderThickness="0,0,0,1"
                                             CornerRadius="8,8,0,0">
-                                        <DockPanel Margin="16,0" LastChildFill="False">
+                                        <DockPanel Margin="14,0" LastChildFill="False">
                                             <Button DockPanel.Dock="Right"
                                                     Style="{StaticResource HeaderIconButtonStyle}"
                                                     Click="RequestZoom_Click"
@@ -300,7 +698,9 @@
                                             </TextBlock.Style>
                                         </TextBlock>
 
-                                        <TabControl Margin="12,8,12,12">
+                                        <TabControl x:Name="RequestTabControl"
+                                                    Margin="10,6,10,10"
+                                                    SelectionChanged="RequestTabControl_SelectionChanged">
                                             <TabControl.Style>
                                                 <Style TargetType="TabControl" BasedOn="{StaticResource {x:Type TabControl}}">
                                                     <Setter Property="Visibility" Value="Visible" />
@@ -336,21 +736,21 @@
                                             <TabItem Header="JSON视图">
                                                 <controls:JsonTreeViewControl JsonText="{Binding Detail.RequestJson}" />
                                             </TabItem>
-                                            <TabItem Header="WebSocket">
-                                                <DataGrid Margin="0,0,0,6"
-                                                          ItemsSource="{Binding Detail.SocketEntries}"
-                                                          AutoGenerateColumns="False"
-                                                          IsReadOnly="True"
-                                                          CanUserAddRows="False">
-                                                    <DataGrid.Columns>
-                                                        <DataGridTextColumn Header="#" Binding="{Binding Index}" Width="60" />
-                                                        <DataGridTextColumn Header="方向" Binding="{Binding Icon}" Width="80" />
-                                                        <DataGridTextColumn Header="类型" Binding="{Binding Type}" Width="90" />
-                                                        <DataGridTextColumn Header="长度" Binding="{Binding Length}" Width="80" />
-                                                        <DataGridTextColumn Header="时间" Binding="{Binding Time}" Width="100" />
-                                                        <DataGridTextColumn Header="数据" Binding="{Binding Data}" Width="*" />
-                                                    </DataGrid.Columns>
-                                                </DataGrid>
+                                            <TabItem x:Name="RequestWebSocketTab" Header="WebSocket">
+                                                <TabItem.Style>
+                                                    <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Detail.IsSocketSession}" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TabItem.Style>
+                                                <controls:WebSocketMessagesControl Entries="{Binding Detail.SocketEntries}"
+                                                                                   SelectedEntry="{Binding Detail.SelectedSocketEntry, Mode=TwoWay}"
+                                                                                   DisplayMode="Flow"
+                                                                                   Theology="{Binding SelectedSession.Theology, TargetNullValue=0}" />
                                             </TabItem>
                                             <TabItem Header="图片视图">
                                                 <controls:ImagePreviewControl ImageBytes="{Binding Detail.RequestImageBytes}"
@@ -367,12 +767,15 @@
                                           Height="10"
                                           HorizontalAlignment="Stretch"
                                           ResizeDirection="Rows"
-                                          ResizeBehavior="PreviousAndNext" />
+                                          ResizeBehavior="PreviousAndNext"
+                                          DragCompleted="LayoutSplitter_DragCompleted" />
 
-                            <Border x:Name="ResponseSectionBorder" Grid.Row="2" Style="{StaticResource PanelSectionBorderStyle}">
+                            <Border x:Name="ResponseSectionBorder"
+                                    Grid.Row="2"
+                                    Style="{StaticResource PanelSectionBorderStyle}">
                                 <Grid>
                                     <Grid.RowDefinitions>
-                                        <RowDefinition Height="56" />
+                                        <RowDefinition Height="46" />
                                         <RowDefinition Height="*" />
                                     </Grid.RowDefinitions>
 
@@ -381,7 +784,7 @@
                                             BorderBrush="{StaticResource DividerBrush}"
                                             BorderThickness="0,0,0,1"
                                             CornerRadius="8,8,0,0">
-                                        <DockPanel Margin="16,0" LastChildFill="False">
+                                        <DockPanel Margin="14,0" LastChildFill="False">
                                             <Button DockPanel.Dock="Right"
                                                     Style="{StaticResource HeaderIconButtonStyle}"
                                                     Click="ResponseZoom_Click"
@@ -447,7 +850,8 @@
                                             </TextBlock.Style>
                                         </TextBlock>
 
-                                        <TabControl Margin="12,8,12,12">
+                                        <TabControl x:Name="ResponseTabControl"
+                                                    Margin="10,6,10,10">
                                             <TabControl.Style>
                                                 <Style TargetType="TabControl" BasedOn="{StaticResource {x:Type TabControl}}">
                                                     <Setter Property="Visibility" Value="Visible" />
@@ -479,6 +883,22 @@
                                                 <controls:HexViewControl Bytes="{Binding Detail.ResponseHexBytes}"
                                                                          HeaderLength="{Binding Detail.ResponseHexHeaderLength}"
                                                                          EmptyText="无响应十六进制数据" />
+                                            </TabItem>
+                                            <TabItem x:Name="ResponseWebSocketTab" Header="WebSocket调试">
+                                                <TabItem.Style>
+                                                    <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Detail.IsSocketSession}" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TabItem.Style>
+                                                <controls:WebSocketMessagesControl Entries="{Binding Detail.SocketEntries}"
+                                                                                   SelectedEntry="{Binding Detail.SelectedSocketEntry, Mode=TwoWay}"
+                                                                                   DisplayMode="Inspector"
+                                                                                   Theology="{Binding SelectedSession.Theology, TargetNullValue=0}" />
                                             </TabItem>
                                             <TabItem Header="Cookies">
                                                 <controls:NameValueTableControl Rows="{Binding Detail.ResponseCookieRows}"
@@ -521,14 +941,18 @@
                     BorderThickness="0,1,0,0"
                     CornerRadius="0">
                 <DockPanel Margin="12,0" LastChildFill="True">
-                    <Button DockPanel.Dock="Right"
-                            Style="{StaticResource TitleBarButtonStyle}"
-                            Click="Theme_Click"
-                            ToolTip="当前为浅色主题">
-                        <TextBlock x:Name="ThemeGlyph" Style="{StaticResource GlyphTextStyle}" Text="&#xE708;" />
-                    </Button>
-
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <ComboBox x:Name="CaptureScopeComboBox"
+                                  Width="126"
+                                  Height="30"
+                                  Padding="10,4"
+                                  SelectedValuePath="Tag"
+                                  SelectionChanged="CaptureScopeComboBox_SelectionChanged"
+                                  ToolTip="选择抓取所有进程或指定进程">
+                            <ComboBoxItem Content="所有进程" Tag="All" />
+                            <ComboBoxItem Content="指定进程" Tag="Process" />
+                        </ComboBox>
+                        <Border Width="1" Margin="8,8" Background="{StaticResource DividerBrush}" />
                         <Button Style="{StaticResource FooterButtonStyle}" Click="IeProxy_Click" Content="{Binding StatusLeft}" />
                         <Border Width="1" Margin="8,8" Background="{StaticResource DividerBrush}" />
                         <Button Style="{StaticResource FooterButtonStyle}" Click="CaptureToggle_Click" Content="{Binding StatusMiddle}" />

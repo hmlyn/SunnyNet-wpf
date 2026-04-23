@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Windows.Data;
 using System.Text;
 using System.Text.Json;
 using System.Windows;
@@ -17,13 +19,21 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
     private readonly GoBackendClient _backend = new();
     private readonly Dictionary<int, CaptureEntry> _sessionMap = new();
+    private readonly HashSet<string> _favoriteKeys = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _selectedProcessFilterKeys = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _selectedDomainFilterKeys = new(StringComparer.OrdinalIgnoreCase);
+    private const string AllProcessFilterKey = "__all_process__";
+    private const string AllDomainFilterKey = "__all_domain__";
     private int _nextIndex = 1;
     private CaptureEntry? _selectedSession;
+    private bool _showFavoritesOnly;
     private bool _isBusy;
     private bool _autoScroll;
     private bool _isCapturing = true;
     private bool _ieProxyEnabled;
     private bool _isSelectedSessionIntercepted;
+    private bool _proxyClearedOnExit;
+    private bool _disposed;
     private int _breakpointMode;
     private string _statusLeft = "未设置系统IE代理";
     private string _statusMiddle = "正在捕获";
@@ -32,6 +42,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
     public MainWindowViewModel()
     {
+        SessionsView = CollectionViewSource.GetDefaultView(Sessions);
+        SessionsView.Filter = FilterSession;
         ClearAllCommand = new AsyncRelayCommand(ClearAllAsync);
         ReleaseAllCommand = new AsyncRelayCommand(ReleaseAllAsync);
         ToggleCaptureCommand = new AsyncRelayCommand(ToggleCaptureAsync);
@@ -39,14 +51,19 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         ResendSelectedCommand = new AsyncRelayCommand(() => ResendSelectedAsync(3), () => SelectedSession is not null && IsSelectedSessionIntercepted);
         CloseSessionCommand = new AsyncRelayCommand(CloseSelectedSessionAsync, () => SelectedSession is not null && IsSelectedSessionIntercepted);
         ReleaseCurrentCommand = new AsyncRelayCommand(() => BreakpointAsync(0), () => SelectedSession is not null && IsSelectedSessionIntercepted);
+        RefreshSessionFilterItems();
     }
 
     public event Action<CaptureEntry>? ScrollToEntryRequested;
     public event Action<string, string>? NotificationRequested;
 
     public ObservableCollection<CaptureEntry> Sessions { get; } = new();
+    public ICollectionView SessionsView { get; }
     public SessionDetail Detail { get; } = new();
     public AppConfigState Settings { get; } = new();
+    public ObservableCollection<SessionFilterItem> ProcessFilters { get; } = new();
+    public ObservableCollection<SessionFilterItem> DomainFilters { get; } = new();
+    public bool IsRefreshingSessionFilters { get; private set; }
 
     public AsyncRelayCommand ClearAllCommand { get; }
     public AsyncRelayCommand ReleaseAllCommand { get; }
@@ -144,6 +161,160 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         set => SetProperty(ref _runningPort, value);
     }
 
+    public string SelectedProcessFilterKey
+    {
+        get => _selectedProcessFilterKeys.FirstOrDefault() ?? AllProcessFilterKey;
+        set => SetSelectedProcessFilters(IsAllFilterKey(value, AllProcessFilterKey) ? Array.Empty<string>() : new[] { value });
+    }
+
+    public string SelectedDomainFilterKey
+    {
+        get => _selectedDomainFilterKeys.FirstOrDefault() ?? AllDomainFilterKey;
+        set => SetSelectedDomainFilters(IsAllFilterKey(value, AllDomainFilterKey) ? Array.Empty<string>() : new[] { value });
+    }
+
+    public bool HasActiveSessionFilter =>
+        ShowFavoritesOnly
+        || _selectedProcessFilterKeys.Count > 0
+        || _selectedDomainFilterKeys.Count > 0;
+
+    public bool ShowFavoritesOnly
+    {
+        get => _showFavoritesOnly;
+        set
+        {
+            if (!SetProperty(ref _showFavoritesOnly, value))
+            {
+                return;
+            }
+
+            RefreshSessionFilterItems();
+            OnPropertyChanged(nameof(HasActiveSessionFilter));
+        }
+    }
+
+    public int FavoriteCount => Sessions.Count(static entry => entry.IsFavorite);
+
+    public string FavoriteSummaryText => FavoriteCount > 0
+        ? $"已收藏 {FavoriteCount} 条"
+        : "暂无收藏";
+
+    public void InitializeFavoriteSettings(IEnumerable<string>? favoriteKeys, bool showFavoritesOnly)
+    {
+        _favoriteKeys.Clear();
+        if (favoriteKeys is not null)
+        {
+            foreach (string favoriteKey in favoriteKeys)
+            {
+                string normalized = NormalizeFavoritePart(favoriteKey);
+                if (!string.IsNullOrWhiteSpace(normalized))
+                {
+                    _favoriteKeys.Add(normalized);
+                }
+            }
+        }
+
+        foreach (CaptureEntry entry in Sessions)
+        {
+            ApplyFavoriteState(entry, forceRefresh: true);
+        }
+
+        ShowFavoritesOnly = showFavoritesOnly;
+        NotifyFavoriteSummaryChanged();
+    }
+
+    public IReadOnlyList<string> GetFavoriteKeys()
+    {
+        return _favoriteKeys
+            .OrderBy(static key => key, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    public void ToggleFavorite(CaptureEntry? entry)
+    {
+        if (entry is null)
+        {
+            return;
+        }
+
+        string favoriteKey = BuildFavoriteKey(entry);
+        bool next = !entry.IsFavorite;
+        entry.IsFavorite = next;
+        if (next)
+        {
+            _favoriteKeys.Add(favoriteKey);
+        }
+        else
+        {
+            _favoriteKeys.Remove(favoriteKey);
+        }
+
+        NotifyFavoriteSummaryChanged();
+
+        if (ShowFavoritesOnly)
+        {
+            RefreshSessionFilterItems();
+        }
+    }
+
+    public void SetSelectedProcessFilters(IEnumerable<string> keys)
+    {
+        if (!ReplaceSelectedFilterKeys(_selectedProcessFilterKeys, keys, AllProcessFilterKey))
+        {
+            ApplySelectionToFilterItems(ProcessFilters, _selectedProcessFilterKeys);
+            return;
+        }
+
+        ApplySelectionToFilterItems(ProcessFilters, _selectedProcessFilterKeys);
+        RefreshSessionView();
+        OnPropertyChanged(nameof(SelectedProcessFilterKey));
+        OnPropertyChanged(nameof(HasActiveSessionFilter));
+    }
+
+    public void SetSelectedDomainFilters(IEnumerable<string> keys)
+    {
+        if (!ReplaceSelectedFilterKeys(_selectedDomainFilterKeys, keys, AllDomainFilterKey))
+        {
+            ApplySelectionToFilterItems(DomainFilters, _selectedDomainFilterKeys);
+            return;
+        }
+
+        ApplySelectionToFilterItems(DomainFilters, _selectedDomainFilterKeys);
+        RefreshSessionView();
+        OnPropertyChanged(nameof(SelectedDomainFilterKey));
+        OnPropertyChanged(nameof(HasActiveSessionFilter));
+    }
+
+    public async Task DeleteSessionsByProcessFiltersAsync(IEnumerable<string> keys)
+    {
+        HashSet<string> normalizedKeys = NormalizeFilterKeys(keys, AllProcessFilterKey);
+        if (normalizedKeys.Count == 0)
+        {
+            return;
+        }
+
+        CaptureEntry[] entries = Sessions
+            .Where(entry => normalizedKeys.Contains(NormalizeFilterValue(entry.Process, "未知进程")))
+            .ToArray();
+
+        await DeleteSessionsAsync(entries);
+    }
+
+    public async Task DeleteSessionsByDomainFiltersAsync(IEnumerable<string> keys)
+    {
+        HashSet<string> normalizedKeys = NormalizeFilterKeys(keys, AllDomainFilterKey);
+        if (normalizedKeys.Count == 0)
+        {
+            return;
+        }
+
+        CaptureEntry[] entries = Sessions
+            .Where(entry => normalizedKeys.Contains(NormalizeFilterValue(entry.Host, "无域名")))
+            .ToArray();
+
+        await DeleteSessionsAsync(entries);
+    }
+
     public async Task InitializeAsync()
     {
         try
@@ -171,6 +342,13 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        await DisableSystemProxyOnExitAsync();
         await _backend.DisposeAsync();
     }
 
@@ -219,6 +397,180 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         }
     }
 
+    public async Task<(byte[] Bytes, string Text, string Json)> LoadSocketPayloadAsync(int theology, int index)
+    {
+        if (theology <= 0 || index < 0)
+        {
+            return (Array.Empty<byte>(), "", "");
+        }
+
+        JsonElement? result = await _backend.InvokeAsync("socket请求获取", new
+        {
+            Theology = theology,
+            Index = index + 1
+        });
+
+        if (result is not { ValueKind: JsonValueKind.String })
+        {
+            return (Array.Empty<byte>(), "", "");
+        }
+
+        byte[] bytes = DecodePayloadBytes(result.Value);
+        string text = BytesToDisplayText(bytes);
+        string json = LooksBinary(bytes) ? "" : TryFormatJson(text);
+        return (bytes, text, json);
+    }
+
+    public async Task<string> ParseProtobufAsync(byte[] data, int skip)
+    {
+        if (data.Length == 0)
+        {
+            return "";
+        }
+
+        JsonElement? result = await _backend.InvokeAsync("protobufToJson", new
+        {
+            Data = Convert.ToBase64String(data),
+            skip
+        });
+
+        return result is { ValueKind: JsonValueKind.String }
+            ? result.Value.GetString() ?? ""
+            : "";
+    }
+
+    public async Task<(bool Ok, string Directory, IReadOnlyList<string> Messages, string Error)> ImportProtobufSchemaAsync(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return (false, "", Array.Empty<string>(), "请选择 Protobuf 描述目录或 .pb 文件。");
+        }
+
+        JsonElement? result = await _backend.InvokeAsync("protobufImportSchema", new
+        {
+            Directory = path
+        });
+
+        if (result is not { ValueKind: JsonValueKind.Object })
+        {
+            return (false, "", Array.Empty<string>(), "导入 Protobuf 描述失败。");
+        }
+
+        bool ok = GetBool(result.Value, "Ok");
+        string directory = GetString(result.Value, "Directory", path.Trim());
+        string error = GetString(result.Value, "Error");
+        IReadOnlyList<string> messages = GetStringArray(result.Value, "Messages");
+        return (ok, directory, messages, error);
+    }
+
+    public async Task<(bool Ok, string Json, string Error)> ParseProtobufBySchemaAsync(byte[] data, int skip, string path, string messageType)
+    {
+        if (data.Length == 0)
+        {
+            return (false, "", "当前数据为空。");
+        }
+
+        JsonElement? result = await _backend.InvokeAsync("protobufToJsonBySchema", new
+        {
+            Data = Convert.ToBase64String(data),
+            skip,
+            Directory = path,
+            MessageType = messageType
+        });
+
+        if (result is not { ValueKind: JsonValueKind.Object })
+        {
+            return (false, "", "按结构解析 Protobuf 失败。");
+        }
+
+        return (
+            GetBool(result.Value, "Ok"),
+            GetString(result.Value, "Json"),
+            GetString(result.Value, "Error"));
+    }
+
+    public async Task<bool> SendSocketFrameAsync(int theology, string wsType, string sendType, string direction, string text)
+    {
+        if (theology <= 0)
+        {
+            return false;
+        }
+
+        JsonElement? result = await _backend.InvokeAsync("主动发送", new
+        {
+            Theology = theology,
+            IsWs = true,
+            IsTCP = false,
+            wsType,
+            SendType = sendType,
+            direction,
+            Data = Convert.ToBase64String(Encoding.UTF8.GetBytes(text ?? ""))
+        });
+
+        return result is { ValueKind: JsonValueKind.True };
+    }
+
+    public async Task<SearchExecutionResult> SearchAsync(SearchRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Value))
+        {
+            NotificationRequested?.Invoke("查找失败", "请输入要搜索的内容。");
+            return new SearchExecutionResult(0, null);
+        }
+
+        try
+        {
+            IsBusy = true;
+            StatusRight = "正在搜索...";
+
+            JsonElement? result = await _backend.InvokeAsync("查找", new
+            {
+                Options = request.Options,
+                request.Value,
+                request.Type,
+                request.Range,
+                request.Color,
+                ProtoSkip = request.ProtoSkip
+            });
+
+            if (result is null || result.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+            {
+                StatusRight = "搜索未返回结果";
+                return new SearchExecutionResult(0, null);
+            }
+
+            SearchExecutionResult applied = await ApplySearchResultAsync(result.Value, request);
+            StatusRight = applied.MatchCount > 0
+                ? $"搜索完成：命中 {applied.MatchCount:N0} 条"
+                : "搜索完成：没有结果";
+            return applied;
+        }
+        catch (Exception exception)
+        {
+            StatusRight = "搜索失败";
+            NotificationRequested?.Invoke("搜索失败", exception.Message);
+            return new SearchExecutionResult(0, null);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    public async Task CancelSearchHighlightAsync()
+    {
+        try
+        {
+            await _backend.InvokeAsync("取消搜索颜色标记");
+            ClearAllSearchHighlights();
+            StatusRight = "搜索颜色标记已清除";
+        }
+        catch (Exception exception)
+        {
+            NotificationRequested?.Invoke("清除搜索标记失败", exception.Message);
+        }
+    }
+
     public async Task ApplyCertificateSettingsAsync()
     {
         if (Settings.CertMode == "默认证书")
@@ -251,6 +603,30 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         }
     }
 
+    public async Task DisableSystemProxyOnExitAsync()
+    {
+        if (_proxyClearedOnExit)
+        {
+            return;
+        }
+
+        _proxyClearedOnExit = true;
+        if (!_backend.IsRunning)
+        {
+            return;
+        }
+
+        try
+        {
+            await _backend.InvokeAsync("设置IE代理", new { Set = false });
+            IeProxyEnabled = false;
+            StatusLeft = "未设置系统IE代理";
+        }
+        catch
+        {
+        }
+    }
+
     public async Task CycleBreakpointModeAsync()
     {
         BreakpointMode++;
@@ -274,6 +650,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         Sessions.Clear();
         _sessionMap.Clear();
         _nextIndex = 1;
+        NotifyFavoriteSummaryChanged();
+        RefreshSessionFilterItems();
         Detail.Clear();
     }
 
@@ -321,6 +699,69 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         await _backend.InvokeAsync("断点点击", new { Theology = SelectedSession.Theology, NextBreak = nextBreak });
         SelectedSession.BreakMode = nextBreak;
         RefreshSelectedSessionInterceptState();
+    }
+
+    private async Task<SearchExecutionResult> ApplySearchResultAsync(JsonElement result, SearchRequest request)
+    {
+        if (request.ClearPrevious)
+        {
+            foreach (int theology in GetIntArray(result, "LastSearchResult"))
+            {
+                if (_sessionMap.TryGetValue(theology, out CaptureEntry? previous))
+                {
+                    previous.SearchColor = "";
+                }
+            }
+
+            foreach (SocketEntry socketEntry in Detail.SocketEntries)
+            {
+                socketEntry.SearchColor = "";
+            }
+        }
+
+        List<int> matchedTheology = GetIntArray(result, "SearchResult");
+        string color = GetString(result, "Color", request.Color);
+        CaptureEntry? firstMatch = null;
+
+        foreach (int theology in matchedTheology)
+        {
+            if (!_sessionMap.TryGetValue(theology, out CaptureEntry? entry))
+            {
+                continue;
+            }
+
+            entry.SearchColor = color;
+            firstMatch ??= entry;
+        }
+
+        if (firstMatch is not null)
+        {
+            if (SelectedSession?.Theology == firstMatch.Theology)
+            {
+                await LoadSelectedSessionAsync();
+            }
+            else
+            {
+                SelectedSession = firstMatch;
+            }
+
+            ScrollToEntryRequested?.Invoke(firstMatch);
+        }
+
+        return new SearchExecutionResult(matchedTheology.Count, firstMatch);
+    }
+
+    private void ClearAllSearchHighlights()
+    {
+        foreach (CaptureEntry entry in Sessions)
+        {
+            entry.SearchColor = "";
+        }
+
+        foreach (SocketEntry socketEntry in Detail.SocketEntries)
+        {
+            socketEntry.SearchColor = "";
+        }
     }
 
     private void OnBackendEventReceived(object? sender, BackendEventEnvelope envelope)
@@ -403,6 +844,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
     private void ApplyInsertList(JsonElement args)
     {
+        bool changed = false;
         foreach (CaptureEntry entry in DeserializeList<CaptureEntry>(args))
         {
             if (entry.Theology == 0 || _sessionMap.ContainsKey(entry.Theology))
@@ -411,11 +853,18 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             }
 
             AddEntry(entry);
+            changed = true;
+        }
+
+        if (changed)
+        {
+            RefreshSessionFilterItems();
         }
     }
 
     private void ApplyUpdateList(JsonElement args)
     {
+        bool changed = false;
         foreach (CaptureEntry entry in DeserializeList<CaptureEntry>(args))
         {
             if (entry.Theology == 0)
@@ -426,6 +875,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             if (_sessionMap.TryGetValue(entry.Theology, out CaptureEntry? existing))
             {
                 existing.UpdateFrom(entry);
+                ApplyFavoriteState(existing, forceRefresh: false);
+                changed = true;
                 if (SelectedSession?.Theology == existing.Theology)
                 {
                     RefreshSelectedSessionInterceptState();
@@ -434,7 +885,13 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             else
             {
                 AddEntry(entry);
+                changed = true;
             }
+        }
+
+        if (changed)
+        {
+            RefreshSessionFilterItems();
         }
     }
 
@@ -535,6 +992,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
                 continue;
             }
 
+            Detail.IsSocketSession = true;
             Detail.SocketEntries.Add(socketEntry);
         }
     }
@@ -583,13 +1041,98 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         }
 
         entry.NormalizeDerivedFields();
+        ApplyFavoriteState(entry, forceRefresh: true);
         Sessions.Add(entry);
         _sessionMap[entry.Theology] = entry;
+        NotifyFavoriteSummaryChanged();
 
         if (AutoScroll)
         {
             ScrollToEntryRequested?.Invoke(entry);
         }
+    }
+
+    public void ClearSessionFilters()
+    {
+        _selectedProcessFilterKeys.Clear();
+        _selectedDomainFilterKeys.Clear();
+        ApplySelectionToFilterItems(ProcessFilters, _selectedProcessFilterKeys);
+        ApplySelectionToFilterItems(DomainFilters, _selectedDomainFilterKeys);
+        RefreshSessionFilterItems();
+        OnPropertyChanged(nameof(SelectedProcessFilterKey));
+        OnPropertyChanged(nameof(SelectedDomainFilterKey));
+        OnPropertyChanged(nameof(HasActiveSessionFilter));
+    }
+
+    public void ClearSessionDecorations()
+    {
+        ClearSessionFilters();
+        ShowFavoritesOnly = false;
+        ClearAllSearchHighlights();
+        RefreshSessionView();
+    }
+
+    private bool FilterSession(object session)
+    {
+        if (session is not CaptureEntry entry)
+        {
+            return false;
+        }
+
+        string processKey = NormalizeFilterValue(entry.Process, "未知进程");
+        string domainKey = NormalizeFilterValue(entry.Host, "无域名");
+
+        if (_selectedProcessFilterKeys.Count > 0
+            && !_selectedProcessFilterKeys.Contains(processKey))
+        {
+            return false;
+        }
+
+        if (_selectedDomainFilterKeys.Count > 0
+            && !_selectedDomainFilterKeys.Contains(domainKey))
+        {
+            return false;
+        }
+
+        if (ShowFavoritesOnly && !entry.IsFavorite)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private void RefreshSessionView()
+    {
+        SessionsView.Refresh();
+    }
+
+    private void RefreshSessionFilterItems()
+    {
+        IReadOnlyList<CaptureEntry> filterSource = GetSessionFilterSource();
+        List<SessionFilterItem> processItems = BuildSessionFilterItems(filterSource, static entry => entry.Process, "未知进程");
+        List<SessionFilterItem> domainItems = BuildSessionFilterItems(filterSource, static entry => entry.Host, "无域名");
+
+        PruneSelectedFilterKeys(_selectedProcessFilterKeys, processItems);
+        PruneSelectedFilterKeys(_selectedDomainFilterKeys, domainItems);
+        ApplySelectionToFilterItems(processItems, _selectedProcessFilterKeys);
+        ApplySelectionToFilterItems(domainItems, _selectedDomainFilterKeys);
+
+        IsRefreshingSessionFilters = true;
+        try
+        {
+            ReplaceRows(ProcessFilters, processItems);
+            ReplaceRows(DomainFilters, domainItems);
+        }
+        finally
+        {
+            IsRefreshingSessionFilters = false;
+        }
+
+        RefreshSessionView();
+        OnPropertyChanged(nameof(SelectedProcessFilterKey));
+        OnPropertyChanged(nameof(SelectedDomainFilterKey));
+        OnPropertyChanged(nameof(HasActiveSessionFilter));
     }
 
     private async Task LoadSelectedSessionAsync()
@@ -603,11 +1146,13 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
         Detail.HasSelection = true;
         Detail.Summary = $"{selected.Method} {selected.Url}";
+        Detail.IsSocketSession = false;
         Detail.RequestHeaders = "正在读取请求数据...";
         Detail.RequestBody = "";
         Detail.ResponseHeaders = "";
         Detail.ResponseBody = "";
         Detail.SocketEntries.Clear();
+        Detail.SelectedSocketEntry = null;
         Detail.RequestHeaderRows.Clear();
         Detail.RequestQueryRows.Clear();
         Detail.RequestCookieRows.Clear();
@@ -646,6 +1191,171 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     private void RefreshSelectedSessionInterceptState()
     {
         IsSelectedSessionIntercepted = SelectedSession?.BreakMode > 0;
+    }
+
+    private IReadOnlyList<CaptureEntry> GetSessionFilterSource()
+    {
+        return ShowFavoritesOnly
+            ? Sessions.Where(static entry => entry.IsFavorite)
+                .ToArray()
+            : Sessions.ToArray();
+    }
+
+    private async Task DeleteSessionsAsync(IReadOnlyCollection<CaptureEntry> entries)
+    {
+        if (entries.Count == 0)
+        {
+            return;
+        }
+
+        int[] theologyIds = entries
+            .Select(static entry => entry.Theology)
+            .Where(static theology => theology > 0)
+            .Distinct()
+            .ToArray();
+
+        if (theologyIds.Length > 0)
+        {
+            try
+            {
+                await _backend.InvokeAsync("删除请求会话", new { Data = theologyIds });
+            }
+            catch (Exception exception)
+            {
+                NotificationRequested?.Invoke("删除失败", exception.Message);
+                return;
+            }
+        }
+
+        bool deletedSelectedSession = SelectedSession is not null
+            && entries.Any(entry => entry.Theology == SelectedSession.Theology);
+
+        foreach (CaptureEntry entry in entries)
+        {
+            Sessions.Remove(entry);
+            if (entry.Theology > 0)
+            {
+                _sessionMap.Remove(entry.Theology);
+            }
+        }
+
+        if (deletedSelectedSession)
+        {
+            SelectedSession = null;
+        }
+
+        NotifyFavoriteSummaryChanged();
+        RefreshSessionFilterItems();
+    }
+
+    private static bool ReplaceSelectedFilterKeys(HashSet<string> target, IEnumerable<string> keys, string allKey)
+    {
+        HashSet<string> next = NormalizeFilterKeys(keys, allKey);
+
+        if (target.SetEquals(next))
+        {
+            return false;
+        }
+
+        target.Clear();
+        foreach (string key in next)
+        {
+            target.Add(key);
+        }
+
+        return true;
+    }
+
+    private static HashSet<string> NormalizeFilterKeys(IEnumerable<string> keys, string allKey)
+    {
+        HashSet<string> normalizedKeys = new(StringComparer.OrdinalIgnoreCase);
+        foreach (string key in keys)
+        {
+            string normalized = NormalizeFilterValue(key, "");
+            if (string.IsNullOrWhiteSpace(normalized) || IsAllFilterKey(normalized, allKey))
+            {
+                continue;
+            }
+
+            normalizedKeys.Add(normalized);
+        }
+
+        return normalizedKeys;
+    }
+
+    private static void PruneSelectedFilterKeys(HashSet<string> selectedKeys, IEnumerable<SessionFilterItem> availableItems)
+    {
+        HashSet<string> availableKeys = availableItems.Select(static item => item.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        selectedKeys.RemoveWhere(key => !availableKeys.Contains(key));
+    }
+
+    private static void ApplySelectionToFilterItems(IEnumerable<SessionFilterItem> items, ISet<string> selectedKeys)
+    {
+        foreach (SessionFilterItem item in items)
+        {
+            item.IsSelected = selectedKeys.Contains(item.Key);
+        }
+    }
+
+    private static bool IsAllFilterKey(string? value, string allKey)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            || string.Equals(value.Trim(), allKey, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void ApplyFavoriteState(CaptureEntry entry, bool forceRefresh)
+    {
+        if (!forceRefresh && entry.IsFavorite)
+        {
+            return;
+        }
+
+        string favoriteKey = BuildFavoriteKey(entry);
+        bool shouldFavorite = _favoriteKeys.Contains(favoriteKey);
+        if (entry.IsFavorite != shouldFavorite)
+        {
+            entry.IsFavorite = shouldFavorite;
+        }
+    }
+
+    private void NotifyFavoriteSummaryChanged()
+    {
+        OnPropertyChanged(nameof(FavoriteCount));
+        OnPropertyChanged(nameof(FavoriteSummaryText));
+    }
+
+    private static string BuildFavoriteKey(CaptureEntry entry)
+    {
+        string method = NormalizeFavoritePart(entry.Method).ToUpperInvariant();
+        string url = NormalizeFavoriteUrl(entry.Url, entry.Host, entry.Query);
+        string process = NormalizeFavoritePart(entry.Process).ToLowerInvariant();
+        string clientAddress = NormalizeFavoritePart(entry.ClientAddress).ToLowerInvariant();
+        string sendTime = NormalizeFavoritePart(entry.SendTime);
+        return $"{method}|{url}|{process}|{clientAddress}|{sendTime}";
+    }
+
+    private static string NormalizeFavoriteUrl(string? url, string? host, string? query)
+    {
+        string urlText = NormalizeFavoritePart(url);
+        if (Uri.TryCreate(urlText, UriKind.Absolute, out Uri? absoluteUri))
+        {
+            return absoluteUri.GetComponents(UriComponents.SchemeAndServer | UriComponents.PathAndQuery, UriFormat.SafeUnescaped)
+                .ToLowerInvariant();
+        }
+
+        string hostText = NormalizeFavoritePart(host).ToLowerInvariant();
+        string queryText = NormalizeFavoritePart(query);
+        if (!string.IsNullOrWhiteSpace(hostText) || !string.IsNullOrWhiteSpace(queryText))
+        {
+            return $"{hostText}{queryText}".ToLowerInvariant();
+        }
+
+        return urlText.ToLowerInvariant();
+    }
+
+    private static string NormalizeFavoritePart(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "" : value.Trim();
     }
 
     private async Task LoadRequestMultipartImageAsync(CaptureEntry selected)
@@ -718,11 +1428,13 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         string method = GetString(data, "Method", selected.Method);
         string url = GetString(data, "URL", selected.Url);
         string proto = GetString(data, "Proto", "HTTP/1.1");
+        JsonElement socketData = GetProperty(data, "SocketData");
         JsonElement requestHeader = GetProperty(data, "Header");
         byte[] requestBodyBytes = DecodePayloadBytes(GetProperty(data, "Body"));
         string requestContentType = GetHeaderValue(requestHeader, "Content-Type");
         Detail.RequestMethod = method;
         Detail.RequestUrl = url;
+        Detail.IsSocketSession = IsSocketSession(selected, socketData);
         Detail.Summary = $"{method} {url}";
         string requestHeadersText = FormatHeaders(requestHeader);
         Detail.RequestHeaders = $"{method} {url} {proto}\r\n{requestHeadersText}".Trim();
@@ -771,7 +1483,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         }
 
         Detail.SocketEntries.Clear();
-        foreach (SocketEntry socketEntry in DeserializeList<SocketEntry>(GetProperty(data, "SocketData")))
+        Detail.SelectedSocketEntry = null;
+        foreach (SocketEntry socketEntry in DeserializeList<SocketEntry>(socketData))
         {
             Detail.SocketEntries.Add(socketEntry);
         }
@@ -817,6 +1530,83 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         }
 
         return defaultValue;
+    }
+
+    private static List<int> GetIntArray(JsonElement element, string propertyName)
+    {
+        JsonElement property = GetProperty(element, propertyName);
+        if (property.ValueKind != JsonValueKind.Array)
+        {
+            return new List<int>();
+        }
+
+        List<int> values = new();
+        foreach (JsonElement item in property.EnumerateArray())
+        {
+            if (item.ValueKind == JsonValueKind.Number && item.TryGetInt32(out int number))
+            {
+                values.Add(number);
+            }
+            else if (item.ValueKind == JsonValueKind.String && int.TryParse(item.GetString(), out int stringNumber))
+            {
+                values.Add(stringNumber);
+            }
+        }
+
+        return values;
+    }
+
+    private static List<SessionFilterItem> BuildSessionFilterItems(
+        IEnumerable<CaptureEntry> entries,
+        Func<CaptureEntry, string> selector,
+        string emptyLabel)
+    {
+        Dictionary<string, int> counter = new(StringComparer.OrdinalIgnoreCase);
+        foreach (CaptureEntry entry in entries)
+        {
+            string key = NormalizeFilterValue(selector(entry), emptyLabel);
+            counter[key] = counter.TryGetValue(key, out int count) ? count + 1 : 1;
+        }
+
+        List<SessionFilterItem> items = new();
+
+        foreach ((string key, int count) in counter.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            items.Add(new SessionFilterItem
+            {
+                Key = key,
+                Name = key,
+                Count = count
+            });
+        }
+
+        return items;
+    }
+
+    private static string NormalizeFilterValue(string? value, string emptyLabel)
+    {
+        string trimmed = value?.Trim() ?? "";
+        return string.IsNullOrWhiteSpace(trimmed) ? emptyLabel : trimmed;
+    }
+
+    private static IReadOnlyList<string> GetStringArray(JsonElement element, string propertyName)
+    {
+        JsonElement property = GetProperty(element, propertyName);
+        if (property.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<string>();
+        }
+
+        List<string> values = new();
+        foreach (JsonElement item in property.EnumerateArray())
+        {
+            if (item.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(item.GetString()))
+            {
+                values.Add(item.GetString()!);
+            }
+        }
+
+        return values;
     }
 
     private static bool GetBool(JsonElement element, string propertyName)
@@ -1329,5 +2119,21 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
         string type = contentType.Split(';', 2)[0].Trim();
         return type.StartsWith("image/", StringComparison.OrdinalIgnoreCase) ? type : "";
+    }
+
+    private static bool IsSocketSession(CaptureEntry selected, JsonElement socketData)
+    {
+        if (socketData.ValueKind == JsonValueKind.Array && socketData.GetArrayLength() > 0)
+        {
+            return true;
+        }
+
+        return selected.Icon is "websocket_connect" or "websocket_close"
+            || selected.Method.Equals("Websocket", StringComparison.OrdinalIgnoreCase)
+            || selected.Method.Contains("TCP", StringComparison.OrdinalIgnoreCase)
+            || selected.Method.Equals("UDP", StringComparison.OrdinalIgnoreCase)
+            || selected.ResponseType.Contains("Websocket", StringComparison.OrdinalIgnoreCase)
+            || selected.ResponseType.Contains("TCP", StringComparison.OrdinalIgnoreCase)
+            || selected.ResponseType.Contains("UDP", StringComparison.OrdinalIgnoreCase);
     }
 }

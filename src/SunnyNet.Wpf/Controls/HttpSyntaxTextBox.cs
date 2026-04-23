@@ -16,18 +16,20 @@ public sealed class HttpSyntaxTextBox : RichTextBox
     private static readonly Brush TextBrush = CreateBrush(0x1F, 0x2D, 0x3D);
     private static readonly Brush MutedBrush = CreateBrush(0x6B, 0x7C, 0x93);
     private static readonly Brush SeparatorBrush = CreateBrush(0xA7, 0xB2, 0xC3);
-    private static readonly Brush HeaderNameBrush = CreateBrush(0x7C, 0x3A, 0xC8);
-    private static readonly Brush HeaderValueBrush = CreateBrush(0x0F, 0x5E, 0x75);
+    private static readonly Brush JsonSeparatorBrush = CreateBrush(0xC1, 0xCB, 0xD8);
+    private static readonly Brush HeaderNameBrush = CreateBrush(0x1E, 0x50, 0xC8);
+    private static readonly Brush HeaderValueBrush = TextBrush;
     private static readonly Brush UrlBrush = CreateBrush(0x1D, 0x4E, 0x89);
     private static readonly Brush GetBrush = CreateBrush(0x19, 0x7A, 0x4D);
     private static readonly Brush PostBrush = CreateBrush(0x2F, 0x7C, 0xF6);
     private static readonly Brush PutBrush = CreateBrush(0xB4, 0x6B, 0x00);
     private static readonly Brush DeleteBrush = CreateBrush(0xD9, 0x2D, 0x20);
     private static readonly Brush PatchBrush = CreateBrush(0x8B, 0x5C, 0xD6);
-    private static readonly Brush JsonKeyBrush = CreateBrush(0x7C, 0x3A, 0xC8);
+    private static readonly Brush JsonKeyBrush = CreateBrush(0x00, 0x00, 0x00);
     private static readonly Brush JsonStringBrush = CreateBrush(0x0F, 0x7B, 0x63);
-    private static readonly Brush JsonNumberBrush = CreateBrush(0xB4, 0x6B, 0x00);
-    private static readonly Brush JsonKeywordBrush = CreateBrush(0xD9, 0x2D, 0x20);
+    private static readonly Brush JsonNumberBrush = CreateBrush(0xD9, 0x2D, 0x20);
+    private static readonly Brush JsonBoolBrush = CreateBrush(0x1E, 0x50, 0xC8);
+    private static readonly Brush JsonNullBrush = CreateBrush(0x8C, 0x8C, 0x8C);
 
     public HttpSyntaxTextBox()
     {
@@ -217,15 +219,23 @@ public sealed class HttpSyntaxTextBox : RichTextBox
                 paragraph.Inlines.Add(CreateRun(line[start..index], JsonNumberBrush));
             }
             else if (StartsWithKeyword(line, index, "true", out int trueEnd) ||
-                     StartsWithKeyword(line, index, "false", out trueEnd) ||
-                     StartsWithKeyword(line, index, "null", out trueEnd))
+                     StartsWithKeyword(line, index, "false", out trueEnd))
             {
-                paragraph.Inlines.Add(CreateRun(line[index..trueEnd], JsonKeywordBrush, FontWeights.SemiBold));
+                paragraph.Inlines.Add(CreateRun(line[index..trueEnd], JsonBoolBrush, FontWeights.SemiBold));
+                index = trueEnd;
+            }
+            else if (StartsWithKeyword(line, index, "null", out trueEnd))
+            {
+                paragraph.Inlines.Add(CreateRun(line[index..trueEnd], JsonNullBrush, FontWeights.SemiBold));
                 index = trueEnd;
             }
             else
             {
-                paragraph.Inlines.Add(CreateRun(current.ToString(), current is '{' or '}' or '[' or ']' ? SeparatorBrush : TextBrush));
+                paragraph.Inlines.Add(CreateRun(
+                    current.ToString(),
+                    current is '{' or '}' or '[' or ']' or ':' or ','
+                        ? JsonSeparatorBrush
+                        : TextBrush));
                 index++;
             }
         }

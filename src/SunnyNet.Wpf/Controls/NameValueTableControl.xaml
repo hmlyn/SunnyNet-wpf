@@ -2,47 +2,136 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="clr-namespace:SunnyNet.Wpf.Controls">
+    <UserControl.Resources>
+        <Style x:Key="NameValueColumnHeaderStyle" TargetType="DataGridColumnHeader" BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
+            <Setter Property="Background" Value="#F8FAFD" />
+            <Setter Property="BorderBrush" Value="#E7ECF3" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style x:Key="NameValueRowStyle" TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="BorderBrush" Value="#EEF2F7" />
+        </Style>
+
+        <Style x:Key="NameValueCellStyle" TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+
+        <Style x:Key="NameKeyTextStyle" TargetType="TextBlock" BasedOn="{StaticResource DetailNameCellTextStyle}">
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{StaticResource DetailPropertyNameBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="ValueBodyTextStyle" TargetType="TextBlock" BasedOn="{StaticResource DetailValueCellTextStyle}">
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+            <Setter Property="LineHeight" Value="16" />
+        </Style>
+
+        <Style x:Key="ExtraBodyTextStyle" TargetType="TextBlock" BasedOn="{StaticResource DetailExtraCellTextStyle}">
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+            <Setter Property="LineHeight" Value="16" />
+        </Style>
+    </UserControl.Resources>
+
     <Border Background="{StaticResource SurfaceBrush}"
-            BorderBrush="{StaticResource DividerBrush}"
+            BorderBrush="#E6EBF2"
             BorderThickness="1"
-            CornerRadius="8"
+            CornerRadius="10"
             SnapsToDevicePixels="True">
         <Grid>
             <DataGrid x:Name="RowsGrid"
+                      Margin="8"
                       ItemsSource="{Binding Rows, RelativeSource={RelativeSource AncestorType=controls:NameValueTableControl}}"
                       AutoGenerateColumns="False"
+                      Background="Transparent"
                       IsReadOnly="True"
                       CanUserAddRows="False"
                       CanUserDeleteRows="False"
                       CanUserResizeRows="False"
+                      CanUserResizeColumns="False"
+                      CellStyle="{StaticResource NameValueCellStyle}"
+                      ColumnHeaderStyle="{StaticResource NameValueColumnHeaderStyle}"
+                      RowStyle="{StaticResource NameValueRowStyle}"
                       SelectionMode="Single"
                       SelectionUnit="FullRow"
                       ScrollViewer.HorizontalScrollBarVisibility="Auto"
                       ScrollViewer.VerticalScrollBarVisibility="Auto"
                       MouseDoubleClick="RowsGrid_MouseDoubleClick">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="名称"
-                                        Binding="{Binding Name}"
-                                        Width="180"
-                                        MinWidth="110"
-                                        ElementStyle="{StaticResource DetailNameCellTextStyle}" />
-                    <DataGridTextColumn Header="值"
-                                        Binding="{Binding Value}"
-                                        Width="*"
-                                        MinWidth="180"
-                                        ElementStyle="{StaticResource DetailValueCellTextStyle}" />
-                    <DataGridTextColumn x:Name="ExtraColumn"
-                                        Header="其他值"
-                                        Binding="{Binding Extra}"
-                                        Width="220"
-                                        MinWidth="140"
-                                        ElementStyle="{StaticResource DetailExtraCellTextStyle}"
-                                        Visibility="Collapsed" />
+                    <DataGridTemplateColumn Header="名称" Width="176" MinWidth="118">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,1,8,1"
+                                      HorizontalAlignment="Left"
+                                      VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="3" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0"
+                                            Width="3"
+                                            Height="14"
+                                            VerticalAlignment="Center"
+                                            Background="{StaticResource DetailPropertyNameBrush}"
+                                            CornerRadius="2" />
+                                    <TextBlock Grid.Column="2"
+                                               Style="{StaticResource NameKeyTextStyle}"
+                                               Text="{Binding Name}" />
+                                </Grid>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <DataGridTemplateColumn Header="值" Width="*" MinWidth="220">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,1,4,1"
+                                        Padding="0"
+                                        Background="Transparent"
+                                        CornerRadius="6">
+                                    <TextBlock Style="{StaticResource ValueBodyTextStyle}"
+                                               Text="{Binding Value}" />
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <DataGridTemplateColumn x:Name="ExtraColumn"
+                                            Header="其他值"
+                                            Width="220"
+                                            MinWidth="160"
+                                            Visibility="Collapsed">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,1,0,1"
+                                        Padding="0"
+                                        Background="Transparent"
+                                        CornerRadius="6">
+                                    <TextBlock Style="{StaticResource ExtraBodyTextStyle}"
+                                               Text="{Binding Extra}" />
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
                 </DataGrid.Columns>
             </DataGrid>
 
             <Border x:Name="EmptyPanel"
+                    Margin="8"
                     Background="#F8FAFD"
+                    CornerRadius="8"
                     IsHitTestVisible="False">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <TextBlock HorizontalAlignment="Center"
