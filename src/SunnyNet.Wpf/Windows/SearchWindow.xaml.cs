@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using SunnyNet.Wpf.Models;
 using SunnyNet.Wpf.ViewModels;
 
@@ -23,6 +24,7 @@ public partial class SearchWindow : Window
     };
 
     private readonly MainWindowViewModel _viewModel;
+    private readonly DispatcherTimer _alertTimer = new() { Interval = TimeSpan.FromSeconds(2.8) };
     private bool _isSearching;
 
     public SearchWindow(MainWindowViewModel viewModel)
@@ -30,6 +32,7 @@ public partial class SearchWindow : Window
         _viewModel = viewModel;
         InitializeComponent();
         DataContext = viewModel;
+        _alertTimer.Tick += AlertTimer_Tick;
         PopulateOptions();
         Loaded += (_, _) => FocusSearchText();
     }
@@ -37,6 +40,19 @@ public partial class SearchWindow : Window
     public void FocusSearchInput()
     {
         FocusSearchText();
+    }
+
+    private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs keyEventArgs)
+    {
+        if (keyEventArgs.LeftButton == MouseButtonState.Pressed)
+        {
+            DragMove();
+        }
+    }
+
+    private void CloseButton_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        Close();
     }
 
     private void PopulateOptions()
@@ -88,7 +104,7 @@ public partial class SearchWindow : Window
     private async void ClearSearchMark_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         await _viewModel.CancelSearchHighlightAsync();
-        SearchStateTextBlock.Text = "搜索颜色标记已清除。";
+        _viewModel.StatusRight = "搜索颜色标记已清除";
     }
 
     private void Close_Click(object sender, RoutedEventArgs routedEventArgs)
@@ -112,6 +128,14 @@ public partial class SearchWindow : Window
         if (keyEventArgs.Key == Key.Escape)
         {
             Close();
+            keyEventArgs.Handled = true;
+            return;
+        }
+
+        if (keyEventArgs.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            keyEventArgs.Handled = true;
+            _ = StartSearchAsync();
         }
     }
 
@@ -141,7 +165,7 @@ public partial class SearchWindow : Window
         string value = FindTextComboBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(value))
         {
-            MessageBox.Show(this, "请输入要搜索的内容。", "查找失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ShowSearchAlert("查找失败：请输入要搜索的内容");
             FocusSearchText();
             return;
         }
@@ -150,7 +174,7 @@ public partial class SearchWindow : Window
         int protoSkip = 0;
         if (type == "pb" && !int.TryParse(ProtoSkipTextBox.Text.Trim(), out protoSkip))
         {
-            MessageBox.Show(this, "ProtoBuf 忽略字节数必须是整数。", "查找失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ShowSearchAlert("查找失败：ProtoBuf 忽略字节数必须是整数");
             ProtoSkipTextBox.Focus();
             ProtoSkipTextBox.SelectAll();
             return;
@@ -173,8 +197,7 @@ public partial class SearchWindow : Window
             SearchExecutionResult result = await _viewModel.SearchAsync(request);
             if (result.MatchCount <= 0)
             {
-                SearchStateTextBlock.Text = "没有搜索结果。";
-                MessageBox.Show(this, "没有搜索结果。", "查找", MessageBoxButton.OK, MessageBoxImage.Information);
+                ShowSearchAlert("查找提示：没有搜索结果");
                 FocusSearchText();
                 return;
             }
@@ -192,7 +215,10 @@ public partial class SearchWindow : Window
         _isSearching = isSearching;
         FindButton.IsEnabled = !isSearching;
         SearchProgressBar.Visibility = isSearching ? Visibility.Visible : Visibility.Collapsed;
-        SearchStateTextBlock.Text = isSearching ? "正在查找，请稍候..." : "Enter 开始查找，Esc 关闭窗口。";
+        if (isSearching)
+        {
+            HideSearchAlert();
+        }
     }
 
     private void UpdateTextHistory()
@@ -225,6 +251,7 @@ public partial class SearchWindow : Window
         }
 
         ProtoSkipPanel.Visibility = type == "pb" ? Visibility.Visible : Visibility.Collapsed;
+        ClearPreviousCheckBox.Visibility = type == "pb" ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void UpdateColorPreview()
@@ -275,6 +302,25 @@ public partial class SearchWindow : Window
             textBox.Focus();
             textBox.SelectAll();
         }
+    }
+
+    private void ShowSearchAlert(string message)
+    {
+        SearchAlertTextBlock.Text = message;
+        SearchAlertBorder.Visibility = Visibility.Visible;
+        _alertTimer.Stop();
+        _alertTimer.Start();
+    }
+
+    private void HideSearchAlert()
+    {
+        _alertTimer.Stop();
+        SearchAlertBorder.Visibility = Visibility.Collapsed;
+    }
+
+    private void AlertTimer_Tick(object? sender, EventArgs eventArgs)
+    {
+        HideSearchAlert();
     }
 
     private static string GetSelectedValue(ComboBox comboBox, string fallback)

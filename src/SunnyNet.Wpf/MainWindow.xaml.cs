@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -739,6 +740,246 @@ public partial class MainWindow : Window
         await Dispatcher.InvokeAsync(async () => await _viewModel.UpdateSelectedNotesAsync());
     }
 
+    private void SessionsGrid_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs mouseButtonEventArgs)
+    {
+        if (FindVisualParent<DataGridRow>(mouseButtonEventArgs.OriginalSource as DependencyObject) is not { Item: CaptureEntry entry } row)
+        {
+            return;
+        }
+
+        if (!row.IsSelected)
+        {
+            SessionsGrid.SelectedItems.Clear();
+            row.IsSelected = true;
+            SessionsGrid.SelectedItem = entry;
+        }
+
+        row.Focus();
+    }
+
+    private void SessionsGridContextMenu_Opened(object sender, RoutedEventArgs routedEventArgs)
+    {
+        CaptureEntry[] entries = GetSelectedSessionEntries();
+        bool hasSelection = entries.Length > 0;
+        bool isHttpSelection = hasSelection && entries.All(IsRequestCodeSupportedSession);
+        bool hasConnectedSocket = hasSelection && entries.Any(IsConnectedSocketSession);
+        bool hasProcess = entries.Any(static entry => !string.IsNullOrWhiteSpace(entry.Process));
+        bool hasDomain = entries.Any(static entry => !string.IsNullOrWhiteSpace(entry.Host));
+
+        CopySelectedSessionsMenuItem.IsEnabled = hasSelection;
+        GenerateCodeSessionsMenuItem.IsEnabled = isHttpSelection;
+        FavoriteSelectedSessionsMenuItem.IsEnabled = hasSelection;
+        FavoriteSelectedSessionsMenuItem.Header = hasSelection && entries.All(static entry => entry.IsFavorite)
+            ? "取消收藏"
+            : "标记收藏";
+        EditNotesSessionsMenuItem.IsEnabled = hasSelection;
+        EditNotesSessionsMenuItem.Header = entries.Length > 1 ? $"编辑注释 ({entries.Length})..." : "编辑注释...";
+        FilterSelectedSessionsMenuItem.IsEnabled = hasSelection;
+        FilterByProcessMenuItem.IsEnabled = hasProcess;
+        FilterByDomainMenuItem.IsEnabled = hasDomain;
+        ClearFiltersFromSessionsMenuItem.IsEnabled = _viewModel.HasActiveSessionFilter;
+        ResendSelectedSessionsMenuItem.IsEnabled = isHttpSelection;
+        CloseSelectedConnectionsMenuItem.Visibility = hasConnectedSocket ? Visibility.Visible : Visibility.Collapsed;
+        CloseSelectedConnectionsMenuItem.IsEnabled = hasConnectedSocket;
+        AutoScrollFromSessionsMenuItem.IsChecked = _viewModel.AutoScroll;
+        DeleteSelectedSessionsMenuItem.IsEnabled = hasSelection;
+        DeleteSelectedSessionsMenuItem.Header = entries.Length > 1 ? $"删除选中 ({entries.Length})" : "删除选中";
+    }
+
+    private void CopySelectedSessionUrls_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        string text = string.Join(Environment.NewLine, GetSelectedSessionEntries()
+            .Select(static entry => entry.Url)
+            .Where(static value => !string.IsNullOrWhiteSpace(value)));
+
+        CopyTextToClipboard(text, "已复制请求地址");
+    }
+
+    private void CopySelectedSessionHosts_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        string text = string.Join(Environment.NewLine, GetSelectedSessionEntries()
+            .Select(GetSessionHost)
+            .Where(static value => !string.IsNullOrWhiteSpace(value)));
+
+        CopyTextToClipboard(text, "已复制 HOST");
+    }
+
+    private void CopySelectedSessionSummary_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        CaptureEntry[] entries = GetSelectedSessionEntries();
+        if (entries.Length == 0)
+        {
+            return;
+        }
+
+        StringBuilder builder = new();
+        builder.AppendLine("序号\t方式\t状态\t请求地址\t响应长度\t响应类型\t进程\t注释");
+        foreach (CaptureEntry entry in entries)
+        {
+            builder.Append(entry.Index).Append('\t')
+                .Append(entry.DisplayMethod).Append('\t')
+                .Append(entry.State).Append('\t')
+                .Append(entry.Url).Append('\t')
+                .Append(entry.ResponseLength).Append('\t')
+                .Append(entry.ResponseType).Append('\t')
+                .Append(entry.Process).Append('\t')
+                .AppendLine(entry.Notes);
+        }
+
+        CopyTextToClipboard(builder.ToString().TrimEnd(), $"已复制 {entries.Length} 条会话摘要");
+    }
+
+    private async void GenerateRequestCode_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        if (sender is not MenuItem { Tag: string tag })
+        {
+            return;
+        }
+
+        string[] parts = tag.Split('|', 2);
+        if (parts.Length != 2)
+        {
+            return;
+        }
+
+        try
+        {
+            await _viewModel.GenerateRequestCodeAsync(GetSelectedSessionEntries(), parts[0], parts[1]);
+        }
+        catch (Exception exception)
+        {
+            ViewModel_NotificationRequested("生成失败", exception.Message);
+        }
+    }
+
+    private void FavoriteSelectedSessions_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        CaptureEntry[] entries = GetSelectedSessionEntries();
+        if (entries.Length == 0)
+        {
+            return;
+        }
+
+        bool shouldFavorite = !entries.All(static entry => entry.IsFavorite);
+        foreach (CaptureEntry entry in entries)
+        {
+            if (entry.IsFavorite != shouldFavorite)
+            {
+                _viewModel.ToggleFavorite(entry);
+            }
+        }
+
+        SaveFavoriteSettings();
+    }
+
+    private async void EditSelectedSessionNotes_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        CaptureEntry[] entries = GetSelectedSessionEntries();
+        if (entries.Length == 0)
+        {
+            return;
+        }
+
+        string initialNotes = entries.Length == 1 || entries.All(entry => string.Equals(entry.Notes, entries[0].Notes, StringComparison.Ordinal))
+            ? entries[0].Notes
+            : "";
+
+        SessionNotesWindow window = new(initialNotes, entries.Length)
+        {
+            Owner = this
+        };
+
+        if (window.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            await _viewModel.UpdateSessionNotesAsync(entries, window.NotesText);
+        }
+        catch (Exception exception)
+        {
+            ViewModel_NotificationRequested("注释失败", exception.Message);
+        }
+    }
+
+    private void FilterSelectedSessionsByProcess_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        string[] keys = GetSelectedSessionEntries()
+            .Select(static entry => NormalizeMenuFilterValue(entry.Process, "未知进程"))
+            .Where(static key => !string.IsNullOrWhiteSpace(key))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        _viewModel.SetSelectedProcessFilters(keys);
+    }
+
+    private void FilterSelectedSessionsByDomain_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        string[] keys = GetSelectedSessionEntries()
+            .Select(static entry => NormalizeMenuFilterValue(entry.Host, "无域名"))
+            .Where(static key => !string.IsNullOrWhiteSpace(key))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        _viewModel.SetSelectedDomainFilters(keys);
+    }
+
+    private async void ResendSelectedSessions_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        if (sender is not MenuItem menuItem || !int.TryParse(menuItem.Tag?.ToString(), out int mode))
+        {
+            return;
+        }
+
+        try
+        {
+            await _viewModel.ResendSessionEntriesAsync(GetSelectedSessionEntries(), mode);
+        }
+        catch (Exception exception)
+        {
+            ViewModel_NotificationRequested("重放失败", exception.Message);
+        }
+    }
+
+    private async void CloseSelectedConnections_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        try
+        {
+            await _viewModel.CloseSessionEntriesAsync(GetSelectedSessionEntries().Where(IsConnectedSocketSession));
+        }
+        catch (Exception exception)
+        {
+            ViewModel_NotificationRequested("断开失败", exception.Message);
+        }
+    }
+
+    private void AutoScrollFromSessions_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        if (sender is MenuItem menuItem)
+        {
+            SetAutoScrollEnabled(menuItem.IsChecked);
+        }
+    }
+
+    private void AutoScrollToolbarButton_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        SetAutoScrollEnabled(AutoScrollToolbarButton.IsChecked == true);
+    }
+
+    private async void DeleteSelectedSessions_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        try
+        {
+            await _viewModel.DeleteSessionEntriesAsync(GetSelectedSessionEntries());
+        }
+        catch (Exception exception)
+        {
+            ViewModel_NotificationRequested("删除失败", exception.Message);
+        }
+    }
+
     private void ClearFilters_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         _viewModel.ClearSessionDecorations();
@@ -754,6 +995,116 @@ public partial class MainWindow : Window
 
         _viewModel.ToggleFavorite(entry);
         SaveFavoriteSettings();
+    }
+
+    private CaptureEntry[] GetSelectedSessionEntries()
+    {
+        CaptureEntry[] entries = SessionsGrid.SelectedItems
+            .OfType<CaptureEntry>()
+            .OrderBy(static entry => entry.Index)
+            .ToArray();
+
+        if (entries.Length > 0)
+        {
+            return entries;
+        }
+
+        return _viewModel.SelectedSession is null
+            ? Array.Empty<CaptureEntry>()
+            : new[] { _viewModel.SelectedSession };
+    }
+
+    private void CopyTextToClipboard(string text, string statusText)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            _viewModel.StatusRight = "没有可复制的内容";
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(text);
+            _viewModel.StatusRight = statusText;
+        }
+        catch (Exception exception)
+        {
+            ViewModel_NotificationRequested("错误", $"复制失败：{exception.Message}");
+        }
+    }
+
+    private void SetAutoScrollEnabled(bool enabled)
+    {
+        _viewModel.AutoScroll = enabled;
+        _viewModel.StatusRight = enabled ? "已开启跟随显示" : "已关闭跟随显示";
+
+        if (enabled)
+        {
+            ScrollToLatestSession();
+        }
+    }
+
+    private void ScrollToLatestSession()
+    {
+        CaptureEntry? latestEntry = _viewModel.SessionsView
+            .OfType<CaptureEntry>()
+            .LastOrDefault();
+
+        if (latestEntry is null)
+        {
+            return;
+        }
+
+        SessionsGrid.ScrollIntoView(latestEntry);
+        SessionsGrid.UpdateLayout();
+    }
+
+    private static string GetSessionHost(CaptureEntry entry)
+    {
+        if (!string.IsNullOrWhiteSpace(entry.Host))
+        {
+            return entry.Host.Trim();
+        }
+
+        return Uri.TryCreate(entry.Url, UriKind.Absolute, out Uri? uri) ? uri.Host : "";
+    }
+
+    private static string NormalizeMenuFilterValue(string? value, string fallback)
+    {
+        return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+    }
+
+    private static bool IsRequestCodeSupportedSession(CaptureEntry entry)
+    {
+        string method = entry.Method.ToUpperInvariant();
+        return !method.Contains("TCP", StringComparison.Ordinal)
+            && !method.Contains("UDP", StringComparison.Ordinal)
+            && !method.Contains("WEBSOCKET", StringComparison.Ordinal);
+    }
+
+    private static bool IsConnectedSocketSession(CaptureEntry entry)
+    {
+        string method = entry.Method.ToUpperInvariant();
+        string state = entry.State.ToUpperInvariant();
+        return state.Contains("已连接", StringComparison.Ordinal)
+            && (method.Contains("TCP", StringComparison.Ordinal)
+                || method.Contains("WEBSOCKET", StringComparison.Ordinal));
+    }
+
+    private static T? FindVisualParent<T>(DependencyObject? source)
+        where T : DependencyObject
+    {
+        while (source is not null)
+        {
+            if (source is T target)
+            {
+                return target;
+            }
+
+            source = VisualTreeHelper.GetParent(source);
+        }
+
+        return null;
     }
 
     private void FavoritesOnlyToggleButton_Click(object sender, RoutedEventArgs routedEventArgs)

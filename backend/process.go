@@ -15,7 +15,6 @@ func processEvent(command string, args *JSON.SyJson) any {
 		return p
 	case "进程驱动添加PID":
 		gx := args.GetData("isSelected") == "true"
-		app.App.ProcessCancelAll()
 		if gx {
 			app.App.ProcessAddPid(getInt(args.GetData("PID")))
 		} else {

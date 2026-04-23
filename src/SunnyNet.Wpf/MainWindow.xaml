@@ -137,12 +137,17 @@
                                     <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="脚本编辑" />
                                 </StackPanel>
                             </Button>
-                            <Button Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}" Command="{Binding ToggleAutoScrollCommand}" ToolTip="列表自动跟随显示">
+                            <ToggleButton x:Name="AutoScrollToolbarButton"
+                                          Margin="6,0,0,0"
+                                          Style="{StaticResource ToolbarToggleButtonStyle}"
+                                          IsChecked="{Binding AutoScroll, Mode=TwoWay}"
+                                          Click="AutoScrollToolbarButton_Click"
+                                          ToolTip="列表自动跟随显示">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE73E;" />
                                     <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="自动滚动显示" />
                                 </StackPanel>
-                            </Button>
+                            </ToggleButton>
 
                             <Border Width="1" Margin="10,6" Background="{StaticResource DividerBrush}" />
 
@@ -404,13 +409,9 @@
                                             </ToggleButton>
                                         </StackPanel>
                                     </Border>
-                                    <Border Style="{StaticResource BadgeBorderStyle}">
-                                        <TextBlock Text="实时抓包" />
-                                    </Border>
                                 </StackPanel>
                                 <StackPanel Orientation="Vertical" VerticalAlignment="Center">
                                     <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="会话列表" />
-                                    <TextBlock Style="{StaticResource CaptionTextStyle}" Text="HTTP / WebSocket / TCP / UDP" />
                                 </StackPanel>
                             </DockPanel>
                         </Border>
@@ -546,7 +547,50 @@
                                       CanUserAddRows="False"
                                       CanUserDeleteRows="False"
                                       EnableRowVirtualization="True"
+                                      PreviewMouseRightButtonDown="SessionsGrid_PreviewMouseRightButtonDown"
                                       CellEditEnding="SessionsGrid_CellEditEnding">
+                                <DataGrid.ContextMenu>
+                                    <ContextMenu x:Name="SessionsGridContextMenu"
+                                                 Padding="4"
+                                                 Background="{StaticResource SurfaceBrush}"
+                                                 BorderBrush="{StaticResource BorderBrush}"
+                                                 BorderThickness="1"
+                                                 FontSize="12"
+                                                 Opened="SessionsGridContextMenu_Opened">
+                                        <MenuItem x:Name="CopySelectedSessionsMenuItem" Header="复制">
+                                            <MenuItem Header="请求地址" Click="CopySelectedSessionUrls_Click" />
+                                            <MenuItem Header="HOST" Click="CopySelectedSessionHosts_Click" />
+                                            <MenuItem Header="会话摘要" Click="CopySelectedSessionSummary_Click" />
+                                        </MenuItem>
+                                        <MenuItem x:Name="GenerateCodeSessionsMenuItem" Header="生成请求代码">
+                                            <MenuItem Header="C# HttpClient" Tag="C#|HttpClient" Click="GenerateRequestCode_Click" />
+                                            <MenuItem Header="C# RestSharp" Tag="C#|RestSharp" Click="GenerateRequestCode_Click" />
+                                            <Separator />
+                                            <MenuItem Header="Go net/http" Tag="Go|net/http" Click="GenerateRequestCode_Click" />
+                                            <MenuItem Header="Python requests" Tag="Python|requests" Click="GenerateRequestCode_Click" />
+                                        </MenuItem>
+                                        <MenuItem x:Name="FavoriteSelectedSessionsMenuItem" Header="标记收藏" Click="FavoriteSelectedSessions_Click" />
+                                        <MenuItem x:Name="EditNotesSessionsMenuItem" Header="编辑注释..." Click="EditSelectedSessionNotes_Click" />
+                                        <Separator />
+                                        <MenuItem x:Name="FilterSelectedSessionsMenuItem" Header="过滤">
+                                            <MenuItem x:Name="FilterByProcessMenuItem" Header="按选中进程过滤" Click="FilterSelectedSessionsByProcess_Click" />
+                                            <MenuItem x:Name="FilterByDomainMenuItem" Header="按选中域名过滤" Click="FilterSelectedSessionsByDomain_Click" />
+                                            <Separator />
+                                            <MenuItem x:Name="ClearFiltersFromSessionsMenuItem" Header="清除过滤" Click="ClearFilters_Click" />
+                                        </MenuItem>
+                                        <MenuItem x:Name="FindFromSessionsMenuItem" Header="查找..." InputGestureText="Ctrl+F" Click="Find_Click" />
+                                        <Separator />
+                                        <MenuItem x:Name="ResendSelectedSessionsMenuItem" Header="重放">
+                                            <MenuItem Header="普通重放" Tag="3" Click="ResendSelectedSessions_Click" />
+                                            <MenuItem Header="重放并拦截上行" Tag="1" Click="ResendSelectedSessions_Click" />
+                                            <MenuItem Header="重放并拦截下行" Tag="2" Click="ResendSelectedSessions_Click" />
+                                        </MenuItem>
+                                        <MenuItem x:Name="CloseSelectedConnectionsMenuItem" Header="断开选中的会话连接" Click="CloseSelectedConnections_Click" />
+                                        <Separator />
+                                        <MenuItem x:Name="AutoScrollFromSessionsMenuItem" Header="跟随显示" IsCheckable="True" Click="AutoScrollFromSessions_Click" />
+                                        <MenuItem x:Name="DeleteSelectedSessionsMenuItem" Header="删除选中" InputGestureText="Del" Click="DeleteSelectedSessions_Click" />
+                                    </ContextMenu>
+                                </DataGrid.ContextMenu>
                                 <DataGrid.Resources>
                                     <Style x:Key="SessionGridCellStyle" TargetType="{x:Type DataGridCell}" BasedOn="{StaticResource {x:Type DataGridCell}}">
                                         <Setter Property="Padding" Value="8,2" />

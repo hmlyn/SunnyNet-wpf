@@ -35,10 +35,16 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     private bool _proxyClearedOnExit;
     private bool _disposed;
     private int _breakpointMode;
+    private bool _processDriverLoaded;
+    private bool _captureAllProcesses;
+    private readonly HashSet<int> _activeProcessPids = new();
+    private string _newProcessName = "";
     private string _statusLeft = "未设置系统IE代理";
     private string _statusMiddle = "正在捕获";
     private string _statusRight = "等待 Go 核心启动";
     private int _runningPort;
+    private RunningProcessItem? _selectedRunningProcess;
+    private ProcessCaptureNameItem? _selectedProcessCaptureName;
 
     public MainWindowViewModel()
     {
@@ -63,6 +69,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     public AppConfigState Settings { get; } = new();
     public ObservableCollection<SessionFilterItem> ProcessFilters { get; } = new();
     public ObservableCollection<SessionFilterItem> DomainFilters { get; } = new();
+    public ObservableCollection<HostsRuleItem> HostsRuleItems { get; } = new();
+    public ObservableCollection<ReplaceRuleItem> ReplaceRuleItems { get; } = new();
+    public ObservableCollection<RequestCertificateRuleItem> RequestCertificateItems { get; } = new();
+    public ObservableCollection<ProcessCaptureNameItem> ProcessCaptureNames { get; } = new();
+    public ObservableCollection<RunningProcessItem> RunningProcesses { get; } = new();
     public bool IsRefreshingSessionFilters { get; private set; }
 
     public AsyncRelayCommand ClearAllCommand { get; }
@@ -159,6 +170,53 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     {
         get => _runningPort;
         set => SetProperty(ref _runningPort, value);
+    }
+
+    public bool ProcessDriverLoaded
+    {
+        get => _processDriverLoaded;
+        set
+        {
+            if (!SetProperty(ref _processDriverLoaded, value))
+            {
+                return;
+            }
+
+            OnPropertyChanged(nameof(ProcessDriverStatusText));
+        }
+    }
+
+    public string ProcessDriverStatusText => ProcessDriverLoaded ? "驱动已加载" : "驱动未加载";
+
+    public bool CaptureAllProcesses
+    {
+        get => _captureAllProcesses;
+        set => SetProperty(ref _captureAllProcesses, value);
+    }
+
+    public string NewProcessName
+    {
+        get => _newProcessName;
+        set => SetProperty(ref _newProcessName, value ?? "");
+    }
+
+    public string CurrentPidCaptureText => _activeProcessPids.Count switch
+    {
+        <= 0 => "当前 PID 捕获：未设置",
+        1 => $"当前 PID 捕获：{_activeProcessPids.First()}",
+        _ => $"当前 PID 捕获：已选 {_activeProcessPids.Count} 项"
+    };
+
+    public RunningProcessItem? SelectedRunningProcess
+    {
+        get => _selectedRunningProcess;
+        set => SetProperty(ref _selectedRunningProcess, value);
+    }
+
+    public ProcessCaptureNameItem? SelectedProcessCaptureName
+    {
+        get => _selectedProcessCaptureName;
+        set => SetProperty(ref _selectedProcessCaptureName, value);
     }
 
     public string SelectedProcessFilterKey
@@ -315,6 +373,58 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         await DeleteSessionsAsync(entries);
     }
 
+    public async Task DeleteSessionEntriesAsync(IEnumerable<CaptureEntry> entries)
+    {
+        await DeleteSessionsAsync(NormalizeSessionEntries(entries));
+    }
+
+    public async Task ResendSessionEntriesAsync(IEnumerable<CaptureEntry> entries, int mode)
+    {
+        int[] theologyIds = GetTheologyIds(entries);
+        if (theologyIds.Length == 0)
+        {
+            return;
+        }
+
+        await _backend.InvokeAsync("重发请求", new { Data = theologyIds, Mode = mode });
+        StatusRight = "重发请求已提交";
+    }
+
+    public async Task CloseSessionEntriesAsync(IEnumerable<CaptureEntry> entries)
+    {
+        CaptureEntry[] selectedEntries = NormalizeSessionEntries(entries);
+        int[] theologyIds = GetTheologyIds(selectedEntries);
+        if (theologyIds.Length == 0)
+        {
+            return;
+        }
+
+        await _backend.InvokeAsync("关闭请求会话", new { Data = theologyIds });
+        foreach (CaptureEntry entry in selectedEntries)
+        {
+            entry.BreakMode = 0;
+            if (entry.State.Contains("已连接", StringComparison.OrdinalIgnoreCase))
+            {
+                entry.State = "断开中";
+            }
+        }
+
+        RefreshSelectedSessionInterceptState();
+        StatusRight = "断开会话请求已提交";
+    }
+
+    public async Task GenerateRequestCodeAsync(IEnumerable<CaptureEntry> entries, string lang, string module)
+    {
+        int[] theologyIds = GetTheologyIds(entries);
+        if (theologyIds.Length == 0)
+        {
+            return;
+        }
+
+        await _backend.InvokeAsync("创建请求代码", new { Data = theologyIds, Lang = lang, Module = module });
+        StatusRight = $"已生成请求代码：{lang} / {module}";
+    }
+
     public async Task InitializeAsync()
     {
         try
@@ -373,6 +483,30 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         await _backend.InvokeAsync("更新注释", new { Theology = SelectedSession.Theology, Data = SelectedSession.Notes });
     }
 
+    public async Task UpdateSessionNotesAsync(IEnumerable<CaptureEntry> entries, string notes)
+    {
+        CaptureEntry[] selectedEntries = NormalizeSessionEntries(entries);
+        if (selectedEntries.Length == 0)
+        {
+            return;
+        }
+
+        string nextNotes = notes ?? "";
+        foreach (CaptureEntry entry in selectedEntries)
+        {
+            if (entry.Theology > 0)
+            {
+                await _backend.InvokeAsync("更新注释", new { Theology = entry.Theology, Data = nextNotes });
+            }
+
+            entry.Notes = nextNotes;
+        }
+
+        StatusRight = selectedEntries.Length > 1
+            ? $"已更新 {selectedEntries.Length} 条会话注释"
+            : "已更新会话注释";
+    }
+
     public async Task ApplyBasicSettingsAsync()
     {
         await _backend.InvokeAsync("修改端口号", new { Settings.Port });
@@ -395,6 +529,434 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         {
             await _backend.InvokeAsync("保存强制TCP使用规则", new { Data = Settings.MustTcpRules });
         }
+    }
+
+    public void AddHostsRule()
+    {
+        HostsRuleItems.Add(new HostsRuleItem());
+        SyncHostsRulesText();
+    }
+
+    public void RemoveHostsRule(HostsRuleItem? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        HostsRuleItems.Remove(item);
+        SyncHostsRulesText();
+    }
+
+    public async Task ApplyHostsRulesAsync()
+    {
+        foreach (HostsRuleItem item in HostsRuleItems)
+        {
+            item.Hash = EnsureRuleHash(item.Hash);
+        }
+
+        JsonElement? result = await _backend.InvokeAsync("保存HOSTS规则", new
+        {
+            Data = HostsRuleItems.Select(static item => new Dictionary<string, object?>
+            {
+                ["Hash"] = item.Hash,
+                ["源地址"] = item.Source,
+                ["新地址"] = item.Target
+            }).ToArray()
+        });
+
+        HashSet<string> failures = result is { ValueKind: JsonValueKind.Array }
+            ? new HashSet<string>(DeserializeList<string>(result.Value), StringComparer.OrdinalIgnoreCase)
+            : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        int failureCount = 0;
+        foreach (HostsRuleItem item in HostsRuleItems)
+        {
+            bool failed = failures.Contains(item.Hash);
+            item.State = failed ? "保存失败" : "已保存";
+            if (failed)
+            {
+                failureCount++;
+            }
+        }
+
+        SyncHostsRulesText();
+        StatusRight = failureCount > 0 ? $"HOSTS 规则保存完成，失败 {failureCount} 项" : "HOSTS 规则已保存";
+        NotificationRequested?.Invoke(failureCount > 0 ? "错误" : "提示",
+            failureCount > 0 ? $"有 {failureCount} 条 HOSTS 规则保存失败，请检查格式。" : "HOSTS 规则已保存。");
+    }
+
+    public void AddReplaceRule()
+    {
+        ReplaceRuleItems.Add(new ReplaceRuleItem());
+        SyncReplaceRulesText();
+    }
+
+    public void RemoveReplaceRule(ReplaceRuleItem? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        ReplaceRuleItems.Remove(item);
+        SyncReplaceRulesText();
+    }
+
+    public async Task ApplyReplaceRulesAsync()
+    {
+        foreach (ReplaceRuleItem item in ReplaceRuleItems)
+        {
+            item.Hash = EnsureRuleHash(item.Hash);
+        }
+
+        JsonElement? result = await _backend.InvokeAsync("保存替换规则", new
+        {
+            Data = ReplaceRuleItems.Select(static item => new Dictionary<string, object?>
+            {
+                ["Hash"] = item.Hash,
+                ["替换类型"] = item.RuleType,
+                ["源内容"] = item.SourceContent,
+                ["替换内容"] = item.ReplacementContent
+            }).ToArray()
+        });
+
+        HashSet<string> failures = result is { ValueKind: JsonValueKind.Array }
+            ? new HashSet<string>(DeserializeList<string>(result.Value), StringComparer.OrdinalIgnoreCase)
+            : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        int failureCount = 0;
+        foreach (ReplaceRuleItem item in ReplaceRuleItems)
+        {
+            bool failed = failures.Contains(item.Hash);
+            item.State = failed ? "保存失败" : "已保存";
+            if (failed)
+            {
+                failureCount++;
+            }
+        }
+
+        SyncReplaceRulesText();
+        StatusRight = failureCount > 0 ? $"替换规则保存完成，失败 {failureCount} 项" : "替换规则已保存";
+        NotificationRequested?.Invoke(failureCount > 0 ? "错误" : "提示",
+            failureCount > 0 ? $"有 {failureCount} 条替换规则保存失败，请检查内容。" : "替换规则已保存。");
+    }
+
+    public async Task RestoreDefaultScriptAsync()
+    {
+        JsonElement? result = await _backend.InvokeAsync("获取默认Go脚本代码");
+        if (result is { ValueKind: JsonValueKind.String })
+        {
+            Settings.ScriptCode = DecodePayloadElement(result.Value);
+            StatusRight = "已载入默认脚本";
+        }
+    }
+
+    public async Task FormatScriptCodeAsync()
+    {
+        JsonElement? result = await _backend.InvokeAsync("格式化Go脚本代码", new
+        {
+            code = EncodeTextBase64(Settings.ScriptCode)
+        });
+
+        if (result is { ValueKind: JsonValueKind.String })
+        {
+            Settings.ScriptCode = DecodePayloadElement(result.Value);
+            StatusRight = "脚本已格式化";
+        }
+    }
+
+    public async Task ApplyScriptCodeAsync()
+    {
+        await FormatScriptCodeAsync();
+
+        JsonElement? result = await _backend.InvokeAsync("保存Go脚本代码", new
+        {
+            code = EncodeTextBase64(Settings.ScriptCode)
+        });
+
+        string message = result is { ValueKind: JsonValueKind.String }
+            ? result.Value.GetString() ?? ""
+            : "";
+
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            StatusRight = "脚本已保存";
+            NotificationRequested?.Invoke("提示", "脚本已保存并通过校验。");
+            return;
+        }
+
+        StatusRight = "脚本保存失败";
+        NotificationRequested?.Invoke("错误", message);
+    }
+
+    public async Task LoadProcessDriverAsync()
+    {
+        JsonElement? result = await _backend.InvokeAsync("加载驱动");
+        bool ok = result is { ValueKind: JsonValueKind.True };
+        ProcessDriverLoaded = ok;
+
+        if (ok)
+        {
+            StatusRight = "进程驱动已加载";
+            await RefreshRunningProcessesAsync();
+            return;
+        }
+
+        StatusRight = "进程驱动加载失败";
+        NotificationRequested?.Invoke("错误", "加载驱动失败，请确认当前程序具有管理员权限。");
+    }
+
+    public async Task RefreshRunningProcessesAsync()
+    {
+        JsonElement? result = await _backend.InvokeAsync("枚举进程");
+        if (result is not { ValueKind: JsonValueKind.Object })
+        {
+            ReplaceRows(RunningProcesses, Array.Empty<RunningProcessItem>());
+            SelectedRunningProcess = null;
+            return;
+        }
+
+        List<RunningProcessItem> items = new();
+        foreach (JsonProperty property in result.Value.EnumerateObject())
+        {
+            if (!int.TryParse(property.Name, out int pid) || pid <= 0)
+            {
+                continue;
+            }
+
+            items.Add(new RunningProcessItem
+            {
+                Pid = pid,
+                Name = ElementToText(property.Value),
+                IsCaptured = _activeProcessPids.Contains(pid)
+            });
+        }
+
+        items.Sort(static (left, right) =>
+        {
+            int nameResult = StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
+            return nameResult != 0 ? nameResult : left.Pid.CompareTo(right.Pid);
+        });
+
+        ReplaceRows(RunningProcesses, items);
+        SelectedRunningProcess = RunningProcesses.FirstOrDefault(item => _activeProcessPids.Contains(item.Pid))
+            ?? RunningProcesses.FirstOrDefault();
+    }
+
+    public async Task SetCaptureAllProcessesAsync(bool enable)
+    {
+        await _backend.InvokeAsync("进程驱动添加进程名", new { Name = "{OpenALL}", isSet = enable });
+        CaptureAllProcesses = enable;
+        if (enable)
+        {
+            await ClearPidCaptureAsync();
+            UpdateRunningProcessCaptureState();
+        }
+
+        StatusRight = enable ? "已切换为捕获所有进程" : "已关闭捕获所有进程";
+    }
+
+    public async Task AddProcessCaptureNameAsync(string? name = null)
+    {
+        if (CaptureAllProcesses)
+        {
+            NotificationRequested?.Invoke("错误", "请先关闭“捕获所有进程”，再指定进程名。");
+            return;
+        }
+
+        string processName = (name ?? NewProcessName).Trim();
+        if (string.IsNullOrWhiteSpace(processName))
+        {
+            NotificationRequested?.Invoke("错误", "请输入要添加的进程名。");
+            return;
+        }
+
+        if (ProcessCaptureNames.Any(item => string.Equals(item.Name, processName, StringComparison.OrdinalIgnoreCase)))
+        {
+            NewProcessName = "";
+            return;
+        }
+
+        await _backend.InvokeAsync("进程驱动添加进程名", new { Name = processName, isSet = true });
+        ProcessCaptureNames.Add(new ProcessCaptureNameItem { Name = processName });
+        NewProcessName = "";
+        StatusRight = $"已添加进程名：{processName}";
+    }
+
+    public async Task RemoveProcessCaptureNameAsync(ProcessCaptureNameItem? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        await _backend.InvokeAsync("进程驱动添加进程名", new { Name = item.Name, isSet = false });
+        ProcessCaptureNames.Remove(item);
+        if (ReferenceEquals(SelectedProcessCaptureName, item))
+        {
+            SelectedProcessCaptureName = null;
+        }
+
+        StatusRight = $"已移除进程名：{item.Name}";
+    }
+
+    public Task SetPidCaptureAsync(RunningProcessItem? item)
+    {
+        return SetPidCaptureAsync(item is null ? Array.Empty<RunningProcessItem>() : new[] { item });
+    }
+
+    public async Task SetPidCaptureAsync(IEnumerable<RunningProcessItem> items)
+    {
+        RunningProcessItem[] targets = items
+            .Where(static item => item is not null)
+            .DistinctBy(static item => item.Pid)
+            .Where(static item => item.Pid > 0)
+            .ToArray();
+
+        if (targets.Length == 0)
+        {
+            return;
+        }
+
+        if (CaptureAllProcesses)
+        {
+            NotificationRequested?.Invoke("错误", "请先关闭“捕获所有进程”，再按 PID 捕获。");
+            return;
+        }
+
+        foreach (RunningProcessItem item in targets)
+        {
+            await _backend.InvokeAsync("进程驱动添加PID", new { PID = item.Pid, isSelected = true });
+            _activeProcessPids.Add(item.Pid);
+        }
+
+        UpdateRunningProcessCaptureState();
+        StatusRight = targets.Length == 1
+            ? $"已按 PID 捕获：{targets[0].Pid}"
+            : $"已按 PID 捕获 {targets.Length} 项";
+    }
+
+    public Task ClearPidCaptureAsync()
+    {
+        return ClearPidCaptureAsync(_activeProcessPids
+            .Select(pid => new RunningProcessItem { Pid = pid })
+            .ToArray());
+    }
+
+    public async Task ClearPidCaptureAsync(IEnumerable<RunningProcessItem> items)
+    {
+        RunningProcessItem[] targets = items
+            .Where(static item => item is not null)
+            .DistinctBy(static item => item.Pid)
+            .Where(static item => item.Pid > 0)
+            .ToArray();
+
+        if (targets.Length == 0)
+        {
+            return;
+        }
+
+        foreach (RunningProcessItem item in targets)
+        {
+            await _backend.InvokeAsync("进程驱动添加PID", new { PID = item.Pid, isSelected = false });
+            _activeProcessPids.Remove(item.Pid);
+        }
+
+        UpdateRunningProcessCaptureState();
+        StatusRight = targets.Length == 1
+            ? $"已清除 PID 捕获：{targets[0].Pid}"
+            : $"已清除 {targets.Length} 项 PID 捕获";
+    }
+
+    public async Task AddRequestCertificateRuleAsync()
+    {
+        JsonElement? result = await _backend.InvokeAsync("创建证书管理器");
+        int context = result is { ValueKind: JsonValueKind.Number } && result.Value.TryGetInt32(out int id)
+            ? id
+            : 0;
+        if (context <= 0)
+        {
+            NotificationRequested?.Invoke("错误", "创建请求证书管理器失败。");
+            return;
+        }
+
+        RequestCertificateItems.Add(new RequestCertificateRuleItem
+        {
+            Context = context,
+            UsageRule = "解析及发送"
+        });
+        StatusRight = "已新增请求证书规则";
+    }
+
+    public async Task RemoveRequestCertificateRuleAsync(RequestCertificateRuleItem? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        await _backend.InvokeAsync("删除证书管理器", new
+        {
+            context = new[]
+            {
+                new { id = item.Context }
+            }
+        });
+
+        RequestCertificateItems.Remove(item);
+        StatusRight = "已删除请求证书规则";
+    }
+
+    public async Task ResolveRequestCertificateCommonNameAsync(RequestCertificateRuleItem? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        JsonElement? result = await _backend.InvokeAsync("查询证书CommonName", new
+        {
+            context = item.Context,
+            rule = item.UsageRule
+        });
+
+        string host = result is { ValueKind: JsonValueKind.String }
+            ? result.Value.GetString() ?? ""
+            : "";
+
+        if (string.IsNullOrWhiteSpace(host))
+        {
+            NotificationRequested?.Invoke("错误", "证书中没有可用的主机名。");
+            return;
+        }
+
+        item.Host = host;
+        StatusRight = "已读取证书主机名";
+    }
+
+    public async Task LoadRequestCertificateAsync(RequestCertificateRuleItem? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        JsonElement? result = await _backend.InvokeAsync("载入请求证书", new
+        {
+            Data = new Dictionary<string, object?>
+            {
+                ["context"] = item.Context,
+                ["使用规则"] = item.UsageRule,
+                ["证书文件"] = item.CertificateFile,
+                ["密码"] = item.Password,
+                ["主机名"] = item.Host
+            }
+        });
+
+        bool ok = result is { ValueKind: JsonValueKind.True };
+        item.LoadState = ok ? "已载入" : "载入失败";
+        StatusRight = ok ? "请求证书已载入" : "请求证书载入失败";
     }
 
     public async Task<(byte[] Bytes, string Text, string Json)> LoadSocketPayloadAsync(int theology, int index)
@@ -1027,6 +1589,80 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         Settings.ScriptCode = DecodePayloadElement(GetProperty(args, "ScriptCode"));
         Settings.HostsRules = ToIndentedJson(GetProperty(args, "HostsRules"));
         Settings.ReplaceRules = ToIndentedJson(GetProperty(args, "ReplaceRules"));
+        ApplyHostsRulesConfig(GetProperty(args, "HostsRules"));
+        ApplyReplaceRulesConfig(GetProperty(args, "ReplaceRules"));
+        ApplyRequestCertificateConfig(GetProperty(args, "RequestCertManager"));
+    }
+
+    private void ApplyHostsRulesConfig(JsonElement element)
+    {
+        List<HostsRuleItem> items = new();
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (JsonElement item in element.EnumerateArray())
+            {
+                items.Add(new HostsRuleItem
+                {
+                    Hash = GetString(item, "Hash", Guid.NewGuid().ToString("N")),
+                    Source = GetString(item, "Src"),
+                    Target = GetString(item, "Dest"),
+                    State = "已保存"
+                });
+            }
+        }
+
+        ReplaceRows(HostsRuleItems, items);
+        SyncHostsRulesText();
+    }
+
+    private void ApplyReplaceRulesConfig(JsonElement element)
+    {
+        List<ReplaceRuleItem> items = new();
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (JsonElement item in element.EnumerateArray())
+            {
+                items.Add(new ReplaceRuleItem
+                {
+                    Hash = GetString(item, "Hash", Guid.NewGuid().ToString("N")),
+                    RuleType = GetString(item, "Type", "String(UTF8)"),
+                    SourceContent = GetString(item, "Src"),
+                    ReplacementContent = GetString(item, "Dest"),
+                    State = "已保存"
+                });
+            }
+        }
+
+        ReplaceRows(ReplaceRuleItems, items);
+        SyncReplaceRulesText();
+    }
+
+    private void ApplyRequestCertificateConfig(JsonElement element)
+    {
+        List<RequestCertificateRuleItem> items = new();
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (JsonProperty property in element.EnumerateObject())
+            {
+                if (!int.TryParse(property.Name, out int context) || context <= 0)
+                {
+                    continue;
+                }
+
+                items.Add(new RequestCertificateRuleItem
+                {
+                    Context = context,
+                    UsageRule = ToRequestCertificateRuleText(GetInt(property.Value, "rule", 2)),
+                    Host = GetString(property.Value, "Host"),
+                    CertificateFile = GetString(property.Value, "FilePath"),
+                    Password = GetString(property.Value, "PassWord"),
+                    LoadState = "未载入"
+                });
+            }
+        }
+
+        items.Sort(static (left, right) => left.Context.CompareTo(right.Context));
+        ReplaceRows(RequestCertificateItems, items);
     }
 
     private void AddEntry(CaptureEntry entry)
@@ -1248,6 +1884,41 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         RefreshSessionFilterItems();
     }
 
+    private static CaptureEntry[] NormalizeSessionEntries(IEnumerable<CaptureEntry> entries)
+    {
+        List<CaptureEntry> result = new();
+        HashSet<int> theologyIds = new();
+        HashSet<CaptureEntry> objectSet = new();
+
+        foreach (CaptureEntry entry in entries)
+        {
+            if (entry.Theology > 0)
+            {
+                if (!theologyIds.Add(entry.Theology))
+                {
+                    continue;
+                }
+            }
+            else if (!objectSet.Add(entry))
+            {
+                continue;
+            }
+
+            result.Add(entry);
+        }
+
+        return result.ToArray();
+    }
+
+    private static int[] GetTheologyIds(IEnumerable<CaptureEntry> entries)
+    {
+        return entries
+            .Select(static entry => entry.Theology)
+            .Where(static theology => theology > 0)
+            .Distinct()
+            .ToArray();
+    }
+
     private static bool ReplaceSelectedFilterKeys(HashSet<string> target, IEnumerable<string> keys, string allKey)
     {
         HashSet<string> next = NormalizeFilterKeys(keys, allKey);
@@ -1356,6 +2027,63 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     private static string NormalizeFavoritePart(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? "" : value.Trim();
+    }
+
+    private void SyncHostsRulesText()
+    {
+        Settings.HostsRules = JsonSerializer.Serialize(
+            HostsRuleItems.Select(static item => new
+            {
+                item.Hash,
+                Src = item.Source,
+                Dest = item.Target
+            }),
+            JsonOptions);
+    }
+
+    private void SyncReplaceRulesText()
+    {
+        Settings.ReplaceRules = JsonSerializer.Serialize(
+            ReplaceRuleItems.Select(static item => new
+            {
+                Type = item.RuleType,
+                Src = item.SourceContent,
+                Dest = item.ReplacementContent,
+                item.Hash
+            }),
+            JsonOptions);
+    }
+
+    private void UpdateRunningProcessCaptureState()
+    {
+        foreach (RunningProcessItem item in RunningProcesses)
+        {
+            item.IsCaptured = _activeProcessPids.Contains(item.Pid);
+        }
+
+        OnPropertyChanged(nameof(CurrentPidCaptureText));
+        SelectedRunningProcess = RunningProcesses.FirstOrDefault(item => _activeProcessPids.Contains(item.Pid))
+            ?? SelectedRunningProcess;
+    }
+
+    private static string EnsureRuleHash(string? hash)
+    {
+        return string.IsNullOrWhiteSpace(hash) ? Guid.NewGuid().ToString("N") : hash;
+    }
+
+    private static string EncodeTextBase64(string? text)
+    {
+        return Convert.ToBase64String(Encoding.UTF8.GetBytes(text ?? ""));
+    }
+
+    private static string ToRequestCertificateRuleText(int rule)
+    {
+        return rule switch
+        {
+            3 => "仅解析",
+            2 => "解析及发送",
+            _ => "仅发送"
+        };
     }
 
     private async Task LoadRequestMultipartImageAsync(CaptureEntry selected)
