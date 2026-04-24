@@ -576,8 +576,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         }
 
         StatusRight = selectedEntries.Length > 1
-            ? $"已更新 {selectedEntries.Length} 条会话注释"
-            : "已更新会话注释";
+            ? $"已更新 {selectedEntries.Length} 条会话备注"
+            : "已更新会话备注";
     }
 
     public async Task ApplyBasicSettingsAsync()

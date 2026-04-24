@@ -570,7 +570,16 @@
                                             <MenuItem Header="Python requests" Tag="Python|requests" Click="GenerateRequestCode_Click" />
                                         </MenuItem>
                                         <MenuItem x:Name="FavoriteSelectedSessionsMenuItem" Header="标记收藏" Click="FavoriteSelectedSessions_Click" />
-                                        <MenuItem x:Name="EditNotesSessionsMenuItem" Header="编辑注释..." Click="EditSelectedSessionNotes_Click" />
+                                        <MenuItem x:Name="EditNotesSessionsMenuItem" Header="编辑备注..." Click="EditSelectedSessionNotes_Click" />
+                                        <Separator />
+                                        <MenuItem x:Name="SelectSessionsMenuItem" Header="选择">
+                                            <MenuItem Header="全选" InputGestureText="Ctrl+A" Click="SelectAllSessions_Click" />
+                                            <MenuItem Header="反选" Click="InvertSelectedSessions_Click" />
+                                            <Separator />
+                                            <MenuItem x:Name="SelectParentRequestsMenuItem" Header="父请求" Click="SelectParentRequests_Click" />
+                                            <MenuItem x:Name="SelectChildRequestsMenuItem" Header="子请求" Click="SelectChildRequests_Click" />
+                                            <MenuItem x:Name="SelectSameValueMenuItem" Header="匹配值" Click="SelectSameValueSessions_Click" />
+                                        </MenuItem>
                                         <Separator />
                                         <MenuItem x:Name="FilterSelectedSessionsMenuItem" Header="过滤">
                                             <MenuItem x:Name="FilterByProcessMenuItem" Header="按选中进程过滤" Click="FilterSelectedSessionsByProcess_Click" />
@@ -633,6 +642,9 @@
                                         <Setter Property="VerticalAlignment" Value="Center" />
                                         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
                                     </Style>
+                                    <Style x:Key="SessionUrlTextCellTextStyle" TargetType="{x:Type TextBlock}" BasedOn="{StaticResource SessionTextCellTextStyle}">
+                                        <Setter Property="ToolTip" Value="{Binding Url}" />
+                                    </Style>
                                     <Style x:Key="SessionNotesEditingStyle" TargetType="{x:Type TextBox}">
                                         <Setter Property="VerticalContentAlignment" Value="Center" />
                                         <Setter Property="Padding" Value="0" />
@@ -660,7 +672,7 @@
                                     </Style>
                                 </DataGrid.RowStyle>
                                 <DataGrid.Columns>
-                                    <DataGridTemplateColumn x:Name="IndexColumn" Header="序号" Width="82" IsReadOnly="True" CellStyle="{StaticResource SessionIndexCellStyle}" HeaderStyle="{StaticResource SessionIndexHeaderStyle}">
+                                    <DataGridTemplateColumn x:Name="IndexColumn" Header="#" Width="82" IsReadOnly="True" CellStyle="{StaticResource SessionIndexCellStyle}" HeaderStyle="{StaticResource SessionIndexHeaderStyle}">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <StackPanel Margin="16,0,0,0"
@@ -697,13 +709,13 @@
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
-                                    <DataGridTextColumn x:Name="MethodColumn" Header="方式" Binding="{Binding DisplayMethod}" Width="62" IsReadOnly="True" ElementStyle="{StaticResource SessionMethodTextStyle}" />
-                                    <DataGridTextColumn x:Name="StateColumn" Header="状态" Binding="{Binding State}" Width="68" IsReadOnly="True" ElementStyle="{StaticResource SessionStateTextStyle}" />
-                                    <DataGridTextColumn x:Name="UrlColumn" Header="请求地址" Binding="{Binding Url}" Width="4*" IsReadOnly="True" ElementStyle="{StaticResource SessionTextCellTextStyle}" />
-                                    <DataGridTextColumn x:Name="LengthColumn" Header="响应长度" Binding="{Binding ResponseLength}" Width="96" IsReadOnly="True" ElementStyle="{StaticResource SessionTextCellTextStyle}" />
-                                    <DataGridTextColumn x:Name="TypeColumn" Header="响应类型" Binding="{Binding ResponseType}" Width="104" IsReadOnly="True" ElementStyle="{StaticResource SessionTextCellTextStyle}" />
-                                    <DataGridTextColumn x:Name="ProcessColumn" Header="进程" Binding="{Binding Process}" Width="92" IsReadOnly="True" ElementStyle="{StaticResource SessionTextCellTextStyle}" />
-                                    <DataGridTextColumn x:Name="NotesColumn" Header="注释" Binding="{Binding Notes, UpdateSourceTrigger=PropertyChanged}" Width="140" ElementStyle="{StaticResource SessionTextCellTextStyle}" EditingElementStyle="{StaticResource SessionNotesEditingStyle}" />
+                                    <DataGridTextColumn x:Name="MethodColumn" Header="方式" Binding="{Binding DisplayMethod}" Width="62" DisplayIndex="2" IsReadOnly="True" ElementStyle="{StaticResource SessionMethodTextStyle}" />
+                                    <DataGridTextColumn x:Name="UrlColumn" Header="URL" Binding="{Binding Url}" Width="4*" DisplayIndex="3" IsReadOnly="True" ElementStyle="{StaticResource SessionUrlTextCellTextStyle}" />
+                                    <DataGridTextColumn x:Name="StateColumn" Header="状态" Binding="{Binding State}" Width="68" DisplayIndex="4" IsReadOnly="True" ElementStyle="{StaticResource SessionStateTextStyle}" />
+                                    <DataGridTextColumn x:Name="LengthColumn" Header="长度" Binding="{Binding ResponseLength}" Width="96" DisplayIndex="5" IsReadOnly="True" ElementStyle="{StaticResource SessionTextCellTextStyle}" />
+                                    <DataGridTextColumn x:Name="TypeColumn" Header="类型" Binding="{Binding ResponseType}" Width="104" DisplayIndex="6" IsReadOnly="True" ElementStyle="{StaticResource SessionTextCellTextStyle}" />
+                                    <DataGridTextColumn x:Name="NotesColumn" Header="备注" Binding="{Binding Notes, UpdateSourceTrigger=PropertyChanged}" Width="140" DisplayIndex="7" ElementStyle="{StaticResource SessionTextCellTextStyle}" EditingElementStyle="{StaticResource SessionNotesEditingStyle}" />
+                                    <DataGridTextColumn x:Name="ProcessColumn" Header="进程" Binding="{Binding Process}" Width="92" DisplayIndex="8" IsReadOnly="True" ElementStyle="{StaticResource SessionTextCellTextStyle}" />
                                 </DataGrid.Columns>
                             </DataGrid>
                         </Grid>
@@ -1047,7 +1059,7 @@
                             <CheckBox Content="响应长度" IsChecked="True" Checked="ColumnCheckChanged" Unchecked="ColumnCheckChanged" Tag="{Binding ElementName=LengthColumn}" />
                             <CheckBox Content="响应类型" IsChecked="True" Checked="ColumnCheckChanged" Unchecked="ColumnCheckChanged" Tag="{Binding ElementName=TypeColumn}" />
                             <CheckBox Content="进程" IsChecked="True" Checked="ColumnCheckChanged" Unchecked="ColumnCheckChanged" Tag="{Binding ElementName=ProcessColumn}" />
-                            <CheckBox Content="注释" IsChecked="True" Checked="ColumnCheckChanged" Unchecked="ColumnCheckChanged" Tag="{Binding ElementName=NotesColumn}" />
+                            <CheckBox Content="备注" IsChecked="True" Checked="ColumnCheckChanged" Unchecked="ColumnCheckChanged" Tag="{Binding ElementName=NotesColumn}" />
                         </StackPanel>
                     </Border>
                 </Grid>

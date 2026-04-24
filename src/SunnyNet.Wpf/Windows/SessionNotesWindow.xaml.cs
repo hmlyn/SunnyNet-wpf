@@ -10,8 +10,8 @@ public partial class SessionNotesWindow : Window
         InitializeComponent();
         NotesTextBox.Text = initialNotes;
         SubtitleTextBlock.Text = sessionCount > 1
-            ? $"将覆盖选中的 {sessionCount} 条会话注释，留空保存即可清除注释。"
-            : "留空保存即可清除注释。";
+            ? $"将覆盖选中的 {sessionCount} 条会话备注，留空保存即可清除备注。"
+            : "留空保存即可清除备注。";
         Loaded += (_, _) =>
         {
             NotesTextBox.Focus();

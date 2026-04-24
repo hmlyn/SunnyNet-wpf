@@ -24,6 +24,7 @@ public sealed class ReplaceRuleItem : ViewModelBase
             if (SetProperty(ref _ruleType, string.IsNullOrWhiteSpace(value) ? "String(UTF8)" : value))
             {
                 State = "未保存";
+                OnPropertyChanged(nameof(UsesResponseFile));
             }
         }
     }
@@ -57,4 +58,6 @@ public sealed class ReplaceRuleItem : ViewModelBase
         get => _state;
         set => SetProperty(ref _state, value ?? "");
     }
+
+    public bool UsesResponseFile => RuleType == "响应文件";
 }

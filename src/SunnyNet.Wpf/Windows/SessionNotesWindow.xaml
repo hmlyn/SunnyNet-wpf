@@ -1,11 +1,11 @@
 <Window x:Class="SunnyNet.Wpf.Windows.SessionNotesWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="编辑注释"
+        Title="编辑备注"
         Width="430"
-        Height="236"
+        Height="248"
         MinWidth="380"
-        MinHeight="220"
+        MinHeight="230"
         ResizeMode="CanResize"
         Background="{StaticResource WindowBackgroundBrush}"
         Foreground="{StaticResource TextPrimaryBrush}"
@@ -19,29 +19,21 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <StackPanel>
-                <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="编辑会话注释" />
-                <TextBlock x:Name="SubtitleTextBlock"
-                           Margin="0,4,0,0"
-                           Style="{StaticResource DialogSubtitleTextStyle}"
-                           Text="留空保存即可清除注释。" />
-            </StackPanel>
+            <TextBlock x:Name="SubtitleTextBlock"
+                       Margin="0,0,0,10"
+                       Style="{StaticResource DialogSubtitleTextStyle}"
+                       Text="留空保存即可清除备注。" />
 
             <TextBox x:Name="NotesTextBox"
                      Grid.Row="1"
-                     Margin="0,12,0,0"
-                     MinHeight="86"
+                     MinHeight="76"
                      AcceptsReturn="True"
                      TextWrapping="Wrap"
                      VerticalScrollBarVisibility="Auto" />
 
             <DockPanel Grid.Row="2"
-                       Margin="0,12,0,0"
+                       Margin="0,10,0,0"
                        LastChildFill="False">
-                <TextBlock VerticalAlignment="Center"
-                           Foreground="{StaticResource TextSecondaryBrush}"
-                           FontSize="12"
-                           Text="Ctrl+Enter 保存，Esc 关闭" />
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                     <Button Margin="0,0,8,0"
                             Padding="12,6"

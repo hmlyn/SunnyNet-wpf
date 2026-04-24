@@ -16,12 +16,20 @@
         </Grid.RowDefinitions>
 
         <Border Style="{StaticResource CardBorderStyle}">
-            <StackPanel Margin="22,18">
-                <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="文本对比" />
-                <TextBlock Margin="0,6,0,0"
-                           Style="{StaticResource DialogSubtitleTextStyle}"
-                           Text="左右粘贴请求、响应或脚本文本，便于快速人工对比差异。" />
-            </StackPanel>
+            <DockPanel Margin="18,14" LastChildFill="True">
+                <Button DockPanel.Dock="Right"
+                        MinWidth="88"
+                        Padding="12,5"
+                        Click="Clear_Click"
+                        Content="清空" />
+                <StackPanel>
+                    <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="文本对比" />
+                    <TextBlock x:Name="CompareSummaryTextBlock"
+                               Margin="0,6,0,0"
+                               Style="{StaticResource DialogSubtitleTextStyle}"
+                               Text="输入或粘贴文本后自动对比，差异字符会以红色高亮。" />
+                </StackPanel>
+            </DockPanel>
         </Border>
 
         <Grid Grid.Row="1" Margin="0,16,0,0">
@@ -41,15 +49,17 @@
                             BorderBrush="{StaticResource DividerBrush}"
                             BorderThickness="0,0,0,1"
                             CornerRadius="8,8,0,0">
-                        <TextBlock Margin="16,0" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="左侧文本" />
+                        <TextBlock x:Name="LeftTitleTextBlock" Margin="16,0" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="左侧文本" />
                     </Border>
-                    <TextBox Grid.Row="1"
-                             Margin="12"
-                             AcceptsReturn="True"
-                             VerticalScrollBarVisibility="Auto"
-                             HorizontalScrollBarVisibility="Auto"
-                             FontFamily="Consolas, Microsoft YaHei UI"
-                             TextWrapping="NoWrap" />
+                    <RichTextBox x:Name="LeftEditor"
+                                 Grid.Row="1"
+                                 Margin="12"
+                                 AcceptsTab="True"
+                                 FontFamily="Consolas, Microsoft YaHei UI"
+                                 FontSize="12"
+                                 HorizontalScrollBarVisibility="Auto"
+                                 TextChanged="Editor_TextChanged"
+                                 VerticalScrollBarVisibility="Auto" />
                 </Grid>
             </Border>
 
@@ -67,15 +77,17 @@
                             BorderBrush="{StaticResource DividerBrush}"
                             BorderThickness="0,0,0,1"
                             CornerRadius="8,8,0,0">
-                        <TextBlock Margin="16,0" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="右侧文本" />
+                        <TextBlock x:Name="RightTitleTextBlock" Margin="16,0" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="右侧文本" />
                     </Border>
-                    <TextBox Grid.Row="1"
-                             Margin="12"
-                             AcceptsReturn="True"
-                             VerticalScrollBarVisibility="Auto"
-                             HorizontalScrollBarVisibility="Auto"
-                             FontFamily="Consolas, Microsoft YaHei UI"
-                             TextWrapping="NoWrap" />
+                    <RichTextBox x:Name="RightEditor"
+                                 Grid.Row="1"
+                                 Margin="12"
+                                 AcceptsTab="True"
+                                 FontFamily="Consolas, Microsoft YaHei UI"
+                                 FontSize="12"
+                                 HorizontalScrollBarVisibility="Auto"
+                                 TextChanged="Editor_TextChanged"
+                                 VerticalScrollBarVisibility="Auto" />
                 </Grid>
             </Border>
         </Grid>

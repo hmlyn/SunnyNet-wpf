@@ -221,6 +221,25 @@ public partial class SettingsWindow : Window
         _viewModel.RemoveReplaceRule(ReplaceRulesGrid.SelectedItem as ReplaceRuleItem);
     }
 
+    private void BrowseReplaceFile_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not ReplaceRuleItem item)
+        {
+            return;
+        }
+
+        OpenFileDialog dialog = new()
+        {
+            Title = "选择响应替换文件",
+            Filter = "所有文件 (*.*)|*.*"
+        };
+
+        if (dialog.ShowDialog(this) == true)
+        {
+            item.ReplacementContent = dialog.FileName;
+        }
+    }
+
     private async void ApplyReplace_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         await RunActionAsync(() => _viewModel.ApplyReplaceRulesAsync());

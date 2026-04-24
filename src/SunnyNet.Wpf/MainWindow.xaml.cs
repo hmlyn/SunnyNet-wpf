@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Windows.Threading;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
@@ -29,6 +30,8 @@ public partial class MainWindow : Window
     private bool _isUpdatingCaptureScope;
     private bool _isCloseConfirmed;
     private bool _isCloseCleanupRunning;
+    private CaptureEntry? _contextSessionEntry;
+    private DispatcherTimer? _columnWidthSaveTimer;
 
     public MainWindow()
     {
@@ -48,6 +51,7 @@ public partial class MainWindow : Window
         _viewModel.ScrollToEntryRequested += ViewModel_ScrollToEntryRequested;
         _viewModel.PropertyChanged += ViewModel_PropertyChanged;
         _viewModel.Detail.PropertyChanged += Detail_PropertyChanged;
+        RegisterSessionColumnWidthListeners();
         UpdateFooterState();
     }
 
@@ -334,6 +338,20 @@ public partial class MainWindow : Window
 
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs keyEventArgs)
     {
+        if (keyEventArgs.Key == Key.Delete && IsKeyboardFocusWithinSessionsGrid())
+        {
+            DeleteSelectedSessionsFromKeyboard();
+            keyEventArgs.Handled = true;
+            return;
+        }
+
+        if (keyEventArgs.Key == Key.A && Keyboard.Modifiers == ModifierKeys.Control && IsKeyboardFocusWithinSessionsGrid())
+        {
+            SelectAllVisibleSessions();
+            keyEventArgs.Handled = true;
+            return;
+        }
+
         if (keyEventArgs.Key != Key.F || Keyboard.Modifiers != ModifierKeys.Control)
         {
             return;
@@ -505,20 +523,18 @@ public partial class MainWindow : Window
 
     private void ApplySavedColumnLayout()
     {
-        if (_layoutSettings.SessionColumns.Count == 0)
-        {
-            return;
-        }
-
         Dictionary<string, DataGridColumn> columns = GetSessionColumnMap();
         foreach ((string key, DataGridColumn column) in columns)
         {
-            if (!_layoutSettings.SessionColumns.TryGetValue(key, out bool isVisible))
+            if (_layoutSettings.SessionColumns.TryGetValue(key, out bool isVisible))
             {
-                continue;
+                column.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            column.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
+            if (_layoutSettings.SessionColumnWidths.TryGetValue(key, out double width) && IsValidLength(width))
+            {
+                column.Width = new DataGridLength(Clamp(width, 36, 1200), DataGridLengthUnitType.Pixel);
+            }
         }
 
         SyncColumnPickerChecks();
@@ -555,6 +571,7 @@ public partial class MainWindow : Window
         foreach ((string key, DataGridColumn column) in GetSessionColumnMap())
         {
             _layoutSettings.SessionColumns[key] = column.Visibility == Visibility.Visible;
+            SaveSessionColumnWidth(key, column);
         }
 
         _layoutSettings.ShowFavoritesOnly = _viewModel.ShowFavoritesOnly;
@@ -629,6 +646,65 @@ public partial class MainWindow : Window
         }
 
         _layoutSettings.SessionColumns[key] = isVisible;
+        SaveSessionColumnWidth(key, column);
+        UiLayoutSettingsStore.Save(_layoutSettings);
+    }
+
+    private void SaveSessionColumnWidth(string key, DataGridColumn column)
+    {
+        double width = column.ActualWidth;
+        if (!IsValidLength(width) || width < 20)
+        {
+            width = column.Width.DisplayValue;
+        }
+
+        if (IsValidLength(width) && width >= 20)
+        {
+            _layoutSettings.SessionColumnWidths[key] = Math.Round(width, 1);
+        }
+    }
+
+    private void RegisterSessionColumnWidthListeners()
+    {
+        foreach (DataGridColumn column in GetSessionColumnMap().Values)
+        {
+            DependencyPropertyDescriptor.FromProperty(DataGridColumn.WidthProperty, typeof(DataGridColumn))
+                ?.AddValueChanged(column, SessionColumnWidthChanged);
+        }
+    }
+
+    private void SessionColumnWidthChanged(object? sender, EventArgs eventArgs)
+    {
+        if (_isInitializingLayout || sender is not DataGridColumn column)
+        {
+            return;
+        }
+
+        string? key = GetSessionColumnKey(column);
+        if (key is null)
+        {
+            return;
+        }
+
+        SaveSessionColumnWidth(key, column);
+        _columnWidthSaveTimer ??= new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(500)
+        };
+        _columnWidthSaveTimer.Tick -= ColumnWidthSaveTimer_Tick;
+        _columnWidthSaveTimer.Tick += ColumnWidthSaveTimer_Tick;
+        _columnWidthSaveTimer.Stop();
+        _columnWidthSaveTimer.Start();
+    }
+
+    private void ColumnWidthSaveTimer_Tick(object? sender, EventArgs eventArgs)
+    {
+        _columnWidthSaveTimer?.Stop();
+        foreach ((string key, DataGridColumn column) in GetSessionColumnMap())
+        {
+            SaveSessionColumnWidth(key, column);
+        }
+
         UiLayoutSettingsStore.Save(_layoutSettings);
     }
 
@@ -648,13 +724,14 @@ public partial class MainWindow : Window
         return new Dictionary<string, DataGridColumn>
         {
             ["Index"] = IndexColumn,
+            ["Favorite"] = FavoriteColumn,
             ["Method"] = MethodColumn,
-            ["State"] = StateColumn,
             ["Url"] = UrlColumn,
+            ["State"] = StateColumn,
             ["Length"] = LengthColumn,
             ["Type"] = TypeColumn,
-            ["Process"] = ProcessColumn,
-            ["Notes"] = NotesColumn
+            ["Notes"] = NotesColumn,
+            ["Process"] = ProcessColumn
         };
     }
 
@@ -761,6 +838,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        _contextSessionEntry = entry;
         if (!row.IsSelected)
         {
             SessionsGrid.SelectedItems.Clear();
@@ -779,6 +857,7 @@ public partial class MainWindow : Window
         bool hasConnectedSocket = hasSelection && entries.Any(IsConnectedSocketSession);
         bool hasProcess = entries.Any(static entry => !string.IsNullOrWhiteSpace(entry.Process));
         bool hasDomain = entries.Any(static entry => !string.IsNullOrWhiteSpace(entry.Host));
+        bool hasContext = _contextSessionEntry is not null;
 
         CopySelectedSessionsMenuItem.IsEnabled = hasSelection;
         GenerateCodeSessionsMenuItem.IsEnabled = isHttpSelection;
@@ -787,7 +866,12 @@ public partial class MainWindow : Window
             ? "取消收藏"
             : "标记收藏";
         EditNotesSessionsMenuItem.IsEnabled = hasSelection;
-        EditNotesSessionsMenuItem.Header = entries.Length > 1 ? $"编辑注释 ({entries.Length})..." : "编辑注释...";
+        EditNotesSessionsMenuItem.Header = entries.Length > 1 ? $"编辑备注 ({entries.Length})..." : "编辑备注...";
+        SelectSessionsMenuItem.IsEnabled = SessionsGrid.Items.Count > 0;
+        SelectParentRequestsMenuItem.IsEnabled = hasContext;
+        SelectChildRequestsMenuItem.IsEnabled = hasContext;
+        SelectSameValueMenuItem.IsEnabled = hasContext;
+        SelectSameValueMenuItem.Header = BuildSameValueMenuHeader(_contextSessionEntry);
         FilterSelectedSessionsMenuItem.IsEnabled = hasSelection;
         FilterByProcessMenuItem.IsEnabled = hasProcess;
         FilterByDomainMenuItem.IsEnabled = hasDomain;
@@ -798,6 +882,63 @@ public partial class MainWindow : Window
         AutoScrollFromSessionsMenuItem.IsChecked = _viewModel.AutoScroll;
         DeleteSelectedSessionsMenuItem.IsEnabled = hasSelection;
         DeleteSelectedSessionsMenuItem.Header = entries.Length > 1 ? $"删除选中 ({entries.Length})" : "删除选中";
+    }
+
+    private void SelectAllSessions_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        SelectAllVisibleSessions();
+    }
+
+    private void InvertSelectedSessions_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        HashSet<CaptureEntry> selected = GetSelectedSessionEntries().ToHashSet();
+        SessionsGrid.SelectedItems.Clear();
+        foreach (CaptureEntry entry in GetVisibleSessionEntries())
+        {
+            if (!selected.Contains(entry))
+            {
+                SessionsGrid.SelectedItems.Add(entry);
+            }
+        }
+    }
+
+    private void SelectParentRequests_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        CaptureEntry? context = _contextSessionEntry ?? _viewModel.SelectedSession;
+        if (context is null)
+        {
+            return;
+        }
+
+        SelectSessions(entry => IsParentRequest(entry, context));
+    }
+
+    private void SelectChildRequests_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        CaptureEntry? context = _contextSessionEntry ?? _viewModel.SelectedSession;
+        if (context is null)
+        {
+            return;
+        }
+
+        SelectSessions(entry => IsChildRequest(entry, context));
+    }
+
+    private void SelectSameValueSessions_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        CaptureEntry? context = _contextSessionEntry ?? _viewModel.SelectedSession;
+        if (context is null)
+        {
+            return;
+        }
+
+        string matchValue = ResolveMatchValue(context);
+        if (string.IsNullOrWhiteSpace(matchValue))
+        {
+            return;
+        }
+
+        SelectSessions(entry => string.Equals(ResolveMatchValue(entry), matchValue, StringComparison.OrdinalIgnoreCase));
     }
 
     private void CopySelectedSessionUrls_Click(object sender, RoutedEventArgs routedEventArgs)
@@ -827,7 +968,7 @@ public partial class MainWindow : Window
         }
 
         StringBuilder builder = new();
-        builder.AppendLine("序号\t方式\t状态\t请求地址\t响应长度\t响应类型\t进程\t注释");
+        builder.AppendLine("序号\t方式\t状态\t请求地址\t响应长度\t响应类型\t进程\t备注");
         foreach (CaptureEntry entry in entries)
         {
             builder.Append(entry.Index).Append('\t')
@@ -914,7 +1055,7 @@ public partial class MainWindow : Window
         }
         catch (Exception exception)
         {
-            ViewModel_NotificationRequested("注释失败", exception.Message);
+            ViewModel_NotificationRequested("备注失败", exception.Message);
         }
     }
 
@@ -992,6 +1133,16 @@ public partial class MainWindow : Window
 
     private async void DeleteSelectedSessions_Click(object sender, RoutedEventArgs routedEventArgs)
     {
+        await DeleteSelectedSessionsAsync();
+    }
+
+    private async void DeleteSelectedSessionsFromKeyboard()
+    {
+        await DeleteSelectedSessionsAsync();
+    }
+
+    private async Task DeleteSelectedSessionsAsync()
+    {
         try
         {
             await _viewModel.DeleteSessionEntriesAsync(GetSelectedSessionEntries());
@@ -1034,6 +1185,103 @@ public partial class MainWindow : Window
         return _viewModel.SelectedSession is null
             ? Array.Empty<CaptureEntry>()
             : new[] { _viewModel.SelectedSession };
+    }
+
+    private CaptureEntry[] GetVisibleSessionEntries()
+    {
+        return _viewModel.SessionsView
+            .OfType<CaptureEntry>()
+            .OrderBy(static entry => entry.Index)
+            .ToArray();
+    }
+
+    private void SelectAllVisibleSessions()
+    {
+        SessionsGrid.SelectedItems.Clear();
+        foreach (CaptureEntry entry in GetVisibleSessionEntries())
+        {
+            SessionsGrid.SelectedItems.Add(entry);
+        }
+    }
+
+    private void SelectSessions(Func<CaptureEntry, bool> predicate)
+    {
+        CaptureEntry[] entries = GetVisibleSessionEntries()
+            .Where(predicate)
+            .ToArray();
+
+        SessionsGrid.SelectedItems.Clear();
+        foreach (CaptureEntry entry in entries)
+        {
+            SessionsGrid.SelectedItems.Add(entry);
+        }
+
+        if (entries.Length > 0)
+        {
+            SessionsGrid.ScrollIntoView(entries[0]);
+            _viewModel.SelectedSession = entries[0];
+        }
+    }
+
+    private bool IsKeyboardFocusWithinSessionsGrid()
+    {
+        if (Keyboard.FocusedElement is TextBoxBase)
+        {
+            return false;
+        }
+
+        return SessionsGrid.IsKeyboardFocusWithin
+            || FindVisualParent<DataGrid>(Keyboard.FocusedElement as DependencyObject) == SessionsGrid;
+    }
+
+    private static bool IsParentRequest(CaptureEntry entry, CaptureEntry context)
+    {
+        string contextHost = GetSessionHost(context);
+        if (string.IsNullOrWhiteSpace(contextHost))
+        {
+            return false;
+        }
+
+        return entry.Index < context.Index
+            && string.Equals(GetSessionHost(entry), contextHost, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsChildRequest(CaptureEntry entry, CaptureEntry context)
+    {
+        string contextHost = GetSessionHost(context);
+        if (string.IsNullOrWhiteSpace(contextHost))
+        {
+            return false;
+        }
+
+        return entry.Index > context.Index
+            && string.Equals(GetSessionHost(entry), contextHost, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ResolveMatchValue(CaptureEntry entry)
+    {
+        if (!string.IsNullOrWhiteSpace(entry.Host))
+        {
+            return entry.Host.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(entry.Process))
+        {
+            return entry.Process.Trim();
+        }
+
+        return entry.DisplayMethod.Trim();
+    }
+
+    private static string BuildSameValueMenuHeader(CaptureEntry? entry)
+    {
+        if (entry is null)
+        {
+            return "匹配值";
+        }
+
+        string value = ResolveMatchValue(entry);
+        return string.IsNullOrWhiteSpace(value) ? "匹配值" : $"匹配值：{value}";
     }
 
     private void CopyTextToClipboard(string text, string statusText)

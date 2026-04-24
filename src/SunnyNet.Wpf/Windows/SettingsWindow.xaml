@@ -594,7 +594,7 @@
 
                         <StackPanel x:Name="ReplaceSectionPanel" Visibility="Collapsed">
                             <TextBlock Style="{StaticResource SettingsGroupTitleTextStyle}" Text="替换规则" />
-                            <TextBlock Margin="0,6,0,0" Style="{StaticResource SettingsPageHintTextStyle}" Text="支持字符串、Base64、HEX 和响应文件替换，保存后即时生效。" />
+                            <TextBlock Margin="0,6,0,0" Style="{StaticResource SettingsPageHintTextStyle}" Text="按类型维护输入与输出内容；响应文件类型可直接选择本地文件作为输出。" />
                             <StackPanel Margin="0,14,0,0" Orientation="Horizontal">
                                 <Button Margin="0,0,10,0" Style="{StaticResource SettingsSmallActionButtonStyle}" Click="AddReplace_Click" Content="新增规则" />
                                 <Button Margin="0,0,10,0" Style="{StaticResource SettingsSmallActionButtonStyle}" Click="RemoveReplace_Click" Content="删除所选" />
@@ -605,12 +605,47 @@
                                       ItemsSource="{Binding ReplaceRuleItems}"
                                       Style="{StaticResource SettingsDataGridStyle}">
                                 <DataGrid.Columns>
-                                    <DataGridComboBoxColumn Header="替换类型"
-                                                            Width="126"
-                                                            ItemsSource="{StaticResource ReplaceRuleTypeItems}"
-                                                            SelectedItemBinding="{Binding RuleType, UpdateSourceTrigger=PropertyChanged}" />
-                                    <DataGridTextColumn Header="源内容" Binding="{Binding SourceContent, UpdateSourceTrigger=PropertyChanged}" Width="2*" />
-                                    <DataGridTextColumn Header="替换内容" Binding="{Binding ReplacementContent, UpdateSourceTrigger=PropertyChanged}" Width="2*" />
+                                    <DataGridTemplateColumn Header="替换类型" Width="138">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <ComboBox ItemsSource="{StaticResource ReplaceRuleTypeItems}"
+                                                          SelectedItem="{Binding RuleType, UpdateSourceTrigger=PropertyChanged}"
+                                                          Style="{StaticResource SettingsCompactComboBoxStyle}" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Header="匹配输入" Binding="{Binding SourceContent, UpdateSourceTrigger=PropertyChanged}" Width="2*" />
+                                    <DataGridTemplateColumn Header="输出内容" Width="2*">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox Text="{Binding ReplacementContent, UpdateSourceTrigger=PropertyChanged}"
+                                                             Style="{StaticResource SettingsCompactTextBoxStyle}" />
+                                                    <Button Grid.Column="1"
+                                                            Margin="6,0,0,0"
+                                                            Padding="10,4"
+                                                            Click="BrowseReplaceFile_Click"
+                                                            Content="选择文件">
+                                                        <Button.Style>
+                                                            <Style TargetType="{x:Type Button}" BasedOn="{StaticResource SettingsSmallActionButtonStyle}">
+                                                                <Setter Property="MinWidth" Value="74" />
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding UsesResponseFile}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Button.Style>
+                                                    </Button>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
                                     <DataGridTextColumn Header="状态" Binding="{Binding State}" Width="108" IsReadOnly="True" />
                                 </DataGrid.Columns>
                             </DataGrid>
@@ -631,9 +666,27 @@
                                 <DataGrid.Columns>
                                     <DataGridCheckBoxColumn Header="启用" Binding="{Binding Enabled, UpdateSourceTrigger=PropertyChanged}" Width="62" />
                                     <DataGridTextColumn Header="名称" Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="1.2*" />
-                                    <DataGridComboBoxColumn Header="方向" Width="88" ItemsSource="{StaticResource InterceptRuleDirectionItems}" SelectedItemBinding="{Binding Direction, UpdateSourceTrigger=PropertyChanged}" />
-                                    <DataGridComboBoxColumn Header="匹配范围" Width="106" ItemsSource="{StaticResource InterceptRuleTargetItems}" SelectedItemBinding="{Binding Target, UpdateSourceTrigger=PropertyChanged}" />
-                                    <DataGridComboBoxColumn Header="匹配方式" Width="92" ItemsSource="{StaticResource InterceptRuleOperatorItems}" SelectedItemBinding="{Binding Operator, UpdateSourceTrigger=PropertyChanged}" />
+                                    <DataGridTemplateColumn Header="方向" Width="94">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <ComboBox ItemsSource="{StaticResource InterceptRuleDirectionItems}" SelectedItem="{Binding Direction, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource SettingsCompactComboBoxStyle}" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTemplateColumn Header="匹配范围" Width="112">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <ComboBox ItemsSource="{StaticResource InterceptRuleTargetItems}" SelectedItem="{Binding Target, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource SettingsCompactComboBoxStyle}" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTemplateColumn Header="匹配方式" Width="98">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <ComboBox ItemsSource="{StaticResource InterceptRuleOperatorItems}" SelectedItem="{Binding Operator, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource SettingsCompactComboBoxStyle}" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
                                     <DataGridTextColumn Header="匹配值" Binding="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Width="2*" />
                                     <DataGridTextColumn Header="状态" Binding="{Binding State}" Width="88" IsReadOnly="True" />
                                 </DataGrid.Columns>
@@ -871,10 +924,13 @@
                                       ItemsSource="{Binding RequestCertificateItems}"
                                       Style="{StaticResource SettingsDataGridStyle}">
                                 <DataGrid.Columns>
-                                    <DataGridComboBoxColumn Header="使用规则"
-                                                            Width="126"
-                                                            ItemsSource="{StaticResource RequestCertificateRuleItems}"
-                                                            SelectedItemBinding="{Binding UsageRule, UpdateSourceTrigger=PropertyChanged}" />
+                                    <DataGridTemplateColumn Header="使用规则" Width="136">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <ComboBox ItemsSource="{StaticResource RequestCertificateRuleItems}" SelectedItem="{Binding UsageRule, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource SettingsCompactComboBoxStyle}" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
                                     <DataGridTextColumn Header="主机名" Binding="{Binding Host, UpdateSourceTrigger=PropertyChanged}" Width="1.2*" />
                                     <DataGridTextColumn Header="证书文件" Binding="{Binding CertificateFile, UpdateSourceTrigger=PropertyChanged}" Width="2*" />
                                     <DataGridTextColumn Header="密码" Binding="{Binding Password, UpdateSourceTrigger=PropertyChanged}" Width="132" />

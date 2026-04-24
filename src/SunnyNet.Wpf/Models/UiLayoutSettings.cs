@@ -14,4 +14,5 @@ public sealed class UiLayoutSettings
     public bool ShowFavoritesOnly { get; set; }
     public List<string> FavoriteSessionKeys { get; set; } = new();
     public Dictionary<string, bool> SessionColumns { get; set; } = new();
+    public Dictionary<string, double> SessionColumnWidths { get; set; } = new();
 }
