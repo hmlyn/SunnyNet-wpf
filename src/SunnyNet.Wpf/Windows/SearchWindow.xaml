@@ -2,30 +2,205 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="查找内容"
-        Width="580"
-        Height="334"
-        MinWidth="580"
-        MinHeight="334"
-        MaxWidth="580"
-        MaxHeight="334"
+        Width="600"
+        Height="280"
+        MinWidth="600"
+        MinHeight="280"
+        MaxWidth="600"
+        MaxHeight="280"
         ResizeMode="NoResize"
-        Background="#FFFFFF"
+        Background="#F3F6FA"
         Foreground="{StaticResource TextPrimaryBrush}"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
         PreviewKeyDown="SearchWindow_PreviewKeyDown">
+    <Window.Resources>
+        <Style x:Key="SearchLabelStyle" TargetType="{x:Type TextBlock}">
+            <Setter Property="Width" Value="74" />
+            <Setter Property="Margin" Value="0,0,10,0" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#222222" />
+            <Setter Property="TextAlignment" Value="Right" />
+        </Style>
+
+        <Style x:Key="SearchComboBoxStyle" TargetType="{x:Type ComboBox}" BasedOn="{StaticResource {x:Type ComboBox}}">
+            <Setter Property="Height" Value="32" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+
+        <DataTemplate x:Key="ColorOptionTemplate">
+            <Grid Height="22">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="18" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Width="12"
+                        Height="12"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center"
+                        Background="{Binding Value}"
+                        BorderBrush="#D8E2EF"
+                        BorderThickness="1"
+                        CornerRadius="3" />
+                <TextBlock Grid.Column="1"
+                           VerticalAlignment="Center"
+                           FontSize="12"
+                           Foreground="#1F2D3D"
+                           Text="{Binding Label}" />
+            </Grid>
+        </DataTemplate>
+    </Window.Resources>
+
     <Grid>
+        <Border Margin="18"
+                Background="#FFFFFF"
+                BorderBrush="#DCE5F1"
+                BorderThickness="1"
+                CornerRadius="8">
+            <Grid Margin="18,18,18,16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="34" />
+                    <RowDefinition Height="27" />
+                    <RowDefinition Height="40" />
+                    <RowDefinition Height="56" />
+                    <RowDefinition Height="34" />
+                    <RowDefinition Height="4" />
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="84" />
+                        <ColumnDefinition Width="190" />
+                        <ColumnDefinition Width="92" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Style="{StaticResource SearchLabelStyle}" Text="查找：" />
+                    <ComboBox x:Name="FindTextComboBox"
+                              Grid.Column="1"
+                              Style="{StaticResource SearchComboBoxStyle}"
+                              IsEditable="True"
+                              IsTextSearchEnabled="False"
+                              StaysOpenOnEdit="True"
+                              KeyDown="FindTextComboBox_KeyDown" />
+
+                    <TextBlock Grid.Column="2"
+                               Style="{StaticResource SearchLabelStyle}"
+                               Text="查找类型：" />
+                    <ComboBox x:Name="FindTypeComboBox"
+                              Grid.Column="3"
+                              MinWidth="170"
+                              Style="{StaticResource SearchComboBoxStyle}"
+                              SelectionChanged="FindTypeComboBox_SelectionChanged" />
+                </Grid>
+
+                <StackPanel Grid.Row="1"
+                            Margin="84,0,0,0"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <CheckBox x:Name="IgnoreCaseCheckBox"
+                              Margin="0,0,18,0"
+                              Foreground="{StaticResource AccentBrush}"
+                              Content="不区分大小写"
+                              IsChecked="True" />
+                    <CheckBox x:Name="RemoveSpacesCheckBox"
+                              Foreground="{StaticResource AccentBrush}"
+                              Content="删除空格后搜索"
+                              IsChecked="True" />
+                </StackPanel>
+
+                <Grid Grid.Row="2" Margin="0,6,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="84" />
+                        <ColumnDefinition Width="190" />
+                        <ColumnDefinition Width="92" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Style="{StaticResource SearchLabelStyle}" Text="查找范围：" />
+                    <ComboBox x:Name="FindRangeComboBox"
+                              Grid.Column="1"
+                              Style="{StaticResource SearchComboBoxStyle}" />
+
+                    <TextBlock Grid.Column="2"
+                               Style="{StaticResource SearchLabelStyle}"
+                               Text="颜色标记：" />
+                    <ComboBox x:Name="FindColorComboBox"
+                              Grid.Column="3"
+                              ItemTemplate="{StaticResource ColorOptionTemplate}"
+                              Style="{StaticResource SearchComboBoxStyle}"
+                              SelectionChanged="FindColorComboBox_SelectionChanged" />
+                </Grid>
+
+                <Grid Grid.Row="3" Margin="0,16,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="84" />
+                        <ColumnDefinition Width="190" />
+                        <ColumnDefinition Width="92" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Button x:Name="FindButton"
+                            Grid.Column="1"
+                            Width="190"
+                            Height="32"
+                            Padding="0"
+                            HorizontalAlignment="Left"
+                            VerticalContentAlignment="Center"
+                            Click="FindButton_Click"
+                            Content="查 找" />
+                    <CheckBox x:Name="ClearPreviousCheckBox"
+                              Grid.Column="3"
+                              VerticalAlignment="Center"
+                              Foreground="{StaticResource AccentBrush}"
+                              Content="取消之前的颜色标记"
+                              IsChecked="True" />
+                    <StackPanel x:Name="ProtoSkipPanel"
+                                Grid.Column="3"
+                                Orientation="Horizontal"
+                                Visibility="Collapsed">
+                        <TextBlock VerticalAlignment="Center"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="#222222"
+                                   Text="忽略前" />
+                        <TextBox x:Name="ProtoSkipTextBox"
+                                 Width="50"
+                                 Height="26"
+                                 Margin="6,0"
+                                 Text="0" />
+                        <TextBlock VerticalAlignment="Center"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="#222222"
+                                   Text="字节" />
+                    </StackPanel>
+                </Grid>
+                <ProgressBar x:Name="SearchProgressBar"
+                             Grid.Row="5"
+                             Width="190"
+                             Height="4"
+                             Margin="84,0,0,0"
+                             HorizontalAlignment="Left"
+                             IsIndeterminate="True"
+                             Visibility="Collapsed" />
+            </Grid>
+        </Border>
+
         <Border x:Name="SearchAlertBorder"
                 Panel.ZIndex="10"
-                Width="260"
-                Margin="22,12,0,0"
-                Padding="16,12"
-                HorizontalAlignment="Left"
+                Width="292"
+                Margin="0,12,0,0"
+                Padding="14,10"
+                HorizontalAlignment="Center"
                 VerticalAlignment="Top"
                 Background="#FEF0F0"
                 BorderBrush="#FDE2E2"
                 BorderThickness="1"
-                CornerRadius="3"
+                CornerRadius="4"
                 Visibility="Collapsed">
             <StackPanel Orientation="Horizontal">
                 <Border Width="14"
@@ -49,157 +224,6 @@
                            Text="查找失败：请输入要搜索的内容" />
             </StackPanel>
         </Border>
-
-        <Grid Margin="36,38,38,28">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="34" />
-                <RowDefinition Height="26" />
-                <RowDefinition Height="36" />
-                <RowDefinition Height="36" />
-                <RowDefinition Height="34" />
-                <RowDefinition Height="12" />
-                <RowDefinition Height="4" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-
-            <Grid Grid.Row="0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="70" />
-                    <ColumnDefinition Width="200" />
-                    <ColumnDefinition Width="78" />
-                    <ColumnDefinition Width="160" />
-                </Grid.ColumnDefinitions>
-
-                <TextBlock VerticalAlignment="Center"
-                           HorizontalAlignment="Right"
-                           FontSize="12"
-                           FontWeight="SemiBold"
-                           Foreground="#222222"
-                           Text="查找：" />
-                <ComboBox x:Name="FindTextComboBox"
-                          Grid.Column="1"
-                          Height="30"
-                          Margin="10,0,0,0"
-                          IsEditable="True"
-                          IsTextSearchEnabled="False"
-                          StaysOpenOnEdit="True"
-                          KeyDown="FindTextComboBox_KeyDown" />
-
-                <TextBlock Grid.Column="2"
-                           VerticalAlignment="Center"
-                           HorizontalAlignment="Right"
-                           FontSize="12"
-                           FontWeight="SemiBold"
-                           Foreground="#222222"
-                           Text="查找类型：" />
-                <ComboBox x:Name="FindTypeComboBox"
-                          Grid.Column="3"
-                          Height="30"
-                          Margin="10,0,0,0"
-                          SelectionChanged="FindTypeComboBox_SelectionChanged" />
-            </Grid>
-
-            <WrapPanel Grid.Row="1"
-                       Margin="204,0,0,0"
-                       VerticalAlignment="Center">
-                <CheckBox x:Name="IgnoreCaseCheckBox"
-                          Margin="0,0,18,0"
-                          Foreground="{StaticResource AccentBrush}"
-                          Content="不区分大小写"
-                          IsChecked="True" />
-                <CheckBox x:Name="RemoveSpacesCheckBox"
-                          Foreground="{StaticResource AccentBrush}"
-                          Content="删除空格后搜索"
-                          IsChecked="True" />
-            </WrapPanel>
-
-            <Grid Grid.Row="2" Margin="0,8,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="70" />
-                    <ColumnDefinition Width="438" />
-                </Grid.ColumnDefinitions>
-
-                <TextBlock VerticalAlignment="Center"
-                           HorizontalAlignment="Right"
-                           FontSize="12"
-                           FontWeight="SemiBold"
-                           Foreground="#222222"
-                           Text="查找范围：" />
-                <ComboBox x:Name="FindRangeComboBox"
-                          Grid.Column="1"
-                          Height="30"
-                          Margin="10,0,0,0" />
-            </Grid>
-
-            <Grid Grid.Row="3" Margin="0,8,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="70" />
-                    <ColumnDefinition Width="188" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-
-                <Border x:Name="ColorPreviewBorder"
-                        HorizontalAlignment="Right"
-                        VerticalAlignment="Center"
-                        Background="#FFE100">
-                    <TextBlock Padding="3,0"
-                               FontSize="12"
-                               FontWeight="SemiBold"
-                               Foreground="#0A0A0A"
-                               Text="颜色标记：" />
-                </Border>
-                <ComboBox x:Name="FindColorComboBox"
-                          Grid.Column="1"
-                          Height="30"
-                          Margin="10,0,0,0"
-                          SelectionChanged="FindColorComboBox_SelectionChanged" />
-                <CheckBox x:Name="ClearPreviousCheckBox"
-                          Grid.Column="2"
-                          Margin="14,0,0,0"
-                          VerticalAlignment="Center"
-                          Foreground="{StaticResource AccentBrush}"
-                          Content="取消之前的颜色标记"
-                          IsChecked="True" />
-                <StackPanel x:Name="ProtoSkipPanel"
-                            Grid.Column="2"
-                            Margin="14,0,0,0"
-                            Orientation="Horizontal"
-                            Visibility="Collapsed">
-                    <TextBlock VerticalAlignment="Center"
-                               FontSize="12"
-                               FontWeight="SemiBold"
-                               Foreground="#222222"
-                               Text="忽略前" />
-                    <TextBox x:Name="ProtoSkipTextBox"
-                             Width="50"
-                             Height="26"
-                             Margin="6,0"
-                             Text="0" />
-                    <TextBlock VerticalAlignment="Center"
-                               FontSize="12"
-                               FontWeight="SemiBold"
-                               Foreground="#222222"
-                               Text="字节" />
-                </StackPanel>
-            </Grid>
-
-            <Button x:Name="FindButton"
-                    Grid.Row="4"
-                    Width="200"
-                    Height="26"
-                    Margin="80,8,0,0"
-                    HorizontalAlignment="Left"
-                    Click="FindButton_Click"
-                    Content="查找" />
-
-            <ProgressBar x:Name="SearchProgressBar"
-                         Grid.Row="6"
-                         Width="200"
-                         Height="4"
-                         Margin="80,0,0,0"
-                         HorizontalAlignment="Left"
-                         IsIndeterminate="True"
-                         Visibility="Collapsed" />
-        </Grid>
     </Grid>
 </Window>
+

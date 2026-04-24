@@ -43,6 +43,7 @@ public partial class HexViewControl : UserControl
     private const double AsciiPaddingTop = 10;
     private const double AutoScrollThreshold = 28;
     private const double AutoScrollMaxStep = 18;
+    private const int MaxImmediateRenderBytes = 32 * 1024;
     private int _lastBytesPerLine;
     private int? _selectionAnchor;
     private int? _selectionStart;
@@ -131,9 +132,12 @@ public partial class HexViewControl : UserControl
         }
 
         byte[] bytes = Bytes ?? Array.Empty<byte>();
+        byte[] renderBytes = bytes.Length > MaxImmediateRenderBytes
+            ? bytes.Take(MaxImmediateRenderBytes).ToArray()
+            : bytes;
         EmptyTextBlock.Text = EmptyText;
         EmptyPanel.Visibility = bytes.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
-        CoerceSelection(bytes.Length);
+        CoerceSelection(renderBytes.Length);
 
         OffsetRowsPanel.Children.Clear();
         HexRowsPanel.Children.Clear();
@@ -149,15 +153,17 @@ public partial class HexViewControl : UserControl
         int bytesPerLine = CalculateBytesPerLine();
         _lastBytesPerLine = bytesPerLine;
         UpdateColumnWidths(bytesPerLine);
-        SummaryTextBlock.Text = BuildSummaryText(bytes.Length, bytesPerLine);
+        SummaryTextBlock.Text = bytes.Length > renderBytes.Length
+            ? $"HEX 数据 · {bytes.Length:N0} Bytes · 已预览前 {renderBytes.Length:N0} Bytes"
+            : BuildSummaryText(bytes.Length, bytesPerLine);
         SelectionInfoBorder.Visibility = HasSelection ? Visibility.Visible : Visibility.Collapsed;
         SelectionInfoTextBlock.Text = BuildSelectionInfoText();
 
-        for (int offset = 0; offset < bytes.Length; offset += bytesPerLine)
+        for (int offset = 0; offset < renderBytes.Length; offset += bytesPerLine)
         {
-            int count = Math.Min(bytesPerLine, bytes.Length - offset);
+            int count = Math.Min(bytesPerLine, renderBytes.Length - offset);
             int headerCount = Math.Clamp(HeaderLength - offset, 0, count);
-            ReadOnlySpan<byte> line = bytes.AsSpan(offset, count);
+            ReadOnlySpan<byte> line = renderBytes.AsSpan(offset, count);
             bool lineSelected = IsLineSelected(offset, count);
             bool lineStartsSelection = IsSelectionStartLine(offset, count);
             bool lineEndsSelection = IsSelectionEndLine(offset, count);

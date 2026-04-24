@@ -19,6 +19,29 @@
             <sys:String>响应文件</sys:String>
         </x:Array>
 
+        <x:Array x:Key="InterceptRuleDirectionItems" Type="{x:Type sys:String}">
+            <sys:String>上行</sys:String>
+            <sys:String>下行</sys:String>
+            <sys:String>上下行</sys:String>
+        </x:Array>
+
+        <x:Array x:Key="InterceptRuleTargetItems" Type="{x:Type sys:String}">
+            <sys:String>URL</sys:String>
+            <sys:String>Host</sys:String>
+            <sys:String>Method</sys:String>
+            <sys:String>Header</sys:String>
+            <sys:String>Query</sys:String>
+            <sys:String>Cookie</sys:String>
+            <sys:String>Body</sys:String>
+            <sys:String>StatusCode</sys:String>
+        </x:Array>
+
+        <x:Array x:Key="InterceptRuleOperatorItems" Type="{x:Type sys:String}">
+            <sys:String>包含</sys:String>
+            <sys:String>等于</sys:String>
+            <sys:String>正则</sys:String>
+        </x:Array>
+
         <x:Array x:Key="RequestCertificateRuleItems" Type="{x:Type sys:String}">
             <sys:String>仅发送</sys:String>
             <sys:String>解析及发送</sys:String>
@@ -169,68 +192,148 @@
         </Style>
 
         <Style x:Key="ProcessToolbarBorderStyle" TargetType="{x:Type Border}">
-            <Setter Property="Background" Value="#F8FBFF" />
-            <Setter Property="BorderBrush" Value="#E4EAF3" />
+            <Setter Property="Background" Value="#FBFCFE" />
+            <Setter Property="BorderBrush" Value="#E1E7F0" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="Padding" Value="14,12" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="10,6" />
         </Style>
 
         <Style x:Key="ProcessWorkspaceBorderStyle" TargetType="{x:Type Border}">
-            <Setter Property="Background" Value="#FCFDFF" />
-            <Setter Property="BorderBrush" Value="#E4EAF3" />
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="#E1E7F0" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="CornerRadius" Value="6" />
         </Style>
 
         <Style x:Key="ProcessPanelTitleTextStyle" TargetType="{x:Type TextBlock}">
             <Setter Property="FontSize" Value="12.5" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
-        <Style x:Key="ProcessBadgeBorderStyle" TargetType="{x:Type Border}">
-            <Setter Property="Padding" Value="8,2" />
-            <Setter Property="Background" Value="#F3F7FD" />
-            <Setter Property="BorderBrush" Value="#D9E6F8" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="11" />
+        <Style x:Key="ProcessCaptionTextStyle" TargetType="{x:Type TextBlock}">
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="ProcessToolbarTextStyle" TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ProcessCaptionTextStyle}">
+            <Setter Property="Foreground" Value="#56657A" />
+        </Style>
+
+        <Style x:Key="ProcessToolbarSeparatorStyle" TargetType="{x:Type Border}">
+            <Setter Property="Width" Value="1" />
+            <Setter Property="Margin" Value="10,3" />
+            <Setter Property="Background" Value="#E6ECF4" />
+        </Style>
+
+        <Style x:Key="ProcessToolbarCheckBoxStyle" TargetType="{x:Type CheckBox}" BasedOn="{StaticResource {x:Type CheckBox}}">
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
         <Style x:Key="ProcessMiniButtonStyle" TargetType="{x:Type Button}" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="Padding" Value="10,4" />
-            <Setter Property="Width" Value="104" />
-            <Setter Property="MinWidth" Value="104" />
+            <Setter Property="Width" Value="96" />
+            <Setter Property="MinWidth" Value="96" />
+            <Setter Property="Height" Value="28" />
             <Setter Property="MinHeight" Value="28" />
             <Setter Property="FontSize" Value="11.5" />
         </Style>
 
         <Style x:Key="ProcessPrimaryMiniButtonStyle" TargetType="{x:Type Button}" BasedOn="{StaticResource PrimaryButtonStyle}">
-            <Setter Property="Padding" Value="10,4" />
-            <Setter Property="Width" Value="104" />
-            <Setter Property="MinWidth" Value="104" />
+            <Setter Property="Padding" Value="12,4" />
+            <Setter Property="Width" Value="96" />
+            <Setter Property="MinWidth" Value="96" />
+            <Setter Property="Height" Value="28" />
             <Setter Property="MinHeight" Value="28" />
             <Setter Property="FontSize" Value="11.5" />
         </Style>
 
-        <Style x:Key="ProcessDataGridCellStyle" TargetType="{x:Type DataGridCell}" BasedOn="{StaticResource {x:Type DataGridCell}}">
-            <Setter Property="Padding" Value="8,0,8,0" />
+        <Style x:Key="ProcessWorkspacePanelBorderStyle" TargetType="{x:Type Border}">
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="#E3E9F2" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="5" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+        </Style>
+
+        <Style x:Key="ProcessPaneHeaderBorderStyle" TargetType="{x:Type Border}">
+            <Setter Property="Background" Value="#F7FAFE" />
+            <Setter Property="BorderBrush" Value="#E8EEF6" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="Padding" Value="10,7" />
+        </Style>
+
+        <Style x:Key="ProcessPaneActionBorderStyle" TargetType="{x:Type Border}">
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="#EEF2F7" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="Padding" Value="10,6" />
+        </Style>
+
+        <Style x:Key="ProcessDataGridColumnHeaderStyle" TargetType="{x:Type DataGridColumnHeader}" BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Padding" Value="8,0" />
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#58687D" />
+            <Setter Property="Background" Value="#F7FAFE" />
+            <Setter Property="BorderBrush" Value="#E8EEF6" />
+            <Setter Property="BorderThickness" Value="0,0,1,1" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
 
+        <Style x:Key="ProcessDataGridCellStyle" TargetType="{x:Type DataGridCell}" BasedOn="{StaticResource {x:Type DataGridCell}}">
+            <Setter Property="Padding" Value="6,0,6,0" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="ProcessDataGridRowStyle" TargetType="{x:Type DataGridRow}" BasedOn="{StaticResource {x:Type DataGridRow}}">
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#F7FAFE" />
+                </Trigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#EEF5FF" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="ProcessDataGridStyle" TargetType="{x:Type DataGrid}" BasedOn="{StaticResource SettingsDataGridStyle}">
-            <Setter Property="RowHeight" Value="26" />
-            <Setter Property="MinRowHeight" Value="26" />
-            <Setter Property="Margin" Value="0,8,0,0" />
+            <Setter Property="RowHeight" Value="24" />
+            <Setter Property="MinRowHeight" Value="24" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="AlternatingRowBackground" Value="#FBFDFF" />
             <Setter Property="CellStyle" Value="{StaticResource ProcessDataGridCellStyle}" />
+            <Setter Property="ColumnHeaderStyle" Value="{StaticResource ProcessDataGridColumnHeaderStyle}" />
+            <Setter Property="RowStyle" Value="{StaticResource ProcessDataGridRowStyle}" />
             <Setter Property="SelectionUnit" Value="FullRow" />
             <Setter Property="CanUserResizeRows" Value="False" />
+            <Setter Property="VerticalGridLinesBrush" Value="#EEF2F7" />
+            <Setter Property="HorizontalGridLinesBrush" Value="#EEF2F7" />
+            <Setter Property="BorderThickness" Value="0" />
         </Style>
 
         <Style x:Key="ProcessGridTextStyle" TargetType="{x:Type TextBlock}">
-            <Setter Property="Margin" Value="10,0,0,0" />
+            <Setter Property="Margin" Value="6,0,2,0" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+
+        <Style x:Key="ProcessGridInputTextBoxStyle" TargetType="{x:Type TextBox}" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Padding" Value="10,3" />
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="MinWidth" Value="150" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
         </Style>
 
         <Style x:Key="ProcessGridCheckBoxStyle" TargetType="{x:Type CheckBox}" BasedOn="{StaticResource {x:Type CheckBox}}">
@@ -306,6 +409,12 @@
                         <StackPanel Orientation="Horizontal">
                             <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}" Text="&#xE8AB;" />
                             <TextBlock Margin="10,0,0,0" Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}" Text="替换规则" />
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem x:Name="InterceptSectionItem" Tag="Intercept">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}" Text="&#xE814;" />
+                            <TextBlock Margin="10,0,0,0" Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}" Text="拦截规则" />
                         </StackPanel>
                     </ListBoxItem>
                     <ListBoxItem x:Name="ScriptSectionItem" Tag="Script">
@@ -507,6 +616,30 @@
                             </DataGrid>
                         </StackPanel>
 
+                        <StackPanel x:Name="InterceptSectionPanel" Visibility="Collapsed">
+                            <TextBlock Style="{StaticResource SettingsGroupTitleTextStyle}" Text="拦截规则" />
+                            <TextBlock Margin="0,6,0,0" Style="{StaticResource SettingsPageHintTextStyle}" Text="命中 URL、参数、协议头或包体后自动进入上行/下行断点编辑。" />
+                            <StackPanel Margin="0,14,0,0" Orientation="Horizontal">
+                                <Button Margin="0,0,10,0" Style="{StaticResource SettingsSmallActionButtonStyle}" Click="AddIntercept_Click" Content="新增规则" />
+                                <Button Margin="0,0,10,0" Style="{StaticResource SettingsSmallActionButtonStyle}" Click="RemoveIntercept_Click" Content="删除所选" />
+                                <Button Style="{StaticResource SettingsPrimaryActionButtonStyle}" Click="ApplyIntercept_Click" Content="保存规则" />
+                            </StackPanel>
+                            <DataGrid x:Name="InterceptRulesGrid"
+                                      Height="320"
+                                      ItemsSource="{Binding InterceptRuleItems}"
+                                      Style="{StaticResource SettingsDataGridStyle}">
+                                <DataGrid.Columns>
+                                    <DataGridCheckBoxColumn Header="启用" Binding="{Binding Enabled, UpdateSourceTrigger=PropertyChanged}" Width="62" />
+                                    <DataGridTextColumn Header="名称" Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="1.2*" />
+                                    <DataGridComboBoxColumn Header="方向" Width="88" ItemsSource="{StaticResource InterceptRuleDirectionItems}" SelectedItemBinding="{Binding Direction, UpdateSourceTrigger=PropertyChanged}" />
+                                    <DataGridComboBoxColumn Header="匹配范围" Width="106" ItemsSource="{StaticResource InterceptRuleTargetItems}" SelectedItemBinding="{Binding Target, UpdateSourceTrigger=PropertyChanged}" />
+                                    <DataGridComboBoxColumn Header="匹配方式" Width="92" ItemsSource="{StaticResource InterceptRuleOperatorItems}" SelectedItemBinding="{Binding Operator, UpdateSourceTrigger=PropertyChanged}" />
+                                    <DataGridTextColumn Header="匹配值" Binding="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Width="2*" />
+                                    <DataGridTextColumn Header="状态" Binding="{Binding State}" Width="88" IsReadOnly="True" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </StackPanel>
+
                         <StackPanel x:Name="ScriptSectionPanel" Visibility="Collapsed">
                             <TextBlock Style="{StaticResource SettingsGroupTitleTextStyle}" Text="脚本编辑" />
                             <TextBlock Margin="0,6,0,0" Style="{StaticResource SettingsPageHintTextStyle}" Text="保存时会自动格式化并校验脚本，适合直接维护 Go 核心脚本。" />
@@ -526,200 +659,202 @@
                                      VerticalScrollBarVisibility="Auto" />
                         </StackPanel>
 
-                        <StackPanel x:Name="ProcessSectionPanel" Visibility="Collapsed">
-                            <Border Margin="0,10,0,0"
-                                    Style="{StaticResource ProcessToolbarBorderStyle}">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="8" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="10" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
+                        <Grid x:Name="ProcessSectionPanel"
+                              Margin="0,10,0,0"
+                              Visibility="Collapsed">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="10" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
 
-                                    <Border Grid.Row="0"
-                                            Grid.Column="0"
-                                            Style="{StaticResource ProcessBadgeBorderStyle}"
-                                            Padding="10,4"
-                                            Background="#F3F9F4"
-                                            BorderBrush="#D5EAD9"
-                                            BorderThickness="1"
-                                            CornerRadius="14"
-                                            HorizontalAlignment="Left">
-                                        <TextBlock Style="{StaticResource SettingsStateTextStyle}" Text="{Binding ProcessDriverStatusText}" />
-                                    </Border>
+                            <Border Style="{StaticResource ProcessToolbarBorderStyle}">
+                                <DockPanel LastChildFill="True">
+                                    <StackPanel DockPanel.Dock="Right"
+                                                Orientation="Horizontal">
+                                        <Button Style="{StaticResource ProcessMiniButtonStyle}"
+                                                Click="RefreshProcesses_Click"
+                                                Content="刷新进程" />
+                                        <Button Margin="8,0,0,0"
+                                                Style="{StaticResource ProcessPrimaryMiniButtonStyle}"
+                                                Click="LoadProcessDriver_Click"
+                                                Content="加载驱动" />
+                                    </StackPanel>
 
-                                    <Button Grid.Row="0"
-                                            Grid.Column="2"
-                                            Style="{StaticResource ProcessMiniButtonStyle}"
-                                            Click="RefreshProcesses_Click"
-                                            Content="刷新进程" />
-
-                                    <Button Grid.Row="0"
-                                            Grid.Column="4"
-                                            Style="{StaticResource ProcessPrimaryMiniButtonStyle}"
-                                            Click="LoadProcessDriver_Click"
-                                            Content="加载驱动" />
-
-                                    <StackPanel Grid.Row="2"
-                                                Grid.ColumnSpan="5"
-                                                Orientation="Horizontal"
-                                                VerticalAlignment="Center">
-                                        <CheckBox Margin="0,0,14,0"
-                                                  VerticalAlignment="Center"
+                                    <StackPanel Orientation="Horizontal">
+                                        <Ellipse Width="8"
+                                                 Height="8"
+                                                 Margin="0,0,6,0"
+                                                 VerticalAlignment="Center">
+                                            <Ellipse.Style>
+                                                <Style TargetType="{x:Type Ellipse}">
+                                                    <Setter Property="Fill" Value="#C6D0DE" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ProcessDriverLoaded}" Value="True">
+                                                            <Setter Property="Fill" Value="#28A35B" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Ellipse.Style>
+                                        </Ellipse>
+                                        <TextBlock Style="{StaticResource SettingsStateTextStyle}"
+                                                   VerticalAlignment="Center"
+                                                   Text="{Binding ProcessDriverStatusText}" />
+                                        <Border Style="{StaticResource ProcessToolbarSeparatorStyle}" />
+                                        <CheckBox Style="{StaticResource ProcessToolbarCheckBoxStyle}"
                                                   Click="CaptureAllProcesses_Click"
                                                   Content="捕获所有进程"
                                                   IsChecked="{Binding CaptureAllProcesses}" />
-                                        <Border Style="{StaticResource ProcessBadgeBorderStyle}"
-                                                VerticalAlignment="Center">
-                                            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Text="{Binding CurrentPidCaptureText}" />
-                                        </Border>
+                                        <Border Style="{StaticResource ProcessToolbarSeparatorStyle}" />
+                                        <TextBlock Style="{StaticResource ProcessToolbarTextStyle}"
+                                                   Text="{Binding CurrentPidCaptureText}" />
                                     </StackPanel>
-                                </Grid>
+                                </DockPanel>
                             </Border>
 
-                            <Border Margin="0,10,0,0"
+                            <Border Grid.Row="2"
+                                    Height="414"
+                                    Padding="10"
                                     Style="{StaticResource ProcessWorkspaceBorderStyle}">
-                                <Grid Margin="0">
+                                <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="1" />
-                                        <ColumnDefinition Width="1.08*" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="1.1*" />
                                     </Grid.ColumnDefinitions>
 
-                                    <Border Grid.Column="1"
-                                            Background="#E8EEF6" />
+                                    <Border Grid.Column="0"
+                                            Style="{StaticResource ProcessWorkspacePanelBorderStyle}">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="*" />
+                                            </Grid.RowDefinitions>
 
-                                    <Grid Grid.Column="0"
-                                          Margin="14,12,12,12">
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="8" />
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="*" />
-                                        </Grid.RowDefinitions>
+                                            <Border Style="{StaticResource ProcessPaneHeaderBorderStyle}">
+                                                <DockPanel LastChildFill="True">
+                                                    <TextBlock Style="{StaticResource ProcessPanelTitleTextStyle}"
+                                                               Text="按进程名捕获" />
+                                                    <Button DockPanel.Dock="Right"
+                                                            Style="{StaticResource ProcessMiniButtonStyle}"
+                                                            Click="AddLdPreset_Click"
+                                                            Content="雷电预设" />
+                                                </DockPanel>
+                                            </Border>
 
-                                        <DockPanel LastChildFill="False">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Style="{StaticResource ProcessPanelTitleTextStyle}" Text="按进程名捕获" />
-                                            </StackPanel>
-                                            <StackPanel DockPanel.Dock="Right"
-                                                        Orientation="Horizontal">
-                                                <Button Margin="0,0,8,0"
-                                                        Style="{StaticResource ProcessMiniButtonStyle}"
-                                                        Click="AddWeChatPreset_Click"
-                                                        Content="微信预设" />
-                                                <Button Style="{StaticResource ProcessMiniButtonStyle}"
-                                                        Click="AddLdPreset_Click"
-                                                        Content="雷电预设" />
-                                            </StackPanel>
-                                        </DockPanel>
+                                            <Border Grid.Row="1"
+                                                    Style="{StaticResource ProcessPaneActionBorderStyle}">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Background="#F8FAFD"
+                                                            BorderBrush="#DCE5F1"
+                                                            BorderThickness="1"
+                                                            CornerRadius="4">
+                                                        <TextBox x:Name="ProcessNameInputTextBox"
+                                                             Style="{StaticResource ProcessGridInputTextBoxStyle}"
+                                                             KeyDown="ProcessNameInput_KeyDown"
+                                                                 Text="{Binding NewProcessName, UpdateSourceTrigger=PropertyChanged}" />
+                                                    </Border>
+                                                    <Button Grid.Column="1"
+                                                            Margin="8,0,0,0"
+                                                            Style="{StaticResource ProcessMiniButtonStyle}"
+                                                            Click="AddProcessName_Click"
+                                                            Content="添加" />
+                                                    <Button Grid.Column="2"
+                                                            Margin="8,0,0,0"
+                                                            Style="{StaticResource ProcessMiniButtonStyle}"
+                                                            Click="RemoveProcessName_Click"
+                                                            Content="移除所选" />
+                                                </Grid>
+                                            </Border>
 
-                                        <Grid Grid.Row="2">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <TextBox x:Name="ProcessNameInputTextBox"
-                                                     Height="30"
-                                                     Style="{StaticResource SettingsCompactTextBoxStyle}"
-                                                     KeyDown="ProcessNameInput_KeyDown"
-                                                     Text="{Binding NewProcessName, UpdateSourceTrigger=PropertyChanged}" />
-                                            <Button Grid.Column="1"
-                                                    Margin="8,0,0,0"
-                                                    Style="{StaticResource ProcessMiniButtonStyle}"
-                                                    Click="AddProcessName_Click"
-                                                    Content="添加" />
-                                            <Button Grid.Column="2"
-                                                    Margin="8,0,0,0"
-                                                    Style="{StaticResource ProcessMiniButtonStyle}"
-                                                    Click="RemoveProcessName_Click"
-                                                    Content="移除所选" />
+                                            <DataGrid x:Name="ProcessNamesGrid"
+                                                      Grid.Row="2"
+                                                      ItemsSource="{Binding ProcessCaptureNames}"
+                                                      SelectedItem="{Binding SelectedProcessCaptureName, Mode=TwoWay}"
+                                                      SelectionMode="Single"
+                                                      Style="{StaticResource ProcessDataGridStyle}">
+                                                <DataGrid.Columns>
+                                                    <DataGridTextColumn Header="进程名"
+                                                                        Binding="{Binding Name}"
+                                                                        ElementStyle="{StaticResource ProcessGridTextStyle}"
+                                                                        Width="*"
+                                                                        IsReadOnly="True" />
+                                                </DataGrid.Columns>
+                                            </DataGrid>
                                         </Grid>
+                                    </Border>
 
-                                        <DataGrid x:Name="ProcessNamesGrid"
-                                                  Grid.Row="3"
-                                                  Height="188"
-                                                  ItemsSource="{Binding ProcessCaptureNames}"
-                                                  SelectedItem="{Binding SelectedProcessCaptureName, Mode=TwoWay}"
-                                                  SelectionMode="Single"
-                                                  Style="{StaticResource ProcessDataGridStyle}">
-                                            <DataGrid.Columns>
-                                                <DataGridTextColumn Header="进程名"
-                                                                    Binding="{Binding Name}"
-                                                                    ElementStyle="{StaticResource ProcessGridTextStyle}"
-                                                                    Width="*"
-                                                                    IsReadOnly="True" />
-                                            </DataGrid.Columns>
-                                        </DataGrid>
-                                    </Grid>
+                                    <Border Grid.Column="2"
+                                            Style="{StaticResource ProcessWorkspacePanelBorderStyle}">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="*" />
+                                            </Grid.RowDefinitions>
 
-                                    <Grid Grid.Column="2"
-                                          Margin="12,12,14,12">
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="8" />
-                                            <RowDefinition Height="*" />
-                                        </Grid.RowDefinitions>
+                                            <Border Style="{StaticResource ProcessPaneHeaderBorderStyle}">
+                                                <TextBlock Style="{StaticResource ProcessPanelTitleTextStyle}"
+                                                           Text="按PID捕获" />
+                                            </Border>
 
-                                        <DockPanel LastChildFill="False">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Style="{StaticResource ProcessPanelTitleTextStyle}" Text="按PID捕获" />
-                                            </StackPanel>
-                                            <StackPanel DockPanel.Dock="Right"
-                                                        Orientation="Horizontal">
-                                                <Button Margin="0,0,8,0"
-                                                        Style="{StaticResource ProcessPrimaryMiniButtonStyle}"
-                                                        Click="SetProcessPid_Click"
-                                                        Content="捕获所选PID" />
-                                                <Button Style="{StaticResource ProcessMiniButtonStyle}"
-                                                        Click="ClearProcessPid_Click"
-                                                        Content="清除PID" />
-                                            </StackPanel>
-                                        </DockPanel>
+                                            <Border Grid.Row="1"
+                                                    Style="{StaticResource ProcessPaneActionBorderStyle}">
+                                                <DockPanel LastChildFill="True">
+                                                    <StackPanel DockPanel.Dock="Right"
+                                                                Orientation="Horizontal">
+                                                        <Button Margin="0,0,8,0"
+                                                                Style="{StaticResource ProcessPrimaryMiniButtonStyle}"
+                                                                Click="SetProcessPid_Click"
+                                                                Content="添加所选" />
+                                                        <Button Style="{StaticResource ProcessMiniButtonStyle}"
+                                                                Click="ClearProcessPid_Click"
+                                                                Content="移除所选" />
+                                                    </StackPanel>
+                                                </DockPanel>
+                                            </Border>
 
-                                        <DataGrid x:Name="RunningProcessesGrid"
-                                                  Grid.Row="2"
-                                                  Height="188"
-                                                  ItemsSource="{Binding RunningProcesses}"
-                                                  SelectedItem="{Binding SelectedRunningProcess, Mode=TwoWay}"
-                                                  SelectionMode="Extended"
-                                                  Style="{StaticResource ProcessDataGridStyle}">
-                                            <DataGrid.Columns>
-                                                <DataGridTextColumn Header="PID"
-                                                                    Binding="{Binding Pid}"
-                                                                    ElementStyle="{StaticResource ProcessGridTextStyle}"
-                                                                    Width="90"
-                                                                    IsReadOnly="True" />
-                                                <DataGridTextColumn Header="进程名"
-                                                                    Binding="{Binding Name}"
-                                                                    ElementStyle="{StaticResource ProcessGridTextStyle}"
-                                                                    Width="*"
-                                                                    IsReadOnly="True" />
-                                                <DataGridTemplateColumn Header="当前捕获"
-                                                                        Width="88"
-                                                                        IsReadOnly="False">
-                                                    <DataGridTemplateColumn.CellTemplate>
-                                                        <DataTemplate>
-                                                            <CheckBox IsChecked="{Binding IsCaptured}"
-                                                                      Style="{StaticResource ProcessGridCheckBoxStyle}"
-                                                                      Click="RunningProcessCaptureCheckBox_Click" />
-                                                        </DataTemplate>
-                                                    </DataGridTemplateColumn.CellTemplate>
-                                                </DataGridTemplateColumn>
-                                            </DataGrid.Columns>
-                                        </DataGrid>
-                                    </Grid>
+                                            <DataGrid x:Name="RunningProcessesGrid"
+                                                      Grid.Row="2"
+                                                      ItemsSource="{Binding RunningProcesses}"
+                                                      SelectedItem="{Binding SelectedRunningProcess, Mode=TwoWay}"
+                                                      SelectionMode="Extended"
+                                                      Style="{StaticResource ProcessDataGridStyle}">
+                                                <DataGrid.Columns>
+                                                    <DataGridTextColumn Header="PID"
+                                                                        Binding="{Binding Pid}"
+                                                                        ElementStyle="{StaticResource ProcessGridTextStyle}"
+                                                                        Width="78"
+                                                                        IsReadOnly="True" />
+                                                    <DataGridTextColumn Header="进程名"
+                                                                        Binding="{Binding Name}"
+                                                                        ElementStyle="{StaticResource ProcessGridTextStyle}"
+                                                                        Width="*"
+                                                                        IsReadOnly="True" />
+                                                    <DataGridTemplateColumn Header="捕获"
+                                                                            Width="72"
+                                                                            IsReadOnly="False">
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate>
+                                                                <CheckBox IsChecked="{Binding IsCaptured}"
+                                                                          Style="{StaticResource ProcessGridCheckBoxStyle}"
+                                                                          Click="RunningProcessCaptureCheckBox_Click" />
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
+                                                </DataGrid.Columns>
+                                            </DataGrid>
+                                        </Grid>
+                                    </Border>
                                 </Grid>
                             </Border>
-                        </StackPanel>
+                        </Grid>
 
                         <StackPanel x:Name="RequestCertSectionPanel" Visibility="Collapsed">
                             <TextBlock Style="{StaticResource SettingsGroupTitleTextStyle}" Text="请求证书" />

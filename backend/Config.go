@@ -425,7 +425,11 @@ func RunHTTPRequestScriptCode(Conn *SunnyNet.HttpConn) (_Display bool) {
 	_Call := httpFunc
 	lock.Unlock()
 	if _Call == nil {
-		h.Break = 0
+		if MatchInterceptRequest(h) {
+			h.Break = 1
+		} else {
+			h.Break = 0
+		}
 		h.Display = true
 		h.Way = "HTTP"
 		h.PID = CommAnd.GetPidName(Conn.PID)
@@ -484,7 +488,7 @@ func RunHTTPRequestScriptCode(Conn *SunnyNet.HttpConn) (_Display bool) {
 		h.URL = _URL
 		Conn.Request.URL, _ = url.Parse(_URL)
 	}
-	if _Break {
+	if _Break || MatchInterceptRequest(h) {
 		h.Break = 1
 	} else {
 		h.Break = 0
@@ -565,7 +569,7 @@ func RunHTTPResponseScriptCode(Conn *SunnyNet.HttpConn) (_Return_ bool) {
 	h1.Response.Body = _Body
 	h1.Response.StateCode = _StateCode
 	h1.Response.Conn = Conn
-	return _Break
+	return _Break || MatchInterceptResponse(h1)
 }
 func RunHTTPErrorScriptCode(Conn *SunnyNet.HttpConn) {
 	defer func() {
@@ -693,6 +697,15 @@ type ConfigReplaceRules struct {
 	Dest string `json:"Dest"`
 	Hash string `json:"Hash"`
 }
+type ConfigInterceptRule struct {
+	Hash      string `json:"Hash"`
+	Enable    bool   `json:"Enable"`
+	Name      string `json:"Name"`
+	Direction string `json:"Direction"`
+	Target    string `json:"Target"`
+	Operator  string `json:"Operator"`
+	Value     string `json:"Value"`
+}
 type ConfigRequestCertManager struct {
 	Rule     uint8  `json:"rule"`
 	FilePath string `json:"FilePath"`
@@ -716,21 +729,22 @@ type UserConfig struct {
 		State404 Color `json:"_404"`
 		State500 Color `json:"_500"`
 	} `json:"ColorConfig"`
-	GoScriptCode           []byte               `json:"ScriptCode"`
-	Port                   int                  `json:"Port"`
-	DisableUDP             bool                 `json:"DisableUDP"`
-	DisableTCP             bool                 `json:"DisableTCP"`
-	DisableCache           bool                 `json:"DisableCache"`
-	Authentication         bool                 `json:"OpenAuthentication"`
-	AuthenticationUserInfo map[string]string    `json:"AuthenticationUserInfo"`
-	GlobalProxy            string               `json:"GlobalProxy"`
-	GlobalProxyRules       string               `json:"GlobalProxyRules"`
-	ReplaceRules           []ConfigReplaceRules `json:"ReplaceRules"`
-	HostsRules             []ConfigReplaceRules `json:"HostsRules"`
-	DarkTheme              uint8                `json:"DarkTheme"`
-	Filter                 string               `json:"Filter"`
-	KeysStrings            string               `json:"KeysStrings"`
-	Columns                string               `json:"Columns"`
+	GoScriptCode           []byte                `json:"ScriptCode"`
+	Port                   int                   `json:"Port"`
+	DisableUDP             bool                  `json:"DisableUDP"`
+	DisableTCP             bool                  `json:"DisableTCP"`
+	DisableCache           bool                  `json:"DisableCache"`
+	Authentication         bool                  `json:"OpenAuthentication"`
+	AuthenticationUserInfo map[string]string     `json:"AuthenticationUserInfo"`
+	GlobalProxy            string                `json:"GlobalProxy"`
+	GlobalProxyRules       string                `json:"GlobalProxyRules"`
+	ReplaceRules           []ConfigReplaceRules  `json:"ReplaceRules"`
+	HostsRules             []ConfigReplaceRules  `json:"HostsRules"`
+	InterceptRules         []ConfigInterceptRule `json:"InterceptRules"`
+	DarkTheme              uint8                 `json:"DarkTheme"`
+	Filter                 string                `json:"Filter"`
+	KeysStrings            string                `json:"KeysStrings"`
+	Columns                string                `json:"Columns"`
 	MustTcp                struct {
 		Open  bool   `json:"open"`
 		Rules string `json:"Rules"`
@@ -770,6 +784,9 @@ func (c *UserConfig) loadDefaultValue() {
 	}
 	if c.HostsRules == nil {
 		c.HostsRules = make([]ConfigReplaceRules, 0)
+	}
+	if c.InterceptRules == nil {
+		c.InterceptRules = make([]ConfigInterceptRule, 0)
 	}
 	if c.AuthenticationUserInfo == nil {
 		c.AuthenticationUserInfo = make(map[string]string)

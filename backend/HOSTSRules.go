@@ -45,7 +45,7 @@ func HostsRulesEvent(command string, args *JSON.SyJson) any {
 		_ = GlobalConfig.saveToFile()
 		return failHash
 	}
-	return false
+	return InterceptRulesEvent(command, args)
 }
 
 func HostsRulesUrl(u *url.URL) {

@@ -147,6 +147,20 @@ public partial class MainWindow : Window
 
     private void Detail_PropertyChanged(object? sender, PropertyChangedEventArgs propertyChangedEventArgs)
     {
+        if (propertyChangedEventArgs.PropertyName == nameof(SessionDetail.InlineInterceptMode))
+        {
+            if (_viewModel.Detail.InlineInterceptMode == 1)
+            {
+                RequestTabControl.SelectedIndex = 0;
+            }
+            else if (_viewModel.Detail.InlineInterceptMode == 2)
+            {
+                ResponseTabControl.SelectedIndex = 0;
+            }
+
+            return;
+        }
+
         if (propertyChangedEventArgs.PropertyName != nameof(SessionDetail.IsSocketSession))
         {
             return;
@@ -935,7 +949,15 @@ public partial class MainWindow : Window
 
         try
         {
-            await _viewModel.ResendSessionEntriesAsync(GetSelectedSessionEntries(), mode);
+            CaptureEntry[] entries = GetSelectedSessionEntries();
+            if (mode is 1 or 2)
+            {
+                await _viewModel.ResendSessionEntriesWithInterceptEditorAsync(entries, mode);
+            }
+            else
+            {
+                await _viewModel.ResendSessionEntriesAsync(entries, mode);
+            }
         }
         catch (Exception exception)
         {

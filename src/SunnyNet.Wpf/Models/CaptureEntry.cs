@@ -12,9 +12,11 @@ public sealed class CaptureEntry : ViewModelBase
     private static readonly Brush WarningStatusBrush = CreateFrozenBrush("#B46B00");
     private static readonly Brush DangerStatusBrush = CreateFrozenBrush("#E5484D");
     private static readonly Brush InfoStatusBrush = CreateFrozenBrush("#2F7CF6");
+    private static readonly Brush InterceptStatusBrush = CreateFrozenBrush("#FF6A00");
     private static readonly Brush FavoriteActiveBrush = CreateFrozenBrush("#F4B400");
     private static readonly Brush FavoriteInactiveBrush = CreateFrozenBrush("#B7C3D0");
     private static readonly Brush DefaultRowBackgroundBrush = Brushes.Transparent;
+    private static readonly Brush InterceptRowBackgroundBrush = CreateFrozenBrush("#FFE0BD");
     private static readonly Brush SuccessRowBackgroundBrush = CreateFrozenBrush("#F3FBF7");
     private static readonly Brush RedirectRowBackgroundBrush = CreateFrozenBrush("#F3F7FF");
     private static readonly Brush WarningRowBackgroundBrush = CreateFrozenBrush("#FFF8EA");
@@ -242,8 +244,18 @@ public sealed class CaptureEntry : ViewModelBase
     public int BreakMode
     {
         get => _breakMode;
-        set => SetProperty(ref _breakMode, value);
+        set
+        {
+            if (SetProperty(ref _breakMode, value))
+            {
+                OnPropertyChanged(nameof(IsIntercepted));
+                NotifyStatusVisualsChanged();
+            }
+        }
     }
+
+    [JsonIgnore]
+    public bool IsIntercepted => BreakMode > 0;
 
     public void UpdateFrom(CaptureEntry entry)
     {
@@ -324,6 +336,11 @@ public sealed class CaptureEntry : ViewModelBase
 
     private Brush GetStatusBrush()
     {
+        if (IsIntercepted)
+        {
+            return InterceptStatusBrush;
+        }
+
         if (IsErrorState())
         {
             return DangerStatusBrush;
@@ -365,6 +382,11 @@ public sealed class CaptureEntry : ViewModelBase
 
     private Brush GetRowBackground()
     {
+        if (IsIntercepted)
+        {
+            return InterceptRowBackgroundBrush;
+        }
+
         if (IsErrorState())
         {
             return DangerRowBackgroundBrush;
@@ -406,6 +428,11 @@ public sealed class CaptureEntry : ViewModelBase
 
     private string GetStatusIconToolTip()
     {
+        if (IsIntercepted)
+        {
+            return BreakMode == 2 ? "已拦截下行响应" : "已拦截上行请求";
+        }
+
         int statusCode = ExtractStatusCode(State);
         if (statusCode > 0)
         {

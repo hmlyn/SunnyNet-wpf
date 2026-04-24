@@ -57,21 +57,24 @@ public sealed class GoBackendClient : IAsyncDisposable
             Args = args
         }, JsonOptions);
 
-        string responseJson = await Task.Run(() => GetNativeLibrary().Invoke(payload), cancellationToken);
-        using JsonDocument document = JsonDocument.Parse(responseJson);
-
-        JsonElement root = document.RootElement;
-        if (!root.TryGetProperty("ok", out JsonElement okElement) || !okElement.GetBoolean())
+        return await Task.Run<JsonElement?>(() =>
         {
-            throw new InvalidOperationException(ExtractError(root));
-        }
+            string responseJson = GetNativeLibrary().Invoke(payload);
+            using JsonDocument document = JsonDocument.Parse(responseJson);
 
-        if (!root.TryGetProperty("data", out JsonElement dataElement) || dataElement.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
-        {
-            return null;
-        }
+            JsonElement root = document.RootElement;
+            if (!root.TryGetProperty("ok", out JsonElement okElement) || !okElement.GetBoolean())
+            {
+                throw new InvalidOperationException(ExtractError(root));
+            }
 
-        return dataElement.Clone();
+            if (!root.TryGetProperty("data", out JsonElement dataElement) || dataElement.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+            {
+                return null;
+            }
+
+            return dataElement.Clone();
+        }, cancellationToken);
     }
 
     public async ValueTask DisposeAsync()

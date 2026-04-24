@@ -11,6 +11,9 @@ namespace SunnyNet.Wpf.ViewModels;
 
 public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 {
+    private const int LargePayloadPreviewBytes = 32 * 1024;
+    private const int LargePayloadThresholdBytes = 512 * 1024;
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -22,6 +25,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     private readonly HashSet<string> _favoriteKeys = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _selectedProcessFilterKeys = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _selectedDomainFilterKeys = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<PendingInterceptReplay> _pendingInterceptReplays = new();
     private const string AllProcessFilterKey = "__all_process__";
     private const string AllDomainFilterKey = "__all_domain__";
     private int _nextIndex = 1;
@@ -54,9 +58,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         ReleaseAllCommand = new AsyncRelayCommand(ReleaseAllAsync);
         ToggleCaptureCommand = new AsyncRelayCommand(ToggleCaptureAsync);
         ToggleAutoScrollCommand = new RelayCommand(_ => AutoScroll = !AutoScroll);
-        ResendSelectedCommand = new AsyncRelayCommand(() => ResendSelectedAsync(3), () => SelectedSession is not null && IsSelectedSessionIntercepted);
+        ResendSelectedCommand = new AsyncRelayCommand(ReleaseCurrentInterceptAsync, () => SelectedSession is not null && IsSelectedSessionIntercepted);
         CloseSessionCommand = new AsyncRelayCommand(CloseSelectedSessionAsync, () => SelectedSession is not null && IsSelectedSessionIntercepted);
-        ReleaseCurrentCommand = new AsyncRelayCommand(() => BreakpointAsync(0), () => SelectedSession is not null && IsSelectedSessionIntercepted);
+        ReleaseCurrentCommand = new AsyncRelayCommand(ReleaseCurrentInterceptAsync, () => SelectedSession is not null && IsSelectedSessionIntercepted);
         RefreshSessionFilterItems();
     }
 
@@ -71,6 +75,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     public ObservableCollection<SessionFilterItem> DomainFilters { get; } = new();
     public ObservableCollection<HostsRuleItem> HostsRuleItems { get; } = new();
     public ObservableCollection<ReplaceRuleItem> ReplaceRuleItems { get; } = new();
+    public ObservableCollection<InterceptRuleItem> InterceptRuleItems { get; } = new();
     public ObservableCollection<RequestCertificateRuleItem> RequestCertificateItems { get; } = new();
     public ObservableCollection<ProcessCaptureNameItem> ProcessCaptureNames { get; } = new();
     public ObservableCollection<RunningProcessItem> RunningProcesses { get; } = new();
@@ -387,7 +392,26 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         }
 
         await _backend.InvokeAsync("重发请求", new { Data = theologyIds, Mode = mode });
-        StatusRight = "重发请求已提交";
+    }
+
+    public async Task ResendSessionEntriesWithInterceptEditorAsync(IEnumerable<CaptureEntry> entries, int mode)
+    {
+        CaptureEntry[] selectedEntries = NormalizeSessionEntries(entries);
+        if (selectedEntries.Length == 0)
+        {
+            return;
+        }
+
+        if (mode is not (1 or 2))
+        {
+            await ResendSessionEntriesAsync(selectedEntries, mode);
+            return;
+        }
+
+        foreach (CaptureEntry entry in selectedEntries)
+        {
+            await ResendSingleSessionWithInterceptEditorAsync(entry, mode);
+        }
     }
 
     public async Task CloseSessionEntriesAsync(IEnumerable<CaptureEntry> entries)
@@ -411,6 +435,55 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
         RefreshSelectedSessionInterceptState();
         StatusRight = "断开会话请求已提交";
+    }
+
+    private async Task ResendSingleSessionWithInterceptEditorAsync(CaptureEntry entry, int mode)
+    {
+        TaskCompletionSource<CaptureEntry> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        PendingInterceptReplay pendingReplay = new(entry, mode, completion);
+        _pendingInterceptReplays.Add(pendingReplay);
+        await _backend.InvokeAsync("重发请求", new { Data = new[] { entry.Theology }, Mode = mode });
+
+        CaptureEntry interceptedEntry;
+        try
+        {
+            interceptedEntry = await completion.Task.WaitAsync(TimeSpan.FromSeconds(20));
+        }
+        catch (TimeoutException)
+        {
+            _pendingInterceptReplays.Remove(pendingReplay);
+
+            NotificationRequested?.Invoke("重放失败", mode == 1 ? "等待上行拦截命中超时。" : "等待下行拦截命中超时。");
+            return;
+        }
+
+        SelectedSession = interceptedEntry;
+        await LoadSelectedSessionAsync();
+        Detail.EnableInlineIntercept(mode);
+        ScrollToEntryRequested?.Invoke(interceptedEntry);
+    }
+
+    private async Task SaveInterceptReplayEditAsync(CaptureEntry entry, int mode, string text)
+    {
+        string data = Convert.ToBase64String(Encoding.UTF8.GetBytes(text ?? ""));
+        await _backend.InvokeAsync("保存修改数据", new
+        {
+            Theology = entry.Theology,
+            Type = mode == 1 ? "Request" : "Response",
+            Tabs = "Raw",
+            UTF8 = true,
+            Data = data
+        });
+    }
+
+    private async Task ReleaseSessionAsync(CaptureEntry entry, int nextBreak)
+    {
+        await _backend.InvokeAsync("断点点击", new { Theology = entry.Theology, NextBreak = nextBreak });
+        entry.BreakMode = nextBreak;
+        if (SelectedSession?.Theology == entry.Theology)
+        {
+            RefreshSelectedSessionInterceptState();
+        }
     }
 
     public async Task GenerateRequestCodeAsync(IEnumerable<CaptureEntry> entries, string lang, string module)
@@ -640,6 +713,55 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         StatusRight = failureCount > 0 ? $"替换规则保存完成，失败 {failureCount} 项" : "替换规则已保存";
         NotificationRequested?.Invoke(failureCount > 0 ? "错误" : "提示",
             failureCount > 0 ? $"有 {failureCount} 条替换规则保存失败，请检查内容。" : "替换规则已保存。");
+    }
+
+    public void AddInterceptRule()
+    {
+        InterceptRuleItems.Add(new InterceptRuleItem());
+        SyncInterceptRulesText();
+    }
+
+    public void RemoveInterceptRule(InterceptRuleItem? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        InterceptRuleItems.Remove(item);
+        SyncInterceptRulesText();
+    }
+
+    public async Task ApplyInterceptRulesAsync()
+    {
+        foreach (InterceptRuleItem item in InterceptRuleItems)
+        {
+            item.Hash = EnsureRuleHash(item.Hash);
+        }
+
+        SyncInterceptRulesText();
+        JsonElement? result = await _backend.InvokeAsync("保存拦截规则", new
+        {
+            Data = InterceptRuleItems.Select(static item => new Dictionary<string, object?>
+            {
+                ["Hash"] = item.Hash,
+                ["Enable"] = item.Enabled,
+                ["Name"] = item.Name,
+                ["Direction"] = item.Direction,
+                ["Target"] = item.Target,
+                ["Operator"] = item.Operator,
+                ["Value"] = item.Value
+            }).ToArray()
+        });
+
+        bool ok = result is null || result.Value.ValueKind != JsonValueKind.False;
+        foreach (InterceptRuleItem item in InterceptRuleItems)
+        {
+            item.State = ok ? "已保存" : "保存失败";
+        }
+
+        StatusRight = ok ? "拦截规则已保存" : "拦截规则保存失败";
+        NotificationRequested?.Invoke(ok ? "提示" : "错误", ok ? "拦截规则已保存。" : "拦截规则保存失败，请检查规则。");
     }
 
     public async Task RestoreDefaultScriptAsync()
@@ -1248,6 +1370,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
         await _backend.InvokeAsync("关闭请求会话", new { Data = new[] { SelectedSession.Theology } });
         SelectedSession.BreakMode = 0;
+        Detail.DisableInlineIntercept();
         RefreshSelectedSessionInterceptState();
     }
 
@@ -1260,7 +1383,30 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
         await _backend.InvokeAsync("断点点击", new { Theology = SelectedSession.Theology, NextBreak = nextBreak });
         SelectedSession.BreakMode = nextBreak;
+        if (nextBreak == 0)
+        {
+            Detail.DisableInlineIntercept();
+        }
+
         RefreshSelectedSessionInterceptState();
+    }
+
+    private async Task ReleaseCurrentInterceptAsync()
+    {
+        if (SelectedSession is null)
+        {
+            return;
+        }
+
+        int mode = SelectedSession.BreakMode;
+        if (mode is 1 or 2)
+        {
+            string text = mode == 1 ? Detail.EditableRequestRaw : Detail.EditableResponseRaw;
+            await SaveInterceptReplayEditAsync(SelectedSession, mode, text);
+        }
+
+        await BreakpointAsync(0);
+        StatusRight = mode == 1 ? "上行修改已保存并放行" : mode == 2 ? "下行修改已保存并放行" : "已运行到结束";
     }
 
     private async Task<SearchExecutionResult> ApplySearchResultAsync(JsonElement result, SearchRequest request)
@@ -1407,14 +1553,38 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     private void ApplyInsertList(JsonElement args)
     {
         bool changed = false;
+        CaptureEntry? interceptedEntry = null;
         foreach (CaptureEntry entry in DeserializeList<CaptureEntry>(args))
         {
-            if (entry.Theology == 0 || _sessionMap.ContainsKey(entry.Theology))
+            if (entry.Theology == 0)
             {
                 continue;
             }
 
+            if (_sessionMap.TryGetValue(entry.Theology, out CaptureEntry? existing))
+            {
+                existing.UpdateFrom(entry);
+                ApplyFavoriteState(existing, forceRefresh: false);
+                if (SelectedSession?.Theology == existing.Theology)
+                {
+                    RefreshSelectedSessionInterceptState();
+                    if (existing.BreakMode <= 0)
+                    {
+                        Detail.DisableInlineIntercept();
+                    }
+                }
+
+                CompletePendingInterceptReplay(existing);
+                changed = true;
+                continue;
+            }
+
             AddEntry(entry);
+            CompletePendingInterceptReplay(entry);
+            if (entry.BreakMode > 0)
+            {
+                interceptedEntry = entry;
+            }
             changed = true;
         }
 
@@ -1422,11 +1592,14 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         {
             RefreshSessionFilterItems();
         }
+
+        OpenInterceptedSession(interceptedEntry);
     }
 
     private void ApplyUpdateList(JsonElement args)
     {
         bool changed = false;
+        CaptureEntry? interceptedEntry = null;
         foreach (CaptureEntry entry in DeserializeList<CaptureEntry>(args))
         {
             if (entry.Theology == 0)
@@ -1443,10 +1616,22 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
                 {
                     RefreshSelectedSessionInterceptState();
                 }
+
+                if (existing.BreakMode > 0)
+                {
+                    interceptedEntry = existing;
+                }
+
+                CompletePendingInterceptReplay(existing);
             }
             else
             {
                 AddEntry(entry);
+                CompletePendingInterceptReplay(entry);
+                if (entry.BreakMode > 0)
+                {
+                    interceptedEntry = entry;
+                }
                 changed = true;
             }
         }
@@ -1455,6 +1640,19 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         {
             RefreshSessionFilterItems();
         }
+
+        OpenInterceptedSession(interceptedEntry);
+    }
+
+    private void OpenInterceptedSession(CaptureEntry? entry)
+    {
+        if (entry is null || _pendingInterceptReplays.Any(static replay => !replay.Completion.Task.IsCompleted))
+        {
+            return;
+        }
+
+        SelectedSession = entry;
+        ScrollToEntryRequested?.Invoke(entry);
     }
 
     private void ApplyResponseLength(JsonElement args)
@@ -1529,17 +1727,17 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
         JsonElement responseHeader = GetProperty(args, "Header");
         Detail.ResponseHeaders = FormatHeaders(responseHeader);
-        Detail.ResponseBody = DecodePayloadElement(GetProperty(args, "Body"));
-        Detail.ResponseText = Detail.ResponseBody;
         byte[] responseBytes = DecodePayloadBytes(GetProperty(args, "Body"));
-        Detail.ResponseHex = ToHex(responseBytes);
+        Detail.ResponseBody = BytesToPreviewText(responseBytes);
+        Detail.ResponseText = Detail.ResponseBody;
+        Detail.ResponseHex = responseBytes.Length > LargePayloadThresholdBytes ? "" : ToHex(responseBytes);
         Detail.ResponseRaw = $"HTTP {GetInt(args, "StateCode")} {GetString(args, "StateText")}\r\n{Detail.ResponseHeaders}\r\n\r\n{Detail.ResponseBody}".Trim();
-        Detail.ResponseJson = TryFormatJson(Detail.ResponseBody);
+        Detail.ResponseJson = responseBytes.Length > LargePayloadThresholdBytes ? "响应内容较大，已跳过 JSON 自动格式化。" : TryFormatJson(Detail.ResponseBody);
         Detail.ResponseCookies = ExtractCookies(responseHeader);
         Detail.ResponseStateText = GetString(args, "StateText");
         Detail.ResponseStateCode = GetInt(args, "StateCode");
         string responseContentType = GetHeaderValue(responseHeader, "Content-Type");
-        Detail.ResponseImageBytes = TryGetImageBytes(responseContentType, responseBytes);
+        Detail.ResponseImageBytes = responseBytes.Length > LargePayloadThresholdBytes ? Array.Empty<byte>() : TryGetImageBytes(responseContentType, responseBytes);
         Detail.ResponseImageType = ExtractImageType(responseContentType);
         (byte[] responseRawBytes, int responseHeaderLength) = BuildHttpBytes($"HTTP {GetInt(args, "StateCode")} {GetString(args, "StateText")}", Detail.ResponseHeaders, responseBytes);
         ApplyResponseRows(responseHeader, responseRawBytes, responseHeaderLength);
@@ -1589,8 +1787,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         Settings.ScriptCode = DecodePayloadElement(GetProperty(args, "ScriptCode"));
         Settings.HostsRules = ToIndentedJson(GetProperty(args, "HostsRules"));
         Settings.ReplaceRules = ToIndentedJson(GetProperty(args, "ReplaceRules"));
+        Settings.InterceptRules = ToIndentedJson(GetProperty(args, "InterceptRules"));
         ApplyHostsRulesConfig(GetProperty(args, "HostsRules"));
         ApplyReplaceRulesConfig(GetProperty(args, "ReplaceRules"));
+        ApplyInterceptRulesConfig(GetProperty(args, "InterceptRules"));
         ApplyRequestCertificateConfig(GetProperty(args, "RequestCertManager"));
     }
 
@@ -1635,6 +1835,31 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
         ReplaceRows(ReplaceRuleItems, items);
         SyncReplaceRulesText();
+    }
+
+    private void ApplyInterceptRulesConfig(JsonElement element)
+    {
+        List<InterceptRuleItem> items = new();
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (JsonElement item in element.EnumerateArray())
+            {
+                items.Add(new InterceptRuleItem
+                {
+                    Hash = GetString(item, "Hash", Guid.NewGuid().ToString("N")),
+                    Enabled = GetProperty(item, "Enable").ValueKind == JsonValueKind.Undefined || GetBool(item, "Enable"),
+                    Name = GetString(item, "Name", "新规则"),
+                    Direction = GetString(item, "Direction", "上行"),
+                    Target = GetString(item, "Target", "URL"),
+                    Operator = GetString(item, "Operator", "包含"),
+                    Value = GetString(item, "Value"),
+                    State = "已保存"
+                });
+            }
+        }
+
+        ReplaceRows(InterceptRuleItems, items);
+        SyncInterceptRulesText();
     }
 
     private void ApplyRequestCertificateConfig(JsonElement element)
@@ -1686,6 +1911,26 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         {
             ScrollToEntryRequested?.Invoke(entry);
         }
+    }
+
+    private void CompletePendingInterceptReplay(CaptureEntry entry)
+    {
+        if (entry.BreakMode <= 0)
+        {
+            return;
+        }
+
+        PendingInterceptReplay? pendingReplay = _pendingInterceptReplays.FirstOrDefault(item =>
+            item.Mode == entry.BreakMode
+            && string.Equals(item.SourceEntry.Method, entry.Method, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(item.SourceEntry.Url, entry.Url, StringComparison.OrdinalIgnoreCase));
+        if (pendingReplay is null)
+        {
+            return;
+        }
+
+        _pendingInterceptReplays.Remove(pendingReplay);
+        pendingReplay.Completion.TrySetResult(entry);
     }
 
     public void ClearSessionFilters()
@@ -1816,7 +2061,15 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             }
 
             ApplySessionDetail(selected, result.Value);
-            await LoadRequestMultipartImageAsync(selected);
+            _ = LoadRequestMultipartImageAsync(selected);
+            if (selected.BreakMode is 1 or 2)
+            {
+                Detail.EnableInlineIntercept(selected.BreakMode);
+            }
+            else
+            {
+                Detail.DisableInlineIntercept();
+            }
         }
         catch (Exception exception)
         {
@@ -2054,6 +2307,22 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             JsonOptions);
     }
 
+    private void SyncInterceptRulesText()
+    {
+        Settings.InterceptRules = JsonSerializer.Serialize(
+            InterceptRuleItems.Select(static item => new
+            {
+                item.Hash,
+                Enable = item.Enabled,
+                item.Name,
+                item.Direction,
+                item.Target,
+                item.Operator,
+                item.Value
+            }),
+            JsonOptions);
+    }
+
     private void UpdateRunningProcessCaptureState()
     {
         foreach (RunningProcessItem item in RunningProcesses)
@@ -2140,9 +2409,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     {
         ReplaceRows(Detail.ResponseHeaderRows, ToHeaderRows(header));
         ReplaceRows(Detail.ResponseCookieRows, ToResponseCookieRows(header));
-        ReplaceRows(Detail.ResponseHexRows, ToHexRows(rawBytes, headerLength));
-        Detail.ResponseHexBytes = rawBytes;
-        Detail.ResponseHexHeaderLength = headerLength;
+        bool largePayload = rawBytes.Length > LargePayloadThresholdBytes;
+        byte[] hexBytes = largePayload ? rawBytes.Take(LargePayloadPreviewBytes).ToArray() : rawBytes;
+        ReplaceRows(Detail.ResponseHexRows, largePayload ? Array.Empty<HexViewRow>() : ToHexRows(rawBytes, headerLength));
+        Detail.ResponseHexBytes = hexBytes;
+        Detail.ResponseHexHeaderLength = Math.Min(headerLength, hexBytes.Length);
     }
 
     private void ApplySessionDetail(CaptureEntry selected, JsonElement data)
@@ -2187,14 +2458,14 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             Detail.ResponseStateText = GetString(response, "StateText");
             string responseHeadersText = FormatHeaders(responseHeader);
             Detail.ResponseHeaders = $"HTTP {Detail.ResponseStateCode} {Detail.ResponseStateText}\r\n{responseHeadersText}".Trim();
-            Detail.ResponseBody = DecodePayloadElement(GetProperty(response, "Body"));
+            Detail.ResponseBody = BytesToPreviewText(responseBodyBytes);
             Detail.ResponseRaw = $"HTTP {Detail.ResponseStateCode} {Detail.ResponseStateText}\r\n{responseHeadersText}\r\n\r\n{Detail.ResponseBody}".Trim();
             Detail.ResponseText = Detail.ResponseBody;
-            Detail.ResponseHex = ToHex(responseBodyBytes);
+            Detail.ResponseHex = responseBodyBytes.Length > LargePayloadThresholdBytes ? "" : ToHex(responseBodyBytes);
             Detail.ResponseCookies = ExtractCookies(responseHeader);
-            Detail.ResponseJson = TryFormatJson(Detail.ResponseBody);
-            Detail.ResponseHtml = Detail.ResponseBody;
-            Detail.ResponseImageBytes = TryGetImageBytes(responseContentType, responseBodyBytes);
+            Detail.ResponseJson = responseBodyBytes.Length > LargePayloadThresholdBytes ? "响应内容较大，已跳过 JSON 自动格式化。" : TryFormatJson(Detail.ResponseBody);
+            Detail.ResponseHtml = responseBodyBytes.Length > LargePayloadThresholdBytes ? "响应内容较大，已跳过 HTML 自动预览。" : Detail.ResponseBody;
+            Detail.ResponseImageBytes = responseBodyBytes.Length > LargePayloadThresholdBytes ? Array.Empty<byte>() : TryGetImageBytes(responseContentType, responseBodyBytes);
             Detail.ResponseImageType = ExtractImageType(responseContentType);
             (byte[] responseRawBytes, int responseHeaderLength) = BuildHttpBytes($"HTTP {Detail.ResponseStateCode} {Detail.ResponseStateText}", responseHeadersText, responseBodyBytes);
             ApplyResponseRows(responseHeader, responseRawBytes, responseHeaderLength);
@@ -2472,6 +2743,18 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         }
 
         return Encoding.UTF8.GetString(bytes);
+    }
+
+    private static string BytesToPreviewText(byte[] bytes)
+    {
+        if (bytes.Length <= LargePayloadThresholdBytes)
+        {
+            return BytesToDisplayText(bytes);
+        }
+
+        byte[] previewBytes = bytes.Take(LargePayloadPreviewBytes).ToArray();
+        string preview = BytesToDisplayText(previewBytes);
+        return $"响应内容较大：{bytes.Length:N0} Bytes，已预览前 {previewBytes.Length:N0} Bytes。\r\n\r\n{preview}";
     }
 
     private static bool LooksBinary(byte[] bytes)
@@ -2865,3 +3148,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             || selected.ResponseType.Contains("UDP", StringComparison.OrdinalIgnoreCase);
     }
 }
+
+internal sealed record PendingInterceptReplay(
+    CaptureEntry SourceEntry,
+    int Mode,
+    TaskCompletionSource<CaptureEntry> Completion);

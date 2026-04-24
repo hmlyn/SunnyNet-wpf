@@ -7,11 +7,14 @@ public sealed class SessionDetail : ViewModelBase
 {
     private bool _hasSelection;
     private bool _isSocketSession;
+    private int _inlineInterceptMode;
+    private bool _syncingEditableRaw = true;
     private string _requestMethod = "";
     private string _requestUrl = "";
     private string _requestHeaders = "";
     private string _requestBody = "";
     private string _requestRaw = "";
+    private string _editableRequestRaw = "";
     private string _requestQuery = "";
     private string _requestHex = "";
     private string _requestCookies = "";
@@ -25,6 +28,7 @@ public sealed class SessionDetail : ViewModelBase
     private string _responseHeaders = "";
     private string _responseBody = "";
     private string _responseRaw = "";
+    private string _editableResponseRaw = "";
     private string _responseText = "";
     private string _responseHex = "";
     private string _responseCookies = "";
@@ -73,7 +77,22 @@ public sealed class SessionDetail : ViewModelBase
     public string RequestRaw
     {
         get => _requestRaw;
-        set => SetProperty(ref _requestRaw, value);
+        set
+        {
+            if (SetProperty(ref _requestRaw, value))
+            {
+                if (_syncingEditableRaw)
+                {
+                    EditableRequestRaw = value;
+                }
+            }
+        }
+    }
+
+    public string EditableRequestRaw
+    {
+        get => _editableRequestRaw;
+        set => SetProperty(ref _editableRequestRaw, value ?? "");
     }
 
     public string RequestQuery
@@ -151,7 +170,22 @@ public sealed class SessionDetail : ViewModelBase
     public string ResponseRaw
     {
         get => _responseRaw;
-        set => SetProperty(ref _responseRaw, value);
+        set
+        {
+            if (SetProperty(ref _responseRaw, value))
+            {
+                if (_syncingEditableRaw)
+                {
+                    EditableResponseRaw = value;
+                }
+            }
+        }
+    }
+
+    public string EditableResponseRaw
+    {
+        get => _editableResponseRaw;
+        set => SetProperty(ref _editableResponseRaw, value ?? "");
     }
 
     public string ResponseText
@@ -232,6 +266,37 @@ public sealed class SessionDetail : ViewModelBase
         set => SetProperty(ref _isSocketSession, value);
     }
 
+    public int InlineInterceptMode
+    {
+        get => _inlineInterceptMode;
+        set
+        {
+            if (SetProperty(ref _inlineInterceptMode, value))
+            {
+                OnPropertyChanged(nameof(IsRequestInlineEditing));
+                OnPropertyChanged(nameof(IsResponseInlineEditing));
+            }
+        }
+    }
+
+    public bool IsRequestInlineEditing => InlineInterceptMode == 1;
+
+    public bool IsResponseInlineEditing => InlineInterceptMode == 2;
+
+    public void EnableInlineIntercept(int mode)
+    {
+        EditableRequestRaw = RequestRaw;
+        EditableResponseRaw = ResponseRaw;
+        _syncingEditableRaw = false;
+        InlineInterceptMode = mode;
+    }
+
+    public void DisableInlineIntercept()
+    {
+        InlineInterceptMode = 0;
+        _syncingEditableRaw = true;
+    }
+
     public string Summary
     {
         get => _summary;
@@ -270,6 +335,7 @@ public sealed class SessionDetail : ViewModelBase
         RequestHeaders = "";
         RequestBody = "";
         RequestRaw = "";
+        EditableRequestRaw = "";
         RequestQuery = "";
         RequestHex = "";
         RequestCookies = "";
@@ -283,6 +349,7 @@ public sealed class SessionDetail : ViewModelBase
         ResponseHeaders = "";
         ResponseBody = "";
         ResponseRaw = "";
+        EditableResponseRaw = "";
         ResponseText = "";
         ResponseHex = "";
         ResponseCookies = "";
@@ -296,6 +363,7 @@ public sealed class SessionDetail : ViewModelBase
         ResponseStateCode = 0;
         ResponseStateText = "";
         IsSocketSession = false;
+        DisableInlineIntercept();
         Summary = "请选择一个会话";
         SelectedSocketEntry = null;
         SocketEntries.Clear();

@@ -253,7 +253,6 @@ func event(command string, args *JSON.SyJson) any {
 			return false
 		}
 		HashMap.Resend(TheologyArray, mode, app.App.Port())
-		CallJs("弹出成功信息", "重发请求已提交")
 		return true
 	case "工作状态":
 		SetWorkingState(args.GetData("State") == "true")
@@ -907,7 +906,6 @@ func event(command string, args *JSON.SyJson) any {
 					h.Method = Method
 					h.Conn.Request.Method = Method
 					h.Conn.Request.URL = URL
-					CallJs("弹出成功提示", "修改请求提交的包体成功")
 				}
 				return true
 			case "Headers":
@@ -929,7 +927,6 @@ func event(command string, args *JSON.SyJson) any {
 					}
 					h.Conn.Request.Header = header
 					h.Header = header
-					CallJs("弹出成功提示", "修改请求提交的协议头成功")
 				}
 				return true
 			case "Args":
@@ -954,7 +951,6 @@ func event(command string, args *JSON.SyJson) any {
 					}
 					h.Conn.Request.URL.RawQuery = RawQuery
 					h.URL = h.Conn.Request.URL.String()
-					CallJs("弹出成功提示", "修改请求URL中的参数成功")
 				}
 				return true
 			case "Cookies":
@@ -976,7 +972,6 @@ func event(command string, args *JSON.SyJson) any {
 						}
 					}
 					h.Conn.Request.Header["Cookie"] = []string{Cookie}
-					CallJs("弹出成功提示", "修改请求Cookies成功")
 				}
 				return true
 			case "BodyArgs":
@@ -1005,7 +1000,6 @@ func event(command string, args *JSON.SyJson) any {
 						}
 						h.Conn.Request.Body = io.NopCloser(bytes.NewBuffer(h.Body))
 					}
-					CallJs("弹出成功提示", "修改请求POST数据成功")
 					return PostData
 				}
 			case "Body", "Json":
@@ -1019,7 +1013,6 @@ func event(command string, args *JSON.SyJson) any {
 						_ = h.Conn.Request.Body.Close()
 					}
 					h.Conn.Request.Body = io.NopCloser(bytes.NewBuffer(h.Body))
-					CallJs("弹出成功提示", "修改请求POST数据成功")
 				}
 				return true
 			}
@@ -1088,7 +1081,6 @@ func event(command string, args *JSON.SyJson) any {
 					h.Response.Conn.Response.Status = http.StatusText(h.Response.StateCode)
 
 				}
-				CallJs("弹出成功提示", "修改响应数据保存成功！！")
 				return true
 			case "Headers":
 				//修改协议头
@@ -1110,7 +1102,6 @@ func event(command string, args *JSON.SyJson) any {
 					}
 					h.Response.Header = header
 					h.Response.Conn.Response.Header = header
-					CallJs("弹出成功提示", "修改响应协议头成功！！")
 				}
 				return true
 			case "Body", "Json":
@@ -1125,7 +1116,6 @@ func event(command string, args *JSON.SyJson) any {
 						_ = h.Response.Conn.Response.Body.Close()
 					}
 					h.Response.Conn.Response.Body = io.NopCloser(bytes.NewBuffer(h.Response.Body))
-					CallJs("弹出成功提示", "修改响应Body成功！！")
 				}
 				return true
 			case "Cookies":
@@ -1146,7 +1136,6 @@ func event(command string, args *JSON.SyJson) any {
 					}
 					h.Response.Conn.Response.Header["Set-Cookie"] = Cookie
 					//h.Response.Header = h.Response.Conn.Response.Header
-					CallJs("弹出成功提示", "修改响应Cookies成功！！")
 				}
 				return true
 			}

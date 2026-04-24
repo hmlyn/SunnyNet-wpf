@@ -596,6 +596,17 @@
                                         <Setter Property="Padding" Value="8,2" />
                                         <Setter Property="MinHeight" Value="26" />
                                         <Setter Property="VerticalContentAlignment" Value="Center" />
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True" />
+                                                    <Condition Binding="{Binding DataContext.IsIntercepted, RelativeSource={RelativeSource AncestorType={x:Type DataGridRow}}}" Value="True" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Background" Value="#FFB35F" />
+                                                <Setter Property="BorderBrush" Value="#FF6A00" />
+                                                <Setter Property="Foreground" Value="#1F2937" />
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
                                     </Style>
                                     <Style x:Key="SessionIndexCellStyle" TargetType="{x:Type DataGridCell}" BasedOn="{StaticResource SessionGridCellStyle}">
                                         <Setter Property="Padding" Value="0,2,8,2" />
@@ -634,6 +645,18 @@
                                     <Style TargetType="{x:Type DataGridRow}" BasedOn="{StaticResource {x:Type DataGridRow}}">
                                         <Setter Property="MinHeight" Value="26" />
                                         <Setter Property="Background" Value="{Binding RowBackground}" />
+                                        <Setter Property="BorderThickness" Value="0" />
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True" />
+                                                    <Condition Binding="{Binding IsIntercepted}" Value="True" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Background" Value="#FFB35F" />
+                                                <Setter Property="BorderBrush" Value="#FF6A00" />
+                                                <Setter Property="BorderThickness" Value="0,0,0,1" />
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
                                     </Style>
                                 </DataGrid.RowStyle>
                                 <DataGrid.Columns>
@@ -756,7 +779,41 @@
                                                 </Style>
                                             </TabControl.Style>
                                             <TabItem Header="原始视图">
-                                                <controls:HttpSyntaxTextBox SourceText="{Binding Detail.RequestRaw}" HighlightMode="RequestRaw" />
+                                                <Grid>
+                                                    <controls:HttpSyntaxTextBox SourceText="{Binding Detail.RequestRaw}" HighlightMode="RequestRaw">
+                                                        <controls:HttpSyntaxTextBox.Style>
+                                                            <Style TargetType="{x:Type controls:HttpSyntaxTextBox}">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Detail.IsRequestInlineEditing}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </controls:HttpSyntaxTextBox.Style>
+                                                    </controls:HttpSyntaxTextBox>
+                                                    <TextBox AcceptsReturn="True"
+                                                             AcceptsTab="True"
+                                                             FontFamily="Consolas, Microsoft YaHei UI"
+                                                             FontSize="12"
+                                                             HorizontalScrollBarVisibility="Auto"
+                                                             Text="{Binding Detail.EditableRequestRaw, UpdateSourceTrigger=PropertyChanged}"
+                                                             TextWrapping="NoWrap"
+                                                             VerticalScrollBarVisibility="Auto">
+                                                        <TextBox.Style>
+                                                            <Style TargetType="{x:Type TextBox}" BasedOn="{StaticResource {x:Type TextBox}}">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                <Setter Property="Padding" Value="12" />
+                                                                <Setter Property="BorderThickness" Value="0" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Detail.IsRequestInlineEditing}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBox.Style>
+                                                    </TextBox>
+                                                </Grid>
                                             </TabItem>
                                             <TabItem Header="协议头">
                                                 <controls:NameValueTableControl Rows="{Binding Detail.RequestHeaderRows}" EmptyText="无请求协议头" />
@@ -839,26 +896,10 @@
                                                         Orientation="Horizontal"
                                                         VerticalAlignment="Center"
                                                         Visibility="{Binding IsSelectedSessionIntercepted, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                                <Border Margin="0,0,10,0"
-                                                        Padding="10,5"
-                                                        Background="{StaticResource DangerSoftBrush}"
-                                                        BorderBrush="#F4C3C6"
-                                                        BorderThickness="1"
-                                                        CornerRadius="14">
-                                                    <StackPanel Orientation="Horizontal">
-                                                        <TextBlock Style="{StaticResource GlyphTextStyle}"
-                                                                   Foreground="{StaticResource DangerBrush}"
-                                                                   Text="&#xE814;" />
-                                                        <TextBlock Margin="6,0,0,0"
-                                                                   VerticalAlignment="Center"
-                                                                   Foreground="{StaticResource DangerBrush}"
-                                                                   Text="断点命中" />
-                                                    </StackPanel>
-                                                </Border>
                                                 <Button Margin="0,0,8,0"
                                                         Style="{StaticResource BreakpointWarningButtonStyle}"
                                                         Command="{Binding ResendSelectedCommand}"
-                                                        Content="普通重发" />
+                                                        Content="放行当前" />
                                                 <Button Margin="0,0,8,0"
                                                         Style="{StaticResource BreakpointSuccessButtonStyle}"
                                                         Command="{Binding ReleaseCurrentCommand}"
@@ -907,7 +948,41 @@
                                                 </Style>
                                             </TabControl.Style>
                                             <TabItem Header="原始响应">
-                                                <controls:HttpSyntaxTextBox SourceText="{Binding Detail.ResponseRaw}" HighlightMode="ResponseRaw" />
+                                                <Grid>
+                                                    <controls:HttpSyntaxTextBox SourceText="{Binding Detail.ResponseRaw}" HighlightMode="ResponseRaw">
+                                                        <controls:HttpSyntaxTextBox.Style>
+                                                            <Style TargetType="{x:Type controls:HttpSyntaxTextBox}">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Detail.IsResponseInlineEditing}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </controls:HttpSyntaxTextBox.Style>
+                                                    </controls:HttpSyntaxTextBox>
+                                                    <TextBox AcceptsReturn="True"
+                                                             AcceptsTab="True"
+                                                             FontFamily="Consolas, Microsoft YaHei UI"
+                                                             FontSize="12"
+                                                             HorizontalScrollBarVisibility="Auto"
+                                                             Text="{Binding Detail.EditableResponseRaw, UpdateSourceTrigger=PropertyChanged}"
+                                                             TextWrapping="NoWrap"
+                                                             VerticalScrollBarVisibility="Auto">
+                                                        <TextBox.Style>
+                                                            <Style TargetType="{x:Type TextBox}" BasedOn="{StaticResource {x:Type TextBox}}">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                <Setter Property="Padding" Value="12" />
+                                                                <Setter Property="BorderThickness" Value="0" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Detail.IsResponseInlineEditing}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBox.Style>
+                                                    </TextBox>
+                                                </Grid>
                                             </TabItem>
                                             <TabItem Header="协议头">
                                                 <controls:NameValueTableControl Rows="{Binding Detail.ResponseHeaderRows}" EmptyText="无响应协议头" />

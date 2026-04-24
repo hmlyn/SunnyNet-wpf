@@ -34,6 +34,7 @@ public partial class SearchWindow : Window
         DataContext = viewModel;
         _alertTimer.Tick += AlertTimer_Tick;
         PopulateOptions();
+        FindTextComboBox.Loaded += (_, _) => ApplyFindTextBoxAlignment();
         Loaded += (_, _) => FocusSearchText();
     }
 
@@ -93,7 +94,6 @@ public partial class SearchWindow : Window
         FindColorComboBox.SelectedIndex = 0;
         UpdateTextHistory();
         UpdateTypeSensitiveOptions();
-        UpdateColorPreview();
     }
 
     private async void FindButton_Click(object sender, RoutedEventArgs routedEventArgs)
@@ -152,7 +152,6 @@ public partial class SearchWindow : Window
 
     private void FindColorComboBox_SelectionChanged(object sender, SelectionChangedEventArgs selectionChangedEventArgs)
     {
-        UpdateColorPreview();
     }
 
     private async Task StartSearchAsync()
@@ -254,24 +253,6 @@ public partial class SearchWindow : Window
         ClearPreviousCheckBox.Visibility = type == "pb" ? Visibility.Collapsed : Visibility.Visible;
     }
 
-    private void UpdateColorPreview()
-    {
-        if (ColorPreviewBorder is null)
-        {
-            return;
-        }
-
-        string color = GetSelectedValue(FindColorComboBox, "#ffe100");
-        try
-        {
-            ColorPreviewBorder.Background = (Brush)new BrushConverter().ConvertFromString(color)!;
-        }
-        catch
-        {
-            ColorPreviewBorder.Background = new SolidColorBrush(Color.FromRgb(0xFF, 0xE1, 0x00));
-        }
-    }
-
     private static void AddHistory(string type, string value)
     {
         if (!SearchHistory.TryGetValue(type, out List<string>? history))
@@ -296,11 +277,22 @@ public partial class SearchWindow : Window
     private void FocusSearchText()
     {
         FindTextComboBox.ApplyTemplate();
+        ApplyFindTextBoxAlignment();
         FindTextComboBox.Focus();
         if (FindTextComboBox.Template.FindName("PART_EditableTextBox", FindTextComboBox) is TextBox textBox)
         {
             textBox.Focus();
             textBox.SelectAll();
+        }
+    }
+
+    private void ApplyFindTextBoxAlignment()
+    {
+        FindTextComboBox.ApplyTemplate();
+        if (FindTextComboBox.Template.FindName("PART_EditableTextBox", FindTextComboBox) is TextBox textBox)
+        {
+            textBox.VerticalContentAlignment = VerticalAlignment.Center;
+            textBox.Padding = new Thickness(8, 0, 4, 0);
         }
     }
 
@@ -335,4 +327,5 @@ public partial class SearchWindow : Window
             return Label;
         }
     }
+
 }

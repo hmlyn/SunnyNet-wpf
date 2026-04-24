@@ -29,6 +29,7 @@ public partial class SettingsWindow : Window
             "Proxy" => ProxySectionItem,
             "Hosts" => HostsSectionItem,
             "Replace" => ReplaceSectionItem,
+            "Intercept" => InterceptSectionItem,
             "Script" => ScriptSectionItem,
             "Process" => ProcessSectionItem,
             "RequestCert" => RequestCertSectionItem,
@@ -57,6 +58,7 @@ public partial class SettingsWindow : Window
         ProxySectionPanel.Visibility = ToVisibility(sectionKey == "Proxy");
         HostsSectionPanel.Visibility = ToVisibility(sectionKey == "Hosts");
         ReplaceSectionPanel.Visibility = ToVisibility(sectionKey == "Replace");
+        InterceptSectionPanel.Visibility = ToVisibility(sectionKey == "Intercept");
         ScriptSectionPanel.Visibility = ToVisibility(sectionKey == "Script");
         ProcessSectionPanel.Visibility = ToVisibility(sectionKey == "Process");
         RequestCertSectionPanel.Visibility = ToVisibility(sectionKey == "RequestCert");
@@ -68,6 +70,7 @@ public partial class SettingsWindow : Window
             "Proxy" => ("上游网关", "设置上游代理地址以及命中规则。"),
             "Hosts" => ("HOSTS 设置", "维护域名映射规则，命中后直接重定向。"),
             "Replace" => ("替换规则", "按规则替换请求或响应中的指定内容。"),
+            "Intercept" => ("拦截规则", "命中条件后自动进入上行或下行断点编辑。"),
             "Script" => ("脚本编辑", "格式化、恢复默认并保存 Go 核心脚本。"),
             "Process" => ("进程拦截", "加载驱动、指定进程名或按PID精准捕获。"),
             "RequestCert" => ("请求证书", "管理按域名匹配的请求证书并即时载入。"),
@@ -92,6 +95,7 @@ public partial class SettingsWindow : Window
             "上游网关" => "Proxy",
             "HOSTS设置" or "HOSTS 设置" => "Hosts",
             "替换规则" => "Replace",
+            "拦截规则" => "Intercept",
             "脚本编辑" => "Script",
             "进程拦截" => "Process",
             "请求证书" => "RequestCert",
@@ -222,6 +226,22 @@ public partial class SettingsWindow : Window
         await RunActionAsync(() => _viewModel.ApplyReplaceRulesAsync());
     }
 
+    private void AddIntercept_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        _viewModel.AddInterceptRule();
+        InterceptRulesGrid.SelectedItem = _viewModel.InterceptRuleItems.LastOrDefault();
+    }
+
+    private void RemoveIntercept_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        _viewModel.RemoveInterceptRule(InterceptRulesGrid.SelectedItem as InterceptRuleItem);
+    }
+
+    private async void ApplyIntercept_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        await RunActionAsync(() => _viewModel.ApplyInterceptRulesAsync());
+    }
+
     private async void RestoreDefaultScript_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         await RunActionAsync(() => _viewModel.RestoreDefaultScriptAsync());
@@ -271,28 +291,6 @@ public partial class SettingsWindow : Window
     private async void RemoveProcessName_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         await RunActionAsync(() => _viewModel.RemoveProcessCaptureNameAsync(ProcessNamesGrid.SelectedItem as ProcessCaptureNameItem));
-    }
-
-    private async void AddWeChatPreset_Click(object sender, RoutedEventArgs routedEventArgs)
-    {
-        string[] names =
-        {
-            "WeChat.exe",
-            "wechatweb.exe",
-            "WechatAppLauncher.exe",
-            "WeChatAppEx.exe",
-            "WechatBrowser.exe",
-            "WeChatPlayer.exe",
-            "WeChatXFile.exe"
-        };
-
-        await RunActionAsync(async () =>
-        {
-            foreach (string name in names)
-            {
-                await _viewModel.AddProcessCaptureNameAsync(name);
-            }
-        });
     }
 
     private async void AddLdPreset_Click(object sender, RoutedEventArgs routedEventArgs)

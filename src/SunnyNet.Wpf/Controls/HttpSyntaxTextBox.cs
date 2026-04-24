@@ -7,6 +7,8 @@ namespace SunnyNet.Wpf.Controls;
 
 public sealed class HttpSyntaxTextBox : RichTextBox
 {
+    private const int MaxImmediateRenderCharacters = 48 * 1024;
+
     public static readonly DependencyProperty SourceTextProperty =
         DependencyProperty.Register(nameof(SourceText), typeof(string), typeof(HttpSyntaxTextBox), new PropertyMetadata("", OnSourceChanged));
 
@@ -81,7 +83,13 @@ public sealed class HttpSyntaxTextBox : RichTextBox
             Margin = new Thickness(0)
         };
 
-        string text = (SourceText ?? "").Replace("\r\n", "\n").Replace('\r', '\n');
+        string sourceText = SourceText ?? "";
+        bool truncated = sourceText.Length > MaxImmediateRenderCharacters;
+        string text = (truncated
+                ? sourceText[..MaxImmediateRenderCharacters] + $"\r\n\r\n…… 已预览前 {MaxImmediateRenderCharacters:N0} 字符，完整内容请切换 HEX 视图或使用复制功能。"
+                : sourceText)
+            .Replace("\r\n", "\n")
+            .Replace('\r', '\n');
         string[] lines = text.Split('\n');
         bool inHeaders = HighlightMode.Contains("Raw", StringComparison.OrdinalIgnoreCase);
         bool looksJson = LooksJson(text) || HighlightMode.Contains("Json", StringComparison.OrdinalIgnoreCase);
