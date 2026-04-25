@@ -439,9 +439,20 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
 
             Tool("request_list", "获取已捕获的 HTTP 请求列表", Schema(
                 Property("limit", "integer", "返回最大数量"),
-                Property("offset", "integer", "偏移量")), ToolRequestListAsync),
+                Property("offset", "integer", "偏移量"),
+                Property("favoritesOnly", "boolean", "仅返回已收藏会话")), ToolRequestListAsync),
+            Tool("request_favorites_list", "列出已收藏的会话", Schema(
+                Property("limit", "integer", "返回最大数量"),
+                Property("offset", "integer", "偏移量")), ToolRequestFavoritesListAsync),
             Tool("request_get", "获取指定请求的详细信息", Schema(
                 Property("theology", "integer", "请求唯一 ID")), ToolRequestGetAsync, "theology"),
+            Tool("request_favorite_add", "收藏指定会话", Schema(
+                Property("theology", "integer", "请求唯一 ID")), ToolRequestFavoriteAddAsync, "theology"),
+            Tool("request_favorite_remove", "取消收藏指定会话", Schema(
+                Property("theology", "integer", "请求唯一 ID")), ToolRequestFavoriteRemoveAsync, "theology"),
+            Tool("request_notes_set", "设置指定会话备注，传空字符串可清除备注", Schema(
+                Property("theology", "integer", "请求唯一 ID"),
+                Property("notes", "string", "备注内容，空字符串表示清除")), ToolRequestNotesSetAsync, "theology", "notes"),
             Tool("request_modify_header", "修改指定请求的请求头", Schema(
                 Property("theology", "integer", "请求唯一 ID"),
                 Property("key", "string", "请求头名称"),
@@ -467,6 +478,7 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
                 Property("url", "string", "URL 关键词"),
                 Property("method", "string", "HTTP 方法"),
                 Property("status_code", "integer", "状态码"),
+                Property("favoritesOnly", "boolean", "仅返回已收藏会话"),
                 Property("limit", "integer", "返回最大数量"),
                 Property("offset", "integer", "偏移量")), ToolRequestSearchAsync),
             Tool("request_delete", "删除指定的请求记录", Schema(
@@ -479,6 +491,7 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
             Tool("request_body_search", "在所有已捕获请求的 URL 或 Body 中搜索关键词", Schema(
                 Property("keyword", "string", "搜索关键词"),
                 EnumProperty("scope", "string", new[] { "url", "request_body", "response_body", "all" }, "搜索范围", "all"),
+                Property("favoritesOnly", "boolean", "仅搜索已收藏会话"),
                 Property("limit", "integer", "返回最大数量")), ToolRequestBodySearchAsync, "keyword"),
             Tool("request_get_response_body_decoded", "获取指定请求的响应体并自动处理编码", Schema(
                 Property("theology", "integer", "请求唯一 ID")), ToolRequestGetResponseBodyDecodedAsync, "theology"),
@@ -501,6 +514,7 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
                 Property("end", "integer", "结束索引")), ToolSocketDataGetRangeAsync, "theology", "start"),
             Tool("connection_list", "列出所有 WebSocket/TCP/UDP 长连接", Schema(
                 EnumProperty("protocol", "string", new[] { "websocket", "tcp", "udp" }, "协议过滤", ""),
+                Property("favoritesOnly", "boolean", "仅返回已收藏会话"),
                 Property("limit", "integer", "返回最大数量"),
                 Property("offset", "integer", "偏移量")), ToolConnectionListAsync)
         };
@@ -1063,7 +1077,29 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
         await Task.CompletedTask;
         int limit = Math.Max(1, GetInt(args, "limit", 100));
         int offset = Math.Max(0, GetInt(args, "offset", 0));
+        bool favoritesOnly = GetBool(args, "favoritesOnly");
         CaptureEntry[] ordered = _viewModel.GetSessionSnapshot()
+            .Where(entry => !favoritesOnly || entry.IsFavorite)
+            .OrderByDescending(static entry => entry.Theology)
+            .ToArray();
+        CaptureEntry[] paged = ordered.Skip(offset).Take(limit).ToArray();
+        return new
+        {
+            success = true,
+            total = ordered.Length,
+            offset,
+            limit,
+            requests = paged.Select(ToRequestInfo).ToArray()
+        };
+    }
+
+    private async Task<object> ToolRequestFavoritesListAsync(JsonElement args)
+    {
+        await Task.CompletedTask;
+        int limit = Math.Max(1, GetInt(args, "limit", 100));
+        int offset = Math.Max(0, GetInt(args, "offset", 0));
+        CaptureEntry[] ordered = _viewModel.GetSessionSnapshot()
+            .Where(static entry => entry.IsFavorite)
             .OrderByDescending(static entry => entry.Theology)
             .ToArray();
         CaptureEntry[] paged = ordered.Skip(offset).Take(limit).ToArray();
@@ -1114,7 +1150,63 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
             sendTime = entry.SendTime,
             recTime = entry.ReceiveTime,
             way = GetSessionWay(entry),
-            notes = entry.Notes
+            notes = entry.Notes,
+            isFavorite = entry.IsFavorite
+        };
+    }
+
+    private async Task<object> ToolRequestFavoriteAddAsync(JsonElement args)
+    {
+        CaptureEntry entry = RequireSessionEntry(args);
+        bool changed = EnsureFavoriteState(entry, shouldFavorite: true);
+        PersistFavoriteSettings();
+        await Task.CompletedTask;
+        return new
+        {
+            success = true,
+            index = entry.Index,
+            theology = entry.Theology,
+            isFavorite = entry.IsFavorite,
+            changed,
+            message = changed ? "会话已收藏" : "会话已在收藏列表中"
+        };
+    }
+
+    private async Task<object> ToolRequestFavoriteRemoveAsync(JsonElement args)
+    {
+        CaptureEntry entry = RequireSessionEntry(args);
+        bool changed = EnsureFavoriteState(entry, shouldFavorite: false);
+        PersistFavoriteSettings();
+        await Task.CompletedTask;
+        return new
+        {
+            success = true,
+            index = entry.Index,
+            theology = entry.Theology,
+            isFavorite = entry.IsFavorite,
+            changed,
+            message = changed ? "会话已取消收藏" : "会话当前未收藏"
+        };
+    }
+
+    private async Task<object> ToolRequestNotesSetAsync(JsonElement args)
+    {
+        if (!HasProperty(args, "notes"))
+        {
+            throw new InvalidOperationException("缺少参数: notes");
+        }
+
+        CaptureEntry entry = RequireSessionEntry(args);
+        string notes = GetString(args, "notes");
+        await _viewModel.UpdateSessionNotesAsync(new[] { entry }, notes);
+        return new
+        {
+            success = true,
+            index = entry.Index,
+            theology = entry.Theology,
+            notes = entry.Notes,
+            cleared = string.IsNullOrWhiteSpace(entry.Notes),
+            message = string.IsNullOrWhiteSpace(entry.Notes) ? "会话备注已清除" : "会话备注已更新"
         };
     }
 
@@ -1338,9 +1430,12 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
         int offset = Math.Max(0, GetInt(args, "offset", 0));
         bool filterStatus = HasProperty(args, "status_code");
         int statusCode = GetInt(args, "status_code");
+        bool favoritesOnly = GetBool(args, "favoritesOnly");
 
         CaptureEntry[] matched = _viewModel.GetSessionSnapshot()
             .Where(entry =>
+                (!favoritesOnly || entry.IsFavorite)
+                &&
                 (string.IsNullOrWhiteSpace(url) || entry.Url.Contains(url, StringComparison.OrdinalIgnoreCase))
                 && (string.IsNullOrWhiteSpace(method) || string.Equals(entry.Method, method, StringComparison.OrdinalIgnoreCase) || string.Equals(entry.DisplayMethod, method, StringComparison.OrdinalIgnoreCase))
                 && (!filterStatus || ExtractStatusCode(entry.State) == statusCode))
@@ -1406,10 +1501,16 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
         await Task.CompletedTask;
         Dictionary<string, int> byProtocol = new(StringComparer.OrdinalIgnoreCase);
         Dictionary<string, int> byStatus = new(StringComparer.OrdinalIgnoreCase);
+        int favoriteCount = 0;
         int total = 0;
         foreach (CaptureEntry entry in _viewModel.GetSessionSnapshot())
         {
             total++;
+            if (entry.IsFavorite)
+            {
+                favoriteCount++;
+            }
+
             string way = GetSessionWay(entry);
             byProtocol[way] = byProtocol.TryGetValue(way, out int protocolCount) ? protocolCount + 1 : 1;
 
@@ -1440,6 +1541,7 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
         {
             success = true,
             total,
+            favoriteCount,
             byProtocol,
             byStatus
         };
@@ -1450,10 +1552,16 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
         string keyword = RequireString(args, "keyword");
         string scope = GetString(args, "scope", "all");
         int limit = Math.Max(1, GetInt(args, "limit", 20));
+        bool favoritesOnly = GetBool(args, "favoritesOnly");
         List<CaptureEntry> matchedEntries = new();
 
         foreach (CaptureEntry entry in _viewModel.GetSessionSnapshot().OrderByDescending(static item => item.Theology))
         {
+            if (favoritesOnly && !entry.IsFavorite)
+            {
+                continue;
+            }
+
             bool matched = false;
             if ((scope == "all" || scope == "url") && entry.Url.Contains(keyword, StringComparison.OrdinalIgnoreCase))
             {
@@ -1496,7 +1604,9 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
                 url = entry.Url,
                 statusCode = ExtractStatusCode(entry.State),
                 way = GetSessionWay(entry),
-                sendTime = entry.SendTime
+                sendTime = entry.SendTime,
+                notes = entry.Notes,
+                isFavorite = entry.IsFavorite
             })
             .Cast<object>()
             .ToArray();
@@ -1742,9 +1852,11 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
         string protocol = GetString(args, "protocol").ToLowerInvariant();
         int limit = Math.Max(1, GetInt(args, "limit", 50));
         int offset = Math.Max(0, GetInt(args, "offset", 0));
+        bool favoritesOnly = GetBool(args, "favoritesOnly");
 
         CaptureEntry[] matched = _viewModel.GetSessionSnapshot()
             .Where(static entry => IsSocketSession(entry))
+            .Where(entry => !favoritesOnly || entry.IsFavorite)
             .Where(entry => string.IsNullOrWhiteSpace(protocol) || ProtocolMatches(entry, protocol))
             .OrderByDescending(static entry => entry.Theology)
             .ToArray();
@@ -1768,7 +1880,8 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
                 pid = entry.Process,
                 clientIP = entry.ClientAddress,
                 sendTime = entry.SendTime,
-                notes = entry.Notes
+                notes = entry.Notes,
+                isFavorite = entry.IsFavorite
             });
         }
 
@@ -1888,10 +2001,42 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
         return _viewModel.RunningPort;
     }
 
+    private bool EnsureFavoriteState(CaptureEntry entry, bool shouldFavorite)
+    {
+        if (entry.IsFavorite == shouldFavorite)
+        {
+            return false;
+        }
+
+        _viewModel.ToggleFavorite(entry);
+        return true;
+    }
+
+    private void PersistFavoriteSettings()
+    {
+        UiLayoutSettings settings = UiLayoutSettingsStore.Load();
+        settings.ShowFavoritesOnly = _viewModel.ShowFavoritesOnly;
+        settings.FavoriteSessionKeys = _viewModel.GetFavoriteKeys().ToList();
+        UiLayoutSettingsStore.Save(settings);
+    }
+
     private CaptureEntry RequireSessionEntry(JsonElement args)
     {
+        CaptureEntry? entry = null;
+        if (HasProperty(args, "index"))
+        {
+            int index = RequireInt(args, "index");
+            entry = _viewModel.GetSessionSnapshot().FirstOrDefault(item => item.Index == index);
+            if (entry is null)
+            {
+                throw new InvalidOperationException($"请求序号 {index} 不存在");
+            }
+
+            return entry;
+        }
+
         int theology = RequireInt(args, "theology");
-        CaptureEntry? entry = _viewModel.FindSessionEntry(theology);
+        entry = _viewModel.FindSessionEntry(theology);
         if (entry is null)
         {
             throw new InvalidOperationException($"请求 {theology} 不存在");
@@ -2160,7 +2305,8 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
             sendTime = entry.SendTime,
             recTime = entry.ReceiveTime,
             way = GetSessionWay(entry),
-            notes = entry.Notes
+            notes = entry.Notes,
+            isFavorite = entry.IsFavorite
         };
     }
 
