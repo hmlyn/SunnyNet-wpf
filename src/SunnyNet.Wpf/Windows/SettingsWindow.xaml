@@ -75,7 +75,7 @@
                                 BorderBrush="Transparent"
                                 BorderThickness="0"
                                 CornerRadius="6">
-                            <Grid Height="34">
+                            <Grid Height="32">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="2" />
                                     <ColumnDefinition Width="*" />
@@ -106,7 +106,7 @@
         </Style>
 
         <Style x:Key="SettingsPageTitleTextStyle" TargetType="{x:Type TextBlock}">
-            <Setter Property="FontSize" Value="17" />
+            <Setter Property="FontSize" Value="16" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
         </Style>
@@ -118,7 +118,7 @@
         </Style>
 
         <Style x:Key="SettingsGroupTitleTextStyle" TargetType="{x:Type TextBlock}">
-            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontSize" Value="12.5" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
         </Style>
@@ -176,46 +176,46 @@
         </Style>
 
         <Style x:Key="SettingsFieldLabelTextStyle" TargetType="{x:Type TextBlock}" BasedOn="{StaticResource FormLabelTextStyle}">
-            <Setter Property="Width" Value="92" />
-            <Setter Property="Margin" Value="0,6,12,0" />
+            <Setter Property="Width" Value="88" />
+            <Setter Property="Margin" Value="0,4,10,0" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
         <Style x:Key="SettingsSectionDividerStyle" TargetType="{x:Type Border}">
             <Setter Property="Height" Value="1" />
-            <Setter Property="Margin" Value="0,14,0,0" />
+            <Setter Property="Margin" Value="0,12,0,0" />
             <Setter Property="Background" Value="{StaticResource DividerBrush}" />
         </Style>
 
         <Style x:Key="SettingsSmallActionButtonStyle" TargetType="{x:Type Button}" BasedOn="{StaticResource {x:Type Button}}">
-            <Setter Property="Padding" Value="12,5" />
-            <Setter Property="MinWidth" Value="104" />
-            <Setter Property="MinHeight" Value="30" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="MinWidth" Value="98" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="FontSize" Value="11.5" />
         </Style>
 
         <Style x:Key="SettingsPrimaryActionButtonStyle" TargetType="{x:Type Button}" BasedOn="{StaticResource PrimaryButtonStyle}">
-            <Setter Property="Padding" Value="14,6" />
-            <Setter Property="MinWidth" Value="112" />
-            <Setter Property="MinHeight" Value="30" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Padding" Value="12,5" />
+            <Setter Property="MinWidth" Value="106" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="FontSize" Value="11.5" />
         </Style>
 
         <Style x:Key="SettingsCompactTextBoxStyle" TargetType="{x:Type TextBox}" BasedOn="{StaticResource {x:Type TextBox}}">
-            <Setter Property="Height" Value="30" />
-            <Setter Property="Padding" Value="10,5" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Padding" Value="9,4" />
+            <Setter Property="FontSize" Value="11.5" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
 
         <Style x:Key="SettingsCompactComboBoxStyle" TargetType="{x:Type ComboBox}" BasedOn="{StaticResource {x:Type ComboBox}}">
-            <Setter Property="Height" Value="30" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="FontSize" Value="11.5" />
         </Style>
 
         <Style x:Key="SettingsEditorTextBoxStyle" TargetType="{x:Type TextBox}" BasedOn="{StaticResource {x:Type TextBox}}">
-            <Setter Property="Padding" Value="10,8" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Padding" Value="9,7" />
+            <Setter Property="FontSize" Value="11.5" />
         </Style>
 
         <Style x:Key="SettingsSubtlePanelStyle" TargetType="{x:Type Border}">
@@ -223,17 +223,17 @@
             <Setter Property="BorderBrush" Value="#E7EDF6" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="Padding" Value="14" />
+            <Setter Property="Padding" Value="12" />
         </Style>
 
         <Style x:Key="SettingsMetaLabelTextStyle" TargetType="{x:Type TextBlock}">
-            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="FontSize" Value="11" />
             <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
         <Style x:Key="SettingsMetaValueTextStyle" TargetType="{x:Type TextBlock}">
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontSize" Value="11.5" />
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
             <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="VerticalAlignment" Value="Center" />
@@ -243,7 +243,7 @@
             <Setter Property="IsReadOnly" Value="True" />
             <Setter Property="FontFamily" Value="Consolas, Microsoft YaHei UI" />
             <Setter Property="FontSize" Value="11.5" />
-            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="Padding" Value="9,7" />
             <Setter Property="TextWrapping" Value="NoWrap" />
             <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
             <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
@@ -254,9 +254,9 @@
             <Setter Property="BorderBrush" Value="#E4EBF5" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Padding" Value="10,7" />
-            <Setter Property="Margin" Value="0,0,8,8" />
-            <Setter Property="MinWidth" Value="156" />
+            <Setter Property="Padding" Value="9,6" />
+            <Setter Property="Margin" Value="0,0,8,6" />
+            <Setter Property="MinWidth" Value="150" />
         </Style>
 
         <Style x:Key="SettingsInfoChipLabelTextStyle" TargetType="{x:Type TextBlock}">
@@ -266,7 +266,7 @@
 
         <Style x:Key="SettingsInfoChipValueTextStyle" TargetType="{x:Type TextBlock}">
             <Setter Property="Margin" Value="0,2,0,0" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontSize" Value="11.5" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
             <Setter Property="TextWrapping" Value="Wrap" />
@@ -278,9 +278,9 @@
             <Setter Property="CanUserDeleteRows" Value="False" />
             <Setter Property="HeadersVisibility" Value="Column" />
             <Setter Property="GridLinesVisibility" Value="Horizontal" />
-            <Setter Property="RowHeight" Value="34" />
-            <Setter Property="MinRowHeight" Value="34" />
-            <Setter Property="Margin" Value="0,12,0,0" />
+            <Setter Property="RowHeight" Value="30" />
+            <Setter Property="MinRowHeight" Value="30" />
+            <Setter Property="Margin" Value="0,10,0,0" />
         </Style>
 
         <Style x:Key="SettingsStateTextStyle" TargetType="{x:Type TextBlock}">
@@ -553,12 +553,12 @@
                 BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="1"
                 CornerRadius="10">
-            <Grid Margin="22,20,22,20">
+            <Grid Margin="18,16,18,16">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="14" />
+                    <RowDefinition Height="10" />
                     <RowDefinition Height="1" />
-                    <RowDefinition Height="16" />
+                    <RowDefinition Height="12" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
@@ -757,15 +757,15 @@
                         <StackPanel x:Name="MustTcpSectionPanel" Visibility="Collapsed">
                             <TextBlock Style="{StaticResource SettingsGroupTitleTextStyle}" Text="强制 TCP 规则" />
                             <TextBlock Margin="0,6,0,0" Style="{StaticResource SettingsPageHintTextStyle}" Text="每行一条规则，命中后优先按 TCP 方式处理。" />
-                            <CheckBox Margin="0,16,0,0" Content="启用强制 TCP" IsChecked="{Binding Settings.MustTcpOpen}" />
-                            <TextBox Height="250"
-                                     Margin="0,12,0,0"
+                            <CheckBox Margin="0,12,0,0" Content="启用强制 TCP" IsChecked="{Binding Settings.MustTcpOpen}" />
+                            <TextBox Height="220"
+                                     Margin="0,10,0,0"
                                      AcceptsReturn="True"
                                      Style="{StaticResource SettingsEditorTextBoxStyle}"
                                      Text="{Binding Settings.MustTcpRules}"
                                      VerticalScrollBarVisibility="Auto" />
                             <Border Style="{StaticResource SettingsSectionDividerStyle}" />
-                            <Button Margin="0,14,0,0"
+                            <Button Margin="0,12,0,0"
                                     HorizontalAlignment="Left"
                                     Style="{StaticResource SettingsPrimaryActionButtonStyle}"
                                     Click="ApplyMustTcp_Click"
@@ -775,17 +775,17 @@
                         <StackPanel x:Name="ProxySectionPanel" Visibility="Collapsed">
                             <TextBlock Style="{StaticResource SettingsGroupTitleTextStyle}" Text="上游代理设置" />
                             <TextBlock Margin="0,6,0,0" Style="{StaticResource SettingsPageHintTextStyle}" Text="配置代理地址，并通过规则控制命中流量。" />
-                            <TextBlock Margin="0,16,0,0" Style="{StaticResource FormLabelTextStyle}" Text="代理地址" />
+                            <TextBlock Margin="0,12,0,0" Style="{StaticResource FormLabelTextStyle}" Text="代理地址" />
                             <TextBox Margin="0,6,0,0" Style="{StaticResource SettingsCompactTextBoxStyle}" Text="{Binding Settings.GlobalProxy}" />
-                            <TextBlock Margin="0,14,0,0" Style="{StaticResource FormLabelTextStyle}" Text="代理规则" />
-                            <TextBox Height="240"
+                            <TextBlock Margin="0,12,0,0" Style="{StaticResource FormLabelTextStyle}" Text="代理规则" />
+                            <TextBox Height="210"
                                      Margin="0,6,0,0"
                                      AcceptsReturn="True"
                                      Style="{StaticResource SettingsEditorTextBoxStyle}"
                                      Text="{Binding Settings.GlobalProxyRules}"
                                      VerticalScrollBarVisibility="Auto" />
                             <Border Style="{StaticResource SettingsSectionDividerStyle}" />
-                            <StackPanel Margin="0,14,0,0" Orientation="Horizontal">
+                            <StackPanel Margin="0,12,0,0" Orientation="Horizontal">
                                 <Button Margin="0,0,10,0" Style="{StaticResource SettingsPrimaryActionButtonStyle}" Click="EnableProxy_Click" Content="启用代理" />
                                 <Button Style="{StaticResource SettingsSmallActionButtonStyle}" Click="DisableProxy_Click" Content="关闭代理" />
                             </StackPanel>
@@ -794,13 +794,13 @@
                         <StackPanel x:Name="HostsSectionPanel" Visibility="Collapsed">
                             <TextBlock Style="{StaticResource SettingsGroupTitleTextStyle}" Text="HOSTS 规则" />
                             <TextBlock Margin="0,6,0,0" Style="{StaticResource SettingsPageHintTextStyle}" Text="优先级高于替换规则。源地址支持通配形式，保存后即时生效。" />
-                            <StackPanel Margin="0,14,0,0" Orientation="Horizontal">
+                            <StackPanel Margin="0,12,0,0" Orientation="Horizontal">
                                 <Button Margin="0,0,10,0" Style="{StaticResource SettingsSmallActionButtonStyle}" Click="AddHosts_Click" Content="新增规则" />
                                 <Button Margin="0,0,10,0" Style="{StaticResource SettingsSmallActionButtonStyle}" Click="RemoveHosts_Click" Content="删除所选" />
                                 <Button Style="{StaticResource SettingsPrimaryActionButtonStyle}" Click="ApplyHosts_Click" Content="保存规则" />
                             </StackPanel>
                             <DataGrid x:Name="HostsRulesGrid"
-                                      Height="320"
+                                      Height="288"
                                       ItemsSource="{Binding HostsRuleItems}"
                                       Style="{StaticResource SettingsDataGridStyle}">
                                 <DataGrid.Columns>
@@ -814,13 +814,13 @@
                         <StackPanel x:Name="ReplaceSectionPanel" Visibility="Collapsed">
                             <TextBlock Style="{StaticResource SettingsGroupTitleTextStyle}" Text="替换规则" />
                             <TextBlock Margin="0,6,0,0" Style="{StaticResource SettingsPageHintTextStyle}" Text="按类型维护输入与输出内容；响应文件类型可直接选择本地文件作为输出。" />
-                            <StackPanel Margin="0,14,0,0" Orientation="Horizontal">
+                            <StackPanel Margin="0,12,0,0" Orientation="Horizontal">
                                 <Button Margin="0,0,10,0" Style="{StaticResource SettingsSmallActionButtonStyle}" Click="AddReplace_Click" Content="新增规则" />
                                 <Button Margin="0,0,10,0" Style="{StaticResource SettingsSmallActionButtonStyle}" Click="RemoveReplace_Click" Content="删除所选" />
                                 <Button Style="{StaticResource SettingsPrimaryActionButtonStyle}" Click="ApplyReplace_Click" Content="保存规则" />
                             </StackPanel>
                             <DataGrid x:Name="ReplaceRulesGrid"
-                                      Height="320"
+                                      Height="288"
                                       ItemsSource="{Binding ReplaceRuleItems}"
                                       Style="{StaticResource SettingsDataGridStyle}">
                                 <DataGrid.Columns>
@@ -873,13 +873,13 @@
                         <StackPanel x:Name="InterceptSectionPanel" Visibility="Collapsed">
                             <TextBlock Style="{StaticResource SettingsGroupTitleTextStyle}" Text="拦截规则" />
                             <TextBlock Margin="0,6,0,0" Style="{StaticResource SettingsPageHintTextStyle}" Text="命中 URL、参数、协议头或包体后自动进入上行/下行断点编辑。" />
-                            <StackPanel Margin="0,14,0,0" Orientation="Horizontal">
+                            <StackPanel Margin="0,12,0,0" Orientation="Horizontal">
                                 <Button Margin="0,0,10,0" Style="{StaticResource SettingsSmallActionButtonStyle}" Click="AddIntercept_Click" Content="新增规则" />
                                 <Button Margin="0,0,10,0" Style="{StaticResource SettingsSmallActionButtonStyle}" Click="RemoveIntercept_Click" Content="删除所选" />
                                 <Button Style="{StaticResource SettingsPrimaryActionButtonStyle}" Click="ApplyIntercept_Click" Content="保存规则" />
                             </StackPanel>
                             <DataGrid x:Name="InterceptRulesGrid"
-                                      Height="320"
+                                      Height="288"
                                       ItemsSource="{Binding InterceptRuleItems}"
                                       Style="{StaticResource SettingsDataGridStyle}">
                                 <DataGrid.Columns>
@@ -915,13 +915,13 @@
                         <StackPanel x:Name="ScriptSectionPanel" Visibility="Collapsed">
                             <TextBlock Style="{StaticResource SettingsGroupTitleTextStyle}" Text="脚本编辑" />
                             <TextBlock Margin="0,6,0,0" Style="{StaticResource SettingsPageHintTextStyle}" Text="保存时会自动格式化并校验脚本，适合直接维护 Go 核心脚本。" />
-                            <StackPanel Margin="0,14,0,0" Orientation="Horizontal">
+                            <StackPanel Margin="0,12,0,0" Orientation="Horizontal">
                                 <Button Margin="0,0,10,0" Style="{StaticResource SettingsSmallActionButtonStyle}" Click="RestoreDefaultScript_Click" Content="恢复默认" />
                                 <Button Margin="0,0,10,0" Style="{StaticResource SettingsSmallActionButtonStyle}" Click="FormatScript_Click" Content="格式化" />
                                 <Button Style="{StaticResource SettingsPrimaryActionButtonStyle}" Click="ApplyScript_Click" Content="保存脚本" />
                             </StackPanel>
-                            <TextBox Height="420"
-                                     Margin="0,14,0,0"
+                            <TextBox Height="372"
+                                     Margin="0,12,0,0"
                                      AcceptsReturn="True"
                                      FontFamily="Consolas, Microsoft YaHei UI"
                                      HorizontalScrollBarVisibility="Auto"
@@ -936,7 +936,7 @@
                               Visibility="Collapsed">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="10" />
+                                <RowDefinition Height="8" />
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
@@ -985,7 +985,7 @@
                             </Border>
 
                             <Border Grid.Row="2"
-                                    Height="414"
+                                    Height="392"
                                     Padding="10"
                                     Style="{StaticResource ProcessWorkspaceBorderStyle}">
                                 <Grid>
@@ -1131,7 +1131,7 @@
                         <StackPanel x:Name="RequestCertSectionPanel" Visibility="Collapsed">
                             <TextBlock Style="{StaticResource SettingsGroupTitleTextStyle}" Text="请求证书" />
                             <TextBlock Margin="0,6,0,0" Style="{StaticResource SettingsPageHintTextStyle}" Text="按规则加载请求证书，支持读取证书主机名并即时应用。" />
-                            <StackPanel Margin="0,14,0,0" Orientation="Horizontal">
+                            <StackPanel Margin="0,12,0,0" Orientation="Horizontal">
                                 <Button Margin="0,0,10,0" Style="{StaticResource SettingsSmallActionButtonStyle}" Click="AddRequestCert_Click" Content="新增规则" />
                                 <Button Margin="0,0,10,0" Style="{StaticResource SettingsSmallActionButtonStyle}" Click="RemoveRequestCert_Click" Content="删除所选" />
                                 <Button Margin="0,0,10,0" Style="{StaticResource SettingsSmallActionButtonStyle}" Click="ResolveRequestCertHost_Click" Content="读取主机名" />
@@ -1139,7 +1139,7 @@
                                 <Button Style="{StaticResource SettingsPrimaryActionButtonStyle}" Click="LoadRequestCert_Click" Content="载入证书" />
                             </StackPanel>
                             <DataGrid x:Name="RequestCertGrid"
-                                      Height="340"
+                                      Height="300"
                                       ItemsSource="{Binding RequestCertificateItems}"
                                       Style="{StaticResource SettingsDataGridStyle}">
                                 <DataGrid.Columns>
