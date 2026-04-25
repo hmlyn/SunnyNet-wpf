@@ -35,7 +35,7 @@ public partial class MainWindow : Window
     private bool _isCloseCleanupRunning;
     private CaptureEntry? _contextSessionEntry;
     private DispatcherTimer? _columnWidthSaveTimer;
-    private SunnyMcpServer? _mcpServer;
+    private SunnyNetCompatibleMcpServer? _mcpServer;
 
     public MainWindow()
     {
@@ -57,26 +57,7 @@ public partial class MainWindow : Window
         _viewModel.Detail.PropertyChanged += Detail_PropertyChanged;
         RegisterSessionColumnWidthListeners();
         UpdateLanIpPopupItems();
-        StartMcpServer();
         UpdateFooterState();
-    }
-
-    private void StartMcpServer()
-    {
-        try
-        {
-            _mcpServer = new SunnyMcpServer(_viewModel);
-            int port = int.TryParse(Environment.GetEnvironmentVariable("SUNNYNET_MCP_PORT"), out int configuredPort)
-                ? configuredPort
-                : 20256;
-            _mcpServer.Start(port);
-            _viewModel.StatusRight = $"MCP 服务已启动: 127.0.0.1:{_mcpServer.Port}";
-        }
-        catch (Exception exception)
-        {
-            _viewModel.StatusRight = "MCP 服务启动失败";
-            ViewModel_NotificationRequested("MCP 启动失败", exception.Message);
-        }
     }
 
     private void UpdateLanIpPopupItems()
@@ -204,6 +185,7 @@ public partial class MainWindow : Window
             WindowState = WindowState.Maximized;
         }
 
+        StartCompatibleMcpServer();
         await _viewModel.InitializeAsync();
         UpdateFooterState();
     }
@@ -225,11 +207,13 @@ public partial class MainWindow : Window
         try
         {
             SaveLayoutSettings();
-            await _viewModel.DisableSystemProxyOnExitAsync();
             if (_mcpServer is not null)
             {
                 await _mcpServer.DisposeAsync();
+                _mcpServer = null;
             }
+
+            await _viewModel.DisableSystemProxyOnExitAsync();
             await _viewModel.DisposeAsync();
         }
         finally
@@ -357,6 +341,25 @@ public partial class MainWindow : Window
     private void ToggleWindowState()
     {
         WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    }
+
+    private void StartCompatibleMcpServer()
+    {
+        if (_mcpServer?.IsRunning == true)
+        {
+            return;
+        }
+
+        try
+        {
+            _mcpServer ??= new SunnyNetCompatibleMcpServer(_viewModel);
+            _mcpServer.Start();
+        }
+        catch (Exception exception)
+        {
+            _mcpServer = null;
+            _viewModel.StatusRight = $"MCP 启动失败: {exception.Message}";
+        }
     }
 
     private async void OpenFile_Click(object sender, RoutedEventArgs routedEventArgs)

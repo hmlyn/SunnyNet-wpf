@@ -47,6 +47,108 @@ func errorText(err error) string {
 	return err.Error()
 }
 
+func importCaptureFile(path string) (int, error) {
+	Path := strings.ReplaceAll(path, "\\\\", "\\")
+	if Path == "" {
+		return 0, fmt.Errorf("文件路径不能为空")
+	}
+
+	SetStatusText("正在读取文件:" + Path)
+	bs, e := os.ReadFile(Path)
+	if e != nil {
+		SetStatusText("读取文件失败:" + e.Error())
+		return 0, e
+	}
+
+	var openData []*MapHash.Request
+	DATA := MapHash.BrUnCompress(bs)
+	e = json.Unmarshal(DATA, &openData)
+	if e != nil {
+		SetStatusText("解密文件失败:" + e.Error())
+		return 0, e
+	}
+
+	max := strconv.Itoa(len(openData))
+	SetStatusText("正在导入记录:0/" + max)
+	var openFileListInfo []ListInfo
+	imported := 0
+	for index, v := range openData {
+		if v == nil {
+			continue
+		}
+
+		SetStatusText("正在导入记录:" + strconv.Itoa(index) + "/" + max)
+		Theology := HashMap.CreateUniqueID()
+		HashMap.SetRequest(Theology, v)
+		State := strconv.Itoa(v.Response.StateCode)
+		if !strings.Contains(strings.ToUpper(v.URL), "HTTP") {
+			State = "已断开"
+		}
+		ResponseType := ""
+		Method := v.Method
+		Ico := "websocket_close"
+		ResponseLen := ""
+		if v.Way == "Websocket" {
+			Method = "Websocket"
+			ResponseType = "Websocket"
+			ResponseLen = strconv.Itoa(v.SendNum) + "/" + strconv.Itoa(v.RecNum)
+		} else if v.Way == "UDP" {
+			Method = "UDP"
+			ResponseType = "UDP"
+			ResponseLen = strconv.Itoa(v.SendNum) + "/" + strconv.Itoa(v.RecNum)
+		} else if strings.Contains(strings.ToUpper(Method), "TCP") {
+			ResponseLen = strconv.Itoa(v.SendNum) + "/" + strconv.Itoa(v.RecNum)
+			ResponseType = Method
+		} else {
+			if v.Response.Header != nil {
+				_a := v.Response.Header["Content-Type"]
+				if len(_a) > 0 {
+					ResponseType = _a[0]
+				} else {
+					_a = v.Response.Header["content-type"]
+					if len(_a) > 0 {
+						ResponseType = _a[0]
+					}
+				}
+				if ResponseType != "" {
+					array := strings.Split(ResponseType+";", ";")
+					if len(array) > 0 {
+						ResponseType = array[0]
+					}
+				}
+			}
+			Ico = UpdateIco(v, ResponseType)
+			ResponseLen = strconv.Itoa(len(v.Response.Body))
+		}
+		tmp := ListInfo{
+			MessageId: -1,
+			Theology:  Theology,
+			State:     State,
+			URL:       v.URL,
+			ClientIP:  v.ClientIP,
+			PID:       v.PID,
+			Method:    Method,
+			Ico:       Ico,
+			Len:       ResponseLen,
+			Type:      ResponseType,
+			SendTime:  v.SendTime,
+			RecTime:   v.RecTime,
+			Notes:     v.Notes,
+		}
+		tmp.Color.TagColor = v.Color.TagColor
+		tmp.Color.Search = v.Color.Search
+		openFileListInfo = append(openFileListInfo, tmp)
+		imported++
+	}
+
+	SetStatusText("导入完成: " + strconv.Itoa(imported) + " 条记录")
+	if len(openFileListInfo) > 0 {
+		CallJs("插入列表", openFileListInfo)
+	}
+
+	return imported, nil
+}
+
 func event(command string, args *JSON.SyJson) any {
 	switch command {
 	case "设置断点模式":
@@ -71,6 +173,14 @@ func event(command string, args *JSON.SyJson) any {
 		return true
 	case "全部放行":
 		HashMap.ReleaseAll()
+		return true
+	case "设置请求断点":
+		Theology := getInt(args.GetData("Theology"))
+		h := HashMap.GetRequest(Theology)
+		if h == nil {
+			return false
+		}
+		h.Break = 1
 		return true
 	case "置剪辑版文本":
 		b, e := base64.StdEncoding.DecodeString(args.GetData("Data"))
@@ -108,98 +218,17 @@ func event(command string, args *JSON.SyJson) any {
 		}
 		return saveToFile(Path, ALL, TheologyArray)
 	case "打开记录文件":
-		var OpenData []*MapHash.Request
-		{
-			Path := strings.ReplaceAll(args.GetData("Path"), "\\\\", "\\")
-			if Path == "" {
-				return false
-			}
-			SetStatusText("正在读取文件:" + Path)
-			bs, e := os.ReadFile(Path)
-			if e != nil {
-				SetStatusText("读取文件失败:" + e.Error())
-				return false
-			}
-			DATA := MapHash.BrUnCompress(bs)
-			e = json.Unmarshal(DATA, &OpenData)
-			if e != nil {
-				SetStatusText("解密文件失败:" + e.Error())
-				return false
-			}
+		_, err := importCaptureFile(args.GetData("Path"))
+		return err == nil
+	case "导入记录文件静默":
+		path := args.GetData("Path")
+		imported, err := importCaptureFile(path)
+		return map[string]any{
+			"Ok":       err == nil,
+			"Path":     strings.ReplaceAll(path, "\\\\", "\\"),
+			"Imported": imported,
+			"Error":    errorText(err),
 		}
-		max := strconv.Itoa(len(OpenData))
-		SetStatusText("正在导入记录:0/" + max)
-		var OpenFileListInfo []ListInfo
-		for index, v := range OpenData {
-			if v != nil {
-				SetStatusText("正在导入记录:" + strconv.Itoa(index) + "/" + max)
-				Theology := HashMap.CreateUniqueID()
-				HashMap.SetRequest(Theology, v)
-				State := strconv.Itoa(v.Response.StateCode)
-				if !strings.Contains(strings.ToUpper(v.URL), "HTTP") {
-					State = "已断开"
-				}
-				ResponseType := ""
-				Method := v.Method
-				Ico := "websocket_close"
-				ResponseLen := ""
-				if v.Way == "Websocket" {
-					Method = "Websocket"
-					ResponseType = "Websocket"
-					ResponseLen = strconv.Itoa(v.SendNum) + "/" + strconv.Itoa(v.RecNum)
-				} else if v.Way == "UDP" {
-					Method = "UDP"
-					ResponseType = "UDP"
-					ResponseLen = strconv.Itoa(v.SendNum) + "/" + strconv.Itoa(v.RecNum)
-				} else if strings.Contains(strings.ToUpper(Method), "TCP") {
-					ResponseLen = strconv.Itoa(v.SendNum) + "/" + strconv.Itoa(v.RecNum)
-					ResponseType = Method
-				} else {
-					if v.Response.Header != nil {
-						_a := v.Response.Header["Content-Type"]
-						if len(_a) > 0 {
-							ResponseType = _a[0]
-						} else {
-							_a = v.Response.Header["content-type"]
-							if len(_a) > 0 {
-								ResponseType = _a[0]
-							}
-						}
-						if ResponseType != "" {
-							array := strings.Split(ResponseType+";", ";")
-							if len(array) > 0 {
-								ResponseType = array[0]
-							}
-						}
-					}
-					Ico = UpdateIco(v, ResponseType)
-					ResponseLen = strconv.Itoa(len(v.Response.Body))
-				}
-				tmp := ListInfo{
-					MessageId: -1,
-					Theology:  Theology,
-					State:     State,
-					URL:       v.URL,
-					ClientIP:  v.ClientIP,
-					PID:       v.PID,
-					Method:    Method,
-					Ico:       Ico,
-					Len:       ResponseLen,
-					Type:      ResponseType,
-					SendTime:  v.SendTime,
-					RecTime:   v.RecTime,
-					Notes:     v.Notes,
-				}
-				tmp.Color.TagColor = v.Color.TagColor
-				tmp.Color.Search = v.Color.Search
-				OpenFileListInfo = append(OpenFileListInfo, tmp)
-			}
-		}
-		SetStatusText("导入完成: " + max + " 条记录")
-		if len(OpenFileListInfo) > 0 {
-			CallJs("插入列表", OpenFileListInfo)
-		}
-		return true
 	case "更新注释":
 		Theology := getInt(args.GetData("Theology"))
 		Data := args.GetData("Data")
@@ -263,6 +292,31 @@ func event(command string, args *JSON.SyJson) any {
 			CallJs("弹出错误提示", "设置IE代理失败")
 		}
 		return ok
+	case "启动代理服务":
+		a := &StartMsg{}
+		if app == nil || app.App == nil {
+			a.Err = "SunnyNet 未初始化"
+			return a
+		}
+		app.App.Error = nil
+		err := app.App.Start().Error
+		if err == nil {
+			a.Ok = true
+			proxyServiceStopped = false
+			CallJs("启动状态", "")
+			return a
+		}
+		a.Err = base64.StdEncoding.EncodeToString([]byte(err.Error()))
+		CallJs("启动状态", a.Err)
+		return a
+	case "停止代理服务":
+		if app == nil || app.App == nil {
+			return true
+		}
+		app.App.Close()
+		proxyServiceStopped = true
+		CallJs("更新状态文本", "代理服务已停止")
+		return true
 	case "选择文件":
 		return ""
 	case "保存文件对话框":
@@ -1340,6 +1394,8 @@ func event(command string, args *JSON.SyJson) any {
 	case "安装默认证书":
 		CallJsAlert("安装结果：", CommAnd.InstallCert([]byte(public.RootCa)))
 		return ""
+	case "安装默认证书静默":
+		return CommAnd.InstallCert([]byte(public.RootCa))
 	case "导出默认证书":
 		path1 := args.GetData("Path")
 		if path1 == "" {
@@ -1355,6 +1411,28 @@ func event(command string, args *JSON.SyJson) any {
 			return true
 		}
 		return false
+	case "导出默认证书静默":
+		path1 := args.GetData("Path")
+		if path1 == "" {
+			A, _ := CommAnd.GetDesktopPath()
+			path1 = filepath.Join(A, "SunnyNet.cer")
+		}
+		if !strings.HasSuffix(strings.ToLower(path1), ".cer") {
+			path1 += ".cer"
+		}
+		_ = os.Remove(path1)
+		if err := os.WriteFile(path1, []byte(public.RootCa), 777); err != nil {
+			return map[string]any{
+				"Ok":    false,
+				"Path":  path1,
+				"Error": err.Error(),
+			}
+		}
+		return map[string]any{
+			"Ok":    true,
+			"Path":  path1,
+			"Error": "",
+		}
 	case "应用默认证书":
 		id := Api.CreateCertificate()
 		defer Api.RemoveCertificate(id)
@@ -1455,6 +1533,7 @@ var DisableUDP = false
 var DisableTCP = false
 var DisableCache = false
 var SocketAuthentication []string
+var proxyServiceStopped bool
 
 type StartMsg struct {
 	Ok  bool   `json:"ok"`

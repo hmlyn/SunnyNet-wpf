@@ -262,6 +262,90 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         ? $"已收藏 {FavoriteCount} 条"
         : "暂无收藏";
 
+    public CaptureEntry[] GetSessionSnapshot()
+    {
+        return Sessions.ToArray();
+    }
+
+    public CaptureEntry? FindSessionEntry(int theology)
+    {
+        if (theology <= 0)
+        {
+            return null;
+        }
+
+        return _sessionMap.TryGetValue(theology, out CaptureEntry? entry)
+            ? entry
+            : Sessions.FirstOrDefault(item => item.Theology == theology || item.Index == theology);
+    }
+
+    public Task<JsonElement?> InvokeBackendCommandAsync(string command, object? args = null, CancellationToken cancellationToken = default)
+    {
+        return _backend.InvokeAsync(command, args, cancellationToken);
+    }
+
+    public async Task ReloadSessionDetailAsync(int theology)
+    {
+        CaptureEntry? entry = FindSessionEntry(theology);
+        if (entry is null)
+        {
+            return;
+        }
+
+        SelectedSession = entry;
+        await LoadSelectedSessionAsync();
+    }
+
+    public Task ClearSessionsQuietAsync()
+    {
+        return ClearAllAsync();
+    }
+
+    public Task ReleaseAllQuietAsync()
+    {
+        return ReleaseAllAsync();
+    }
+
+    public async Task<SearchExecutionResult> SearchQuietAsync(SearchRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Value))
+        {
+            return new SearchExecutionResult(0, null);
+        }
+
+        JsonElement? result = await _backend.InvokeAsync("查找", new
+        {
+            Options = request.Options,
+            request.Value,
+            request.Type,
+            request.Range,
+            request.Color,
+            ProtoSkip = request.ProtoSkip
+        });
+
+        if (result is null || result.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return new SearchExecutionResult(0, null);
+        }
+
+        SearchExecutionResult applied = await ApplySearchResultAsync(result.Value, request);
+        StatusRight = applied.MatchCount > 0
+            ? $"搜索完成：命中 {applied.MatchCount:N0} 条"
+            : "搜索完成：没有结果";
+        return applied;
+    }
+
+    public async Task<int> CancelSearchHighlightQuietAsync()
+    {
+        int cleared = Sessions.Count(entry => !string.IsNullOrWhiteSpace(entry.SearchColor))
+            + Detail.SocketEntries.Count(entry => !string.IsNullOrWhiteSpace(entry.SearchColor));
+
+        await _backend.InvokeAsync("取消搜索颜色标记");
+        ClearAllSearchHighlights();
+        StatusRight = "搜索颜色标记已清除";
+        return cleared;
+    }
+
     public void InitializeFavoriteSettings(IEnumerable<string>? favoriteKeys, bool showFavoritesOnly)
     {
         _favoriteKeys.Clear();
@@ -435,66 +519,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
         RefreshSelectedSessionInterceptState();
         StatusRight = "断开会话请求已提交";
-    }
-
-    public CaptureEntry[] GetMcpSessionsSnapshot()
-    {
-        return Sessions.ToArray();
-    }
-
-    public CaptureEntry? FindMcpSession(int theology)
-    {
-        return Sessions.FirstOrDefault(entry => entry.Theology == theology || entry.Index == theology);
-    }
-
-    public async Task<SessionDetail> LoadMcpSessionDetailAsync(int theology)
-    {
-        CaptureEntry? entry = FindMcpSession(theology);
-        if (entry is null)
-        {
-            throw new InvalidOperationException($"未找到会话：{theology}");
-        }
-
-        SelectedSession = entry;
-        await LoadSelectedSessionAsync();
-        return Detail;
-    }
-
-    public async Task DeleteMcpSessionAsync(int theology)
-    {
-        CaptureEntry? entry = FindMcpSession(theology);
-        if (entry is not null)
-        {
-            await DeleteSessionsAsync(new[] { entry });
-        }
-    }
-
-    public async Task ResendMcpSessionAsync(int theology, int mode)
-    {
-        CaptureEntry? entry = FindMcpSession(theology);
-        if (entry is not null)
-        {
-            await ResendSessionEntriesAsync(new[] { entry }, mode);
-        }
-    }
-
-    public async Task CloseMcpSessionAsync(int theology)
-    {
-        CaptureEntry? entry = FindMcpSession(theology);
-        if (entry is not null)
-        {
-            await CloseSessionEntriesAsync(new[] { entry });
-        }
-    }
-
-    public async Task ClearMcpSessionsAsync()
-    {
-        await ClearAllAsync();
-    }
-
-    public async Task ReleaseMcpAllAsync()
-    {
-        await ReleaseAllAsync();
     }
 
     private async Task ResendSingleSessionWithInterceptEditorAsync(CaptureEntry entry, int mode)
