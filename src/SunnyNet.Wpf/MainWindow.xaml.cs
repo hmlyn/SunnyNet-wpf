@@ -321,14 +321,14 @@ public partial class MainWindow : Window
         new TextCompareWindow { Owner = this }.Show();
     }
 
+    private void JsonTool_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        new JsonToolWindow { Owner = this }.Show();
+    }
+
     private void CertificateGuide_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         new CertificateGuideWindow(_viewModel) { Owner = this }.Show();
-    }
-
-    private void OpenSource_Click(object sender, RoutedEventArgs routedEventArgs)
-    {
-        new OpenSourceWindow { Owner = this }.Show();
     }
 
     private void Find_Click(object sender, RoutedEventArgs routedEventArgs)

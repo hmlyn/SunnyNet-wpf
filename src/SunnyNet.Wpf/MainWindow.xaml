@@ -151,22 +151,22 @@
 
                             <Border Width="1" Margin="10,6" Background="{StaticResource DividerBrush}" />
 
-                            <Button Style="{StaticResource ToolbarButtonStyle}" Click="TextCompare_Click" ToolTip="文本对比">
+                            <Button Style="{StaticResource ToolbarButtonStyle}" Click="TextCompare_Click" ToolTip="文本工具">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE8D2;" />
-                                    <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="文本对比" />
+                                    <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="文本工具" />
+                                </StackPanel>
+                            </Button>
+                            <Button Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}" Click="JsonTool_Click" ToolTip="JSON工具">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE8A5;" />
+                                    <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="JSON" />
                                 </StackPanel>
                             </Button>
                             <Button Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}" Click="CertificateGuide_Click" ToolTip="证书安装教程">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE7C3;" />
                                     <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="证书教程" />
-                                </StackPanel>
-                            </Button>
-                            <Button Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}" Click="OpenSource_Click" ToolTip="开源协议">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE82D;" />
-                                    <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="开源协议" />
                                 </StackPanel>
                             </Button>
                         </StackPanel>
