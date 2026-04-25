@@ -1,0 +1,240 @@
+﻿<Window x:Class="SunnyNet.Wpf.Windows.CryptoToolWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="加密/解密"
+        Width="1180"
+        Height="760"
+        MinWidth="980"
+        MinHeight="620"
+        Background="{StaticResource WindowBackgroundBrush}"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Style="{StaticResource CardBorderStyle}">
+            <DockPanel Margin="18,14" LastChildFill="True">
+                <Button DockPanel.Dock="Right" MinWidth="88" Padding="12,5" Click="ClearAll_Click" Content="清空" />
+                <StackPanel>
+                    <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="加密/解密" />
+                    <TextBlock x:Name="ToolSummaryTextBlock" Margin="0,6,0,0" Style="{StaticResource DialogSubtitleTextStyle}" Text="支持 AES/DES、RSA 和常用哈希，输入/输出支持文本、Base64、HEX。" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <TabControl Grid.Row="1" Margin="0,16,0,0">
+            <TabItem Header="对称加密">
+                <Grid Margin="0,12,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border Style="{StaticResource CardBorderStyle}">
+                        <WrapPanel Margin="14,10" VerticalAlignment="Center">
+                            <TextBlock Margin="0,0,6,0" VerticalAlignment="Center" Text="算法" />
+                            <ComboBox x:Name="SymmetricAlgorithmComboBox" Width="90" SelectedIndex="0">
+                                <ComboBoxItem Content="AES" />
+                                <ComboBoxItem Content="DES" />
+                            </ComboBox>
+                            <TextBlock Margin="12,0,6,0" VerticalAlignment="Center" Text="模式" />
+                            <ComboBox x:Name="SymmetricModeComboBox" Width="90" SelectedIndex="1">
+                                <ComboBoxItem Content="ECB" />
+                                <ComboBoxItem Content="CBC" />
+                                <ComboBoxItem Content="GCM" />
+                            </ComboBox>
+                            <TextBlock Margin="12,0,6,0" VerticalAlignment="Center" Text="填充" />
+                            <ComboBox x:Name="SymmetricPaddingComboBox" Width="110" SelectedIndex="0">
+                                <ComboBoxItem Content="PKCS7" />
+                                <ComboBoxItem Content="Zeros" />
+                                <ComboBoxItem Content="None" />
+                            </ComboBox>
+                            <TextBlock Margin="12,0,6,0" VerticalAlignment="Center" Text="输入" />
+                            <ComboBox x:Name="SymmetricInputFormatComboBox" Width="88" SelectedIndex="0">
+                                <ComboBoxItem Content="文本" />
+                                <ComboBoxItem Content="Base64" />
+                                <ComboBoxItem Content="HEX" />
+                            </ComboBox>
+                            <TextBlock Margin="12,0,6,0" VerticalAlignment="Center" Text="输出" />
+                            <ComboBox x:Name="SymmetricOutputFormatComboBox" Width="88" SelectedIndex="1">
+                                <ComboBoxItem Content="文本" />
+                                <ComboBoxItem Content="Base64" />
+                                <ComboBoxItem Content="HEX" />
+                            </ComboBox>
+                            <Button Margin="14,0,0,0" MinWidth="88" Padding="12,5" Click="SymmetricEncrypt_Click" Content="加密" />
+                            <Button Margin="8,0,0,0" MinWidth="88" Padding="12,5" Click="SymmetricDecrypt_Click" Content="解密" />
+                        </WrapPanel>
+                    </Border>
+                    <Grid Grid.Row="1" Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Border Grid.ColumnSpan="3" Style="{StaticResource CardBorderStyle}">
+                            <Grid Margin="14,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock VerticalAlignment="Center" Text="Key" />
+                                <TextBox x:Name="SymmetricKeyTextBox" Grid.Column="1" Margin="8,0,16,0" Height="34" Padding="10,6" VerticalContentAlignment="Center" />
+                                <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="Key格式" />
+                                <ComboBox x:Name="SymmetricKeyFormatComboBox" Grid.Column="3" Margin="8,0,16,0" Width="100" SelectedIndex="0">
+                                    <ComboBoxItem Content="文本" />
+                                    <ComboBoxItem Content="Base64" />
+                                    <ComboBoxItem Content="HEX" />
+                                </ComboBox>
+                                <TextBlock Grid.Column="4" VerticalAlignment="Center" Text="IV/Nonce" />
+                                <StackPanel Grid.Column="5" Orientation="Horizontal">
+                                    <TextBox x:Name="SymmetricIvTextBox" Width="240" Height="34" Padding="10,6" VerticalContentAlignment="Center" />
+                                    <ComboBox x:Name="SymmetricIvFormatComboBox" Margin="8,0,0,0" Width="100" SelectedIndex="0">
+                                        <ComboBoxItem Content="文本" />
+                                        <ComboBoxItem Content="Base64" />
+                                        <ComboBoxItem Content="HEX" />
+                                    </ComboBox>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Margin="0,12,0,0">
+                            <TextBox x:Name="SymmetricInputTextBox" Margin="12" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FontFamily="Consolas, Microsoft YaHei UI" />
+                        </Border>
+                        <GridSplitter Grid.Row="1" Grid.Column="1" Width="12" HorizontalAlignment="Stretch" />
+                        <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource CardBorderStyle}" Margin="0,12,0,0">
+                            <TextBox x:Name="SymmetricOutputTextBox" Margin="12" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FontFamily="Consolas, Microsoft YaHei UI" />
+                        </Border>
+                    </Grid>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="RSA">
+                <Grid Margin="0,12,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border Style="{StaticResource CardBorderStyle}">
+                        <WrapPanel Margin="14,10">
+                            <TextBlock Margin="0,0,6,0" VerticalAlignment="Center" Text="密钥格式" />
+                            <ComboBox x:Name="RsaKeyFormatComboBox" Width="130" SelectedIndex="0">
+                                <ComboBoxItem Content="PEM" />
+                                <ComboBoxItem Content="XML" />
+                            </ComboBox>
+                            <TextBlock Margin="12,0,6,0" VerticalAlignment="Center" Text="填充" />
+                            <ComboBox x:Name="RsaPaddingComboBox" Width="150" SelectedIndex="0">
+                                <ComboBoxItem Content="PKCS1" />
+                                <ComboBoxItem Content="OAEP-SHA1" />
+                                <ComboBoxItem Content="OAEP-SHA256" />
+                                <ComboBoxItem Content="OAEP-SHA384" />
+                                <ComboBoxItem Content="OAEP-SHA512" />
+                            </ComboBox>
+                            <TextBlock Margin="12,0,6,0" VerticalAlignment="Center" Text="输入" />
+                            <ComboBox x:Name="RsaInputFormatComboBox" Width="88" SelectedIndex="0">
+                                <ComboBoxItem Content="文本" />
+                                <ComboBoxItem Content="Base64" />
+                                <ComboBoxItem Content="HEX" />
+                            </ComboBox>
+                            <TextBlock Margin="12,0,6,0" VerticalAlignment="Center" Text="输出" />
+                            <ComboBox x:Name="RsaOutputFormatComboBox" Width="88" SelectedIndex="1">
+                                <ComboBoxItem Content="文本" />
+                                <ComboBoxItem Content="Base64" />
+                                <ComboBoxItem Content="HEX" />
+                            </ComboBox>
+                            <Button Margin="14,0,0,0" MinWidth="88" Padding="12,5" Click="RsaEncrypt_Click" Content="加密" />
+                            <Button Margin="8,0,0,0" MinWidth="88" Padding="12,5" Click="RsaDecrypt_Click" Content="解密" />
+                        </WrapPanel>
+                    </Border>
+                    <Grid Grid.Row="1" Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="0.9*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="1.1*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="160" />
+                            <RowDefinition Height="12" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Border Grid.ColumnSpan="3" Style="{StaticResource CardBorderStyle}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="34" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Margin="12,8,0,0" Style="{StaticResource SectionTitleTextStyle}" Text="RSA 公钥/私钥" />
+                                <TextBox x:Name="RsaKeyTextBox" Grid.Row="1" Margin="12" AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" FontFamily="Consolas, Microsoft YaHei UI" />
+                            </Grid>
+                        </Border>
+                        <Border Grid.Row="2" Style="{StaticResource CardBorderStyle}">
+                            <TextBox x:Name="RsaInputTextBox" Margin="12" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FontFamily="Consolas, Microsoft YaHei UI" />
+                        </Border>
+                        <GridSplitter Grid.Row="2" Grid.Column="1" Width="12" HorizontalAlignment="Stretch" />
+                        <Border Grid.Row="2" Grid.Column="2" Style="{StaticResource CardBorderStyle}">
+                            <TextBox x:Name="RsaOutputTextBox" Margin="12" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FontFamily="Consolas, Microsoft YaHei UI" />
+                        </Border>
+                    </Grid>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="哈希">
+                <Grid Margin="0,12,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border Style="{StaticResource CardBorderStyle}">
+                        <WrapPanel Margin="14,10">
+                            <TextBlock Margin="0,0,6,0" VerticalAlignment="Center" Text="算法" />
+                            <ComboBox x:Name="HashAlgorithmComboBox" Width="150" SelectedIndex="2">
+                                <ComboBoxItem Content="MD5" />
+                                <ComboBoxItem Content="SHA1" />
+                                <ComboBoxItem Content="SHA256" />
+                                <ComboBoxItem Content="SHA384" />
+                                <ComboBoxItem Content="SHA512" />
+                                <ComboBoxItem Content="SHA3-256" />
+                                <ComboBoxItem Content="SHA3-384" />
+                                <ComboBoxItem Content="SHA3-512" />
+                            </ComboBox>
+                            <TextBlock Margin="12,0,6,0" VerticalAlignment="Center" Text="输入" />
+                            <ComboBox x:Name="HashInputFormatComboBox" Width="88" SelectedIndex="0">
+                                <ComboBoxItem Content="文本" />
+                                <ComboBoxItem Content="Base64" />
+                                <ComboBoxItem Content="HEX" />
+                            </ComboBox>
+                            <TextBlock Margin="12,0,6,0" VerticalAlignment="Center" Text="输出" />
+                            <ComboBox x:Name="HashOutputFormatComboBox" Width="88" SelectedIndex="1">
+                                <ComboBoxItem Content="Base64" />
+                                <ComboBoxItem Content="HEX" />
+                            </ComboBox>
+                            <Button Margin="14,0,0,0" MinWidth="88" Padding="12,5" Click="Hash_Click" Content="计算" />
+                        </WrapPanel>
+                    </Border>
+                    <Grid Grid.Row="1" Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Style="{StaticResource CardBorderStyle}">
+                            <TextBox x:Name="HashInputTextBox" Margin="12" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FontFamily="Consolas, Microsoft YaHei UI" />
+                        </Border>
+                        <GridSplitter Grid.Column="1" Width="12" HorizontalAlignment="Stretch" />
+                        <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}">
+                            <TextBox x:Name="HashOutputTextBox" Margin="12" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FontFamily="Consolas, Microsoft YaHei UI" />
+                        </Border>
+                    </Grid>
+                </Grid>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</Window>

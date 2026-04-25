@@ -148,15 +148,11 @@
                             </Grid.RowDefinitions>
                             <Border Style="{StaticResource CardBorderStyle}">
                                 <StackPanel Margin="14,10" Orientation="Horizontal">
-                                    <CheckBox x:Name="DistinctTrimCheckBox" VerticalAlignment="Center" Content="去除行首尾空白后判断重复" />
-                                    <CheckBox x:Name="DistinctIgnoreCaseCheckBox" Margin="14,0,0,0" VerticalAlignment="Center" Content="忽略大小写" />
-                                    <Button Margin="14,0,0,0" MinWidth="100" Padding="12,5" Click="RemoveDuplicateLines_Click" Content="开始去重" />
+                                    <Button MinWidth="100" Padding="12,5" Click="RemoveDuplicateLines_Click" Content="开始去重" />
                                 </StackPanel>
                             </Border>
                             <Grid Grid.Row="1" Margin="0,12,0,0">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="12" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="12" />
                                     <ColumnDefinition Width="*" />
@@ -167,23 +163,12 @@
                                             <RowDefinition Height="36" />
                                             <RowDefinition Height="*" />
                                         </Grid.RowDefinitions>
-                                        <TextBlock Margin="12,0" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="数据A" />
+                                        <TextBlock Margin="12,0" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="原始数据" />
                                         <TextBox x:Name="DistinctLeftTextBox" Grid.Row="1" Margin="12" AcceptsReturn="True" Background="White" Foreground="{StaticResource TextPrimaryBrush}" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" FontFamily="Consolas, Microsoft YaHei UI" TextWrapping="NoWrap" />
                                     </Grid>
                                 </Border>
                                 <GridSplitter Grid.Column="1" Width="12" HorizontalAlignment="Stretch" />
                                 <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="36" />
-                                            <RowDefinition Height="*" />
-                                        </Grid.RowDefinitions>
-                                        <TextBlock Margin="12,0" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="数据B" />
-                                        <TextBox x:Name="DistinctRightTextBox" Grid.Row="1" Margin="12" AcceptsReturn="True" Background="White" Foreground="{StaticResource TextPrimaryBrush}" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" FontFamily="Consolas, Microsoft YaHei UI" TextWrapping="NoWrap" />
-                                    </Grid>
-                                </Border>
-                                <GridSplitter Grid.Column="3" Width="12" HorizontalAlignment="Stretch" />
-                                <Border Grid.Column="4" Style="{StaticResource CardBorderStyle}">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="36" />

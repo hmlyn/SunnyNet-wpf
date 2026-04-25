@@ -163,6 +163,12 @@
                                     <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="JSON" />
                                 </StackPanel>
                             </Button>
+                            <Button Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}" Click="CryptoTool_Click" ToolTip="加密/解密">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE72E;" />
+                                    <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="加密/解密" />
+                                </StackPanel>
+                            </Button>
                             <Button Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}" Click="CertificateGuide_Click" ToolTip="证书安装教程">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE7C3;" />

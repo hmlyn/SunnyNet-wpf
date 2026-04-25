@@ -326,6 +326,11 @@ public partial class MainWindow : Window
         new JsonToolWindow { Owner = this }.Show();
     }
 
+    private void CryptoTool_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        new CryptoToolWindow { Owner = this }.Show();
+    }
+
     private void CertificateGuide_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         new CertificateGuideWindow(_viewModel) { Owner = this }.Show();

@@ -52,7 +52,6 @@ public partial class TextCompareWindow : Window
             CompressInputTextBox.Clear();
             CompressOutputTextBox.Clear();
             DistinctLeftTextBox.Clear();
-            DistinctRightTextBox.Clear();
             DistinctOutputTextBox.Clear();
             CaseInputTextBox.Clear();
             CaseOutputTextBox.Clear();
@@ -163,15 +162,13 @@ public partial class TextCompareWindow : Window
 
     private void RemoveDuplicateLines_Click(object sender, RoutedEventArgs routedEventArgs)
     {
-        string mergedText = (DistinctLeftTextBox.Text ?? "") + "\n" + (DistinctRightTextBox.Text ?? "");
-        string[] lines = mergedText.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
-        StringComparer comparer = DistinctIgnoreCaseCheckBox.IsChecked == true ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
-        HashSet<string> seen = new(comparer);
+        string inputText = DistinctLeftTextBox.Text ?? string.Empty;
+        string[] lines = inputText.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+        HashSet<string> seen = new(StringComparer.Ordinal);
         List<string> result = new();
         foreach (string line in lines)
         {
-            string key = DistinctTrimCheckBox.IsChecked == true ? line.Trim() : line;
-            if (seen.Add(key)) result.Add(line);
+            if (seen.Add(line)) result.Add(line);
         }
         DistinctOutputTextBox.Text = string.Join(Environment.NewLine, result);
         ToolSummaryTextBlock.Text = $"文本去重完成：{lines.Length:N0} 行 → {result.Count:N0} 行。";
