@@ -1090,6 +1090,7 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
 
         return new
         {
+            index = entry.Index,
             theology = entry.Theology,
             method = GetString(payload, "Method", entry.Method),
             url = GetString(payload, "URL", entry.Url),
@@ -1148,6 +1149,7 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
         return new
         {
             success = true,
+            index = entry.Index,
             theology = entry.Theology,
             key,
             value,
@@ -1176,6 +1178,7 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
         return new
         {
             success = true,
+            index = entry.Index,
             theology = entry.Theology,
             message = "请求体已修改"
         };
@@ -1213,6 +1216,7 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
         return new
         {
             success = true,
+            index = entry.Index,
             theology = entry.Theology,
             key,
             value,
@@ -1241,6 +1245,7 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
         return new
         {
             success = true,
+            index = entry.Index,
             theology = entry.Theology,
             message = "响应体已修改"
         };
@@ -1259,6 +1264,7 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
         return new
         {
             success = true,
+            index = entry.Index,
             theology = entry.Theology,
             message = "请求已被阻断，等待处理"
         };
@@ -1484,6 +1490,7 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
             .Take(limit)
             .Select(entry => new
             {
+                index = entry.Index,
                 theology = entry.Theology,
                 method = entry.Method,
                 url = entry.Url,
@@ -1516,6 +1523,7 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
 
         Dictionary<string, object?> result = new()
         {
+            ["index"] = entry.Index,
             ["theology"] = entry.Theology,
             ["statusCode"] = GetInt(response, "StateCode", ExtractStatusCode(entry.State)),
             ["length"] = body.Length,
@@ -1631,6 +1639,7 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
         return new
         {
             success = true,
+            index = entry.Index,
             theology = entry.Theology,
             protocol = GetSessionWay(entry),
             url = entry.Url,
@@ -1658,6 +1667,7 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
         return new
         {
             success = true,
+            index = entry.Index,
             theology = entry.Theology,
             protocol = GetSessionWay(entry),
             packet = new
@@ -1690,6 +1700,7 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
             return new
             {
                 success = true,
+                index = entry.Index,
                 theology = entry.Theology,
                 total = packets.Length,
                 packets = Array.Empty<object>()
@@ -1716,6 +1727,7 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
         return new
         {
             success = true,
+            index = entry.Index,
             theology = entry.Theology,
             protocol = GetSessionWay(entry),
             total = packets.Length,
@@ -1745,6 +1757,7 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
             (int sendNum, int recNum) = ParseSocketCounters(entry.ResponseLength);
             connections.Add(new
             {
+                index = entry.Index,
                 theology = entry.Theology,
                 protocol = GetSessionWay(entry),
                 url = entry.Url,
@@ -2137,6 +2150,7 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
     {
         return new
         {
+            index = entry.Index,
             theology = entry.Theology,
             method = entry.Method,
             url = entry.Url,
