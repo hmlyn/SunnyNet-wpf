@@ -67,7 +67,18 @@
                       SelectionUnit="FullRow"
                       ScrollViewer.HorizontalScrollBarVisibility="Auto"
                       ScrollViewer.VerticalScrollBarVisibility="Auto"
+                      PreviewMouseRightButtonDown="RowsGrid_PreviewMouseRightButtonDown"
                       MouseDoubleClick="RowsGrid_MouseDoubleClick">
+                <DataGrid.ContextMenu>
+                    <ContextMenu Opened="RowsGridContextMenu_Opened">
+                        <MenuItem x:Name="CopyRowNameMenuItem"
+                                  Header="复制键"
+                                  Click="CopyRowNameMenuItem_Click" />
+                        <MenuItem x:Name="CopyRowValueMenuItem"
+                                  Header="复制值"
+                                  Click="CopyRowValueMenuItem_Click" />
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
                 <DataGrid.Columns>
                     <DataGridTemplateColumn Header="名称" Width="176" MinWidth="118">
                         <DataGridTemplateColumn.CellTemplate>

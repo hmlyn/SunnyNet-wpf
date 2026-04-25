@@ -3,6 +3,7 @@ using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using SunnyNet.Wpf.Models;
 
 namespace SunnyNet.Wpf.Controls;
@@ -100,7 +101,7 @@ public partial class NameValueTableControl : UserControl
 
     private void RowsGrid_MouseDoubleClick(object sender, MouseButtonEventArgs mouseButtonEventArgs)
     {
-        if (RowsGrid.SelectedItem is not DetailNameValueRow row)
+        if (TryGetSelectedRow(out DetailNameValueRow? row) is false)
         {
             return;
         }
@@ -116,6 +117,84 @@ public partial class NameValueTableControl : UserControl
         catch
         {
         }
+    }
+
+    private void RowsGrid_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs mouseButtonEventArgs)
+    {
+        if (FindVisualParent<DataGridRow>(mouseButtonEventArgs.OriginalSource as DependencyObject) is not { Item: DetailNameValueRow row })
+        {
+            return;
+        }
+
+        if (!ReferenceEquals(RowsGrid.SelectedItem, row))
+        {
+            RowsGrid.SelectedItem = row;
+        }
+    }
+
+    private void RowsGridContextMenu_Opened(object sender, RoutedEventArgs routedEventArgs)
+    {
+        bool hasRow = TryGetSelectedRow(out DetailNameValueRow? row);
+        CopyRowNameMenuItem.IsEnabled = hasRow && !string.IsNullOrWhiteSpace(row?.Name);
+        CopyRowValueMenuItem.IsEnabled = hasRow && !string.IsNullOrWhiteSpace(row?.Value);
+    }
+
+    private void CopyRowNameMenuItem_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        if (TryGetSelectedRow(out DetailNameValueRow? row) is false)
+        {
+            return;
+        }
+
+        CopyText(row.Name);
+    }
+
+    private void CopyRowValueMenuItem_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        if (TryGetSelectedRow(out DetailNameValueRow? row) is false)
+        {
+            return;
+        }
+
+        CopyText(row.Value);
+    }
+
+    private bool TryGetSelectedRow(out DetailNameValueRow row)
+    {
+        row = RowsGrid.SelectedItem as DetailNameValueRow ?? null!;
+        return row is not null;
+    }
+
+    private static void CopyText(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(text);
+        }
+        catch
+        {
+        }
+    }
+
+    private static T? FindVisualParent<T>(DependencyObject? source)
+        where T : DependencyObject
+    {
+        while (source is not null)
+        {
+            if (source is T target)
+            {
+                return target;
+            }
+
+            source = VisualTreeHelper.GetParent(source);
+        }
+
+        return null;
     }
 
     private static int CountRows(IEnumerable? rows)
