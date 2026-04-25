@@ -18,6 +18,10 @@ public partial class JsonToolWindow : Window
     private readonly Dictionary<JsonEditorNode, string> _editingValues = new();
     private readonly Dictionary<JsonEditorNode, string> _editingTypes = new();
     private bool _isRefreshingNodes;
+    private Point _dragStartPoint;
+    private JsonEditorNode? _dragSourceNode;
+    private JsonEditorNode? _dropTargetNode;
+    private bool _dropAfter;
 
     public JsonToolWindow()
     {
@@ -245,6 +249,118 @@ public partial class JsonToolWindow : Window
         keyEventArgs.Handled = true;
     }
 
+    private void JsonNodeRow_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs mouseButtonEventArgs)
+    {
+        _dragStartPoint = mouseButtonEventArgs.GetPosition(JsonNodeListBox);
+        _dragSourceNode = (sender as FrameworkElement)?.DataContext as JsonEditorNode;
+    }
+
+    private void JsonNodeRow_PreviewMouseMove(object sender, MouseEventArgs mouseEventArgs)
+    {
+        if (mouseEventArgs.LeftButton != MouseButtonState.Pressed || _dragSourceNode is null)
+        {
+            return;
+        }
+
+        Point currentPoint = mouseEventArgs.GetPosition(JsonNodeListBox);
+        if (Math.Abs(currentPoint.X - _dragStartPoint.X) < SystemParameters.MinimumHorizontalDragDistance
+            && Math.Abs(currentPoint.Y - _dragStartPoint.Y) < SystemParameters.MinimumVerticalDragDistance)
+        {
+            return;
+        }
+
+        if (mouseEventArgs.OriginalSource is DependencyObject source && IsTextInputElement(source))
+        {
+            return;
+        }
+
+        DragDrop.DoDragDrop(JsonNodeListBox, _dragSourceNode, DragDropEffects.Move);
+        ClearDropMarker();
+        _dragSourceNode = null;
+    }
+
+    private void JsonNodeRow_DragOver(object sender, DragEventArgs dragEventArgs)
+    {
+        JsonEditorNode? sourceNode = dragEventArgs.Data.GetData(typeof(JsonEditorNode)) as JsonEditorNode;
+        JsonEditorNode? targetNode = (sender as FrameworkElement)?.DataContext as JsonEditorNode;
+        if (!CanDropSibling(sourceNode, targetNode))
+        {
+            dragEventArgs.Effects = DragDropEffects.None;
+            ClearDropMarker();
+            dragEventArgs.Handled = true;
+            return;
+        }
+
+        bool dropAfter = IsDropAfter(sender, dragEventArgs);
+        SetDropMarker(targetNode!, dropAfter);
+        dragEventArgs.Effects = DragDropEffects.Move;
+        dragEventArgs.Handled = true;
+    }
+
+    private void JsonNodeRow_DragLeave(object sender, DragEventArgs dragEventArgs)
+    {
+        if (ReferenceEquals((sender as FrameworkElement)?.DataContext, _dropTargetNode))
+        {
+            ClearDropMarker();
+        }
+    }
+
+    private void JsonNodeRow_Drop(object sender, DragEventArgs dragEventArgs)
+    {
+        JsonEditorNode? sourceNode = dragEventArgs.Data.GetData(typeof(JsonEditorNode)) as JsonEditorNode;
+        JsonEditorNode? targetNode = (sender as FrameworkElement)?.DataContext as JsonEditorNode;
+        bool dropAfter = IsDropAfter(sender, dragEventArgs);
+        ClearDropMarker();
+
+        if (!CanDropSibling(sourceNode, targetNode))
+        {
+            dragEventArgs.Handled = true;
+            return;
+        }
+
+        MoveSiblingNode(sourceNode!, targetNode!, dropAfter);
+        dragEventArgs.Handled = true;
+    }
+
+    private void JsonNodeListBox_DragOver(object sender, DragEventArgs dragEventArgs)
+    {
+        JsonEditorNode? sourceNode = dragEventArgs.Data.GetData(typeof(JsonEditorNode)) as JsonEditorNode;
+        (JsonEditorNode? targetNode, bool dropAfter) = FindDropTarget(dragEventArgs.GetPosition(JsonNodeListBox));
+        if (!CanDropSibling(sourceNode, targetNode))
+        {
+            dragEventArgs.Effects = DragDropEffects.None;
+            ClearDropMarker();
+            dragEventArgs.Handled = true;
+            return;
+        }
+
+        SetDropMarker(targetNode!, dropAfter);
+        dragEventArgs.Effects = DragDropEffects.Move;
+        dragEventArgs.Handled = true;
+    }
+
+    private void JsonNodeListBox_DragLeave(object sender, DragEventArgs dragEventArgs)
+    {
+        if (!JsonNodeListBox.IsMouseOver)
+        {
+            ClearDropMarker();
+        }
+    }
+
+    private void JsonNodeListBox_Drop(object sender, DragEventArgs dragEventArgs)
+    {
+        JsonEditorNode? sourceNode = dragEventArgs.Data.GetData(typeof(JsonEditorNode)) as JsonEditorNode;
+        (JsonEditorNode? targetNode, bool dropAfter) = FindDropTarget(dragEventArgs.GetPosition(JsonNodeListBox));
+        ClearDropMarker();
+
+        if (CanDropSibling(sourceNode, targetNode))
+        {
+            MoveSiblingNode(sourceNode!, targetNode!, dropAfter);
+        }
+
+        dragEventArgs.Handled = true;
+    }
+
     private void JsonTypeDropDownClosed(object sender, EventArgs eventArgs)
     {
         if ((sender as FrameworkElement)?.DataContext is not JsonEditorNode node)
@@ -457,6 +573,137 @@ public partial class JsonToolWindow : Window
         {
             return false;
         }
+    }
+
+    private static bool CanDropSibling(JsonEditorNode? sourceNode, JsonEditorNode? targetNode)
+    {
+        if (sourceNode is null || targetNode is null || ReferenceEquals(sourceNode, targetNode))
+        {
+            return false;
+        }
+
+        return ReferenceEquals(sourceNode.Parent, targetNode.Parent);
+    }
+
+    private static bool IsDropAfter(object sender, DragEventArgs dragEventArgs)
+    {
+        if (sender is not FrameworkElement element || element.ActualHeight <= 0)
+        {
+            return false;
+        }
+
+        return dragEventArgs.GetPosition(element).Y >= element.ActualHeight / 2;
+    }
+
+    private (JsonEditorNode? TargetNode, bool DropAfter) FindDropTarget(Point listPoint)
+    {
+        JsonEditorNode? nearestNode = null;
+        bool dropAfter = false;
+        double nearestDistance = double.MaxValue;
+
+        for (int index = 0; index < JsonNodeListBox.Items.Count; index++)
+        {
+            if (JsonNodeListBox.ItemContainerGenerator.ContainerFromIndex(index) is not ListBoxItem item
+                || JsonNodeListBox.Items[index] is not JsonEditorNode node)
+            {
+                continue;
+            }
+
+            Point itemPoint = item.TranslatePoint(new Point(0, 0), JsonNodeListBox);
+            double top = itemPoint.Y;
+            double bottom = top + item.ActualHeight;
+            if (listPoint.Y >= top && listPoint.Y <= bottom)
+            {
+                return (node, listPoint.Y >= top + item.ActualHeight / 2);
+            }
+
+            double distanceToTop = Math.Abs(listPoint.Y - top);
+            if (distanceToTop < nearestDistance)
+            {
+                nearestDistance = distanceToTop;
+                nearestNode = node;
+                dropAfter = false;
+            }
+
+            double distanceToBottom = Math.Abs(listPoint.Y - bottom);
+            if (distanceToBottom < nearestDistance)
+            {
+                nearestDistance = distanceToBottom;
+                nearestNode = node;
+                dropAfter = true;
+            }
+        }
+
+        return (nearestNode, dropAfter);
+    }
+
+    private void SetDropMarker(JsonEditorNode targetNode, bool dropAfter)
+    {
+        if (!ReferenceEquals(_dropTargetNode, targetNode))
+        {
+            ClearDropMarker();
+        }
+
+        _dropTargetNode = targetNode;
+        _dropAfter = dropAfter;
+        targetNode.ShowDropBefore = !dropAfter;
+        targetNode.ShowDropAfter = dropAfter;
+    }
+
+    private void ClearDropMarker()
+    {
+        if (_dropTargetNode is not null)
+        {
+            _dropTargetNode.ShowDropBefore = false;
+            _dropTargetNode.ShowDropAfter = false;
+        }
+
+        _dropTargetNode = null;
+        _dropAfter = false;
+    }
+
+    private void MoveSiblingNode(JsonEditorNode sourceNode, JsonEditorNode targetNode, bool dropAfter)
+    {
+        ObservableCollection<JsonEditorNode> siblings = sourceNode.Parent?.Children ?? _rootNodes;
+        int sourceIndex = siblings.IndexOf(sourceNode);
+        int targetIndex = siblings.IndexOf(targetNode);
+        if (sourceIndex < 0 || targetIndex < 0)
+        {
+            return;
+        }
+
+        int insertIndex = dropAfter ? targetIndex + 1 : targetIndex;
+        if (sourceIndex < insertIndex)
+        {
+            insertIndex--;
+        }
+
+        if (sourceIndex == insertIndex)
+        {
+            return;
+        }
+
+        siblings.RemoveAt(sourceIndex);
+        siblings.Insert(Math.Clamp(insertIndex, 0, siblings.Count), sourceNode);
+        NormalizeLevels();
+        RefreshVisibleNodes();
+        ToolSummaryTextBlock.Text = "节点顺序已调整。";
+    }
+
+    private static bool IsTextInputElement(DependencyObject source)
+    {
+        DependencyObject? current = source;
+        while (current is not null)
+        {
+            if (current is TextBox or ComboBox)
+            {
+                return true;
+            }
+
+            current = LogicalTreeHelper.GetParent(current) ?? System.Windows.Media.VisualTreeHelper.GetParent(current);
+        }
+
+        return false;
     }
 
     private static string FormatTypeName(string type)

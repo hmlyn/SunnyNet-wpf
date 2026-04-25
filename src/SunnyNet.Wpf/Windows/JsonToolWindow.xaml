@@ -207,7 +207,12 @@
                                      BorderThickness="0"
                                      Background="White"
                                      ItemContainerStyle="{StaticResource JsonNodeRowStyle}"
+                                     AllowDrop="True"
                                      SelectionChanged="JsonNodeListBox_SelectionChanged"
+                                     DragEnter="JsonNodeListBox_DragOver"
+                                     DragOver="JsonNodeListBox_DragOver"
+                                     DragLeave="JsonNodeListBox_DragLeave"
+                                     Drop="JsonNodeListBox_Drop"
                                      VirtualizingPanel.IsVirtualizing="False"
                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                 <ListBox.ItemsPanel>
@@ -217,17 +222,51 @@
                                 </ListBox.ItemsPanel>
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
-                                        <Grid MinHeight="30" Margin="0">
+                                        <Grid MinHeight="30" Margin="0"
+                                              AllowDrop="True"
+                                              PreviewMouseLeftButtonDown="JsonNodeRow_PreviewMouseLeftButtonDown"
+                                              PreviewMouseMove="JsonNodeRow_PreviewMouseMove"
+                                              DragEnter="JsonNodeRow_DragOver"
+                                              DragOver="JsonNodeRow_DragOver"
+                                              DragLeave="JsonNodeRow_DragLeave"
+                                              Drop="JsonNodeRow_Drop">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="214" />
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="156" />
                                             </Grid.ColumnDefinitions>
 
+                                            <Border Height="2" Margin="4,0" VerticalAlignment="Top" Background="#1E78FF" Panel.ZIndex="3">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding ShowDropBefore}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                            </Border>
+
+                                            <Border Height="2" Margin="4,0" VerticalAlignment="Bottom" Background="#1E78FF" Panel.ZIndex="3">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding ShowDropAfter}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                            </Border>
+
                                             <Grid Grid.Column="0">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto" />
                                                     <ColumnDefinition Width="20" />
+                                                    <ColumnDefinition Width="16" />
                                                     <ColumnDefinition Width="*" />
                                                 </Grid.ColumnDefinitions>
                                                 <Grid Width="{Binding Indent}" MinWidth="0">
@@ -264,7 +303,8 @@
                                                         </Path>
                                                     </Button>
                                                 </Grid>
-                                                <TextBox Grid.Column="2" Style="{StaticResource JsonEditorTextBoxStyle}" Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" LostFocus="JsonNodeChanged" />
+                                                <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="#9AAABD" Cursor="SizeAll" Text="⋮" ToolTip="拖动调整同级顺序" />
+                                                <TextBox Grid.Column="3" Style="{StaticResource JsonEditorTextBoxStyle}" Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" LostFocus="JsonNodeChanged" />
                                             </Grid>
 
                                             <TextBox Grid.Column="1" Style="{StaticResource JsonEditorTextBoxStyle}" Foreground="{Binding ValueBrush}" Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" GotKeyboardFocus="JsonValueTextBox_GotKeyboardFocus" LostFocus="JsonNodeChanged" KeyDown="JsonValueTextBox_KeyDown" />

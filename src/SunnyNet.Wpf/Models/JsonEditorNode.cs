@@ -13,6 +13,8 @@ public sealed class JsonEditorNode : INotifyPropertyChanged
     private bool _isSelected;
     private double _indent;
     private bool _canToggle;
+    private bool _showDropBefore;
+    private bool _showDropAfter;
 
     public JsonEditorNode(string name, string type, string value = "")
     {
@@ -84,6 +86,18 @@ public sealed class JsonEditorNode : INotifyPropertyChanged
     {
         get => _canToggle;
         set => SetField(ref _canToggle, value);
+    }
+
+    public bool ShowDropBefore
+    {
+        get => _showDropBefore;
+        set => SetField(ref _showDropBefore, value);
+    }
+
+    public bool ShowDropAfter
+    {
+        get => _showDropAfter;
+        set => SetField(ref _showDropAfter, value);
     }
 
     public string TypeBadge => Type switch
