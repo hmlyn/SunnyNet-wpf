@@ -67,7 +67,7 @@ public partial class SettingsWindow : Window
 
         (string title, string subtitle) = sectionKey switch
         {
-            "Mcp" => ("MCP 集成", "固定使用程序目录下的 mcp 桥接目录，并生成 Cursor / Claude / Codex 可用的配置片段。"),
+            "Mcp" => ("MCP 集成", "内置本机 MCP 服务与客户端配置。"),
             "Ssl" => ("SSL 证书", "配置默认证书或自定义 CA / KEY 文件。"),
             "MustTcp" => ("强制走 TCP", "通过规则控制指定流量强制转为 TCP。"),
             "Proxy" => ("上游网关", "设置上游代理地址以及命中规则。"),

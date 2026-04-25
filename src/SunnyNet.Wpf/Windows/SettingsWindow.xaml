@@ -249,6 +249,29 @@
             <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
         </Style>
 
+        <Style x:Key="SettingsInfoChipBorderStyle" TargetType="{x:Type Border}">
+            <Setter Property="Background" Value="#F8FBFF" />
+            <Setter Property="BorderBrush" Value="#E4EBF5" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="Margin" Value="0,0,8,8" />
+            <Setter Property="MinWidth" Value="156" />
+        </Style>
+
+        <Style x:Key="SettingsInfoChipLabelTextStyle" TargetType="{x:Type TextBlock}">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+        </Style>
+
+        <Style x:Key="SettingsInfoChipValueTextStyle" TargetType="{x:Type TextBlock}">
+            <Setter Property="Margin" Value="0,2,0,0" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+
         <Style x:Key="SettingsDataGridStyle" TargetType="{x:Type DataGrid}" BasedOn="{StaticResource {x:Type DataGrid}}">
             <Setter Property="AutoGenerateColumns" Value="False" />
             <Setter Property="CanUserAddRows" Value="False" />
@@ -583,20 +606,14 @@
                         </StackPanel>
 
                         <StackPanel x:Name="McpSectionPanel" Visibility="Collapsed">
-                            <TextBlock Style="{StaticResource SettingsGroupTitleTextStyle}" Text="服务状态" />
-                            <TextBlock Margin="0,6,0,0"
-                                       Style="{StaticResource SettingsPageHintTextStyle}"
-                                       Text="内置 MCP 固定监听本机地址；桥接程序固定读取当前程序目录下的 `mcp\sunnynet-mcp.exe`。" />
-
-                            <Border Margin="0,16,0,0"
-                                    Style="{StaticResource SettingsSubtlePanelStyle}">
+                            <Border Style="{StaticResource SettingsSubtlePanelStyle}">
                                 <StackPanel>
                                     <DockPanel LastChildFill="False">
                                         <StackPanel>
-                                            <TextBlock Style="{StaticResource SettingsGroupTitleTextStyle}" Text="启动 MCP 服务" />
+                                            <TextBlock Style="{StaticResource SettingsGroupTitleTextStyle}" Text="MCP 服务" />
                                             <TextBlock Margin="0,4,0,0"
                                                        Style="{StaticResource SettingsPageHintTextStyle}"
-                                                       Text="默认不自动启动，需要时再手动开启。" />
+                                                       Text="固定使用程序目录下的 `mcp\sunnynet-mcp.exe` 桥接，并提供 Cursor / Claude / Codex 配置片段。" />
                                         </StackPanel>
                                         <ToggleButton DockPanel.Dock="Right"
                                                       VerticalAlignment="Center"
@@ -604,108 +621,98 @@
                                                       IsChecked="{Binding Mcp.Enabled, Mode=TwoWay}" />
                                     </DockPanel>
 
-                                    <Grid Margin="0,16,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="92" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                        </Grid.RowDefinitions>
+                                    <WrapPanel Margin="0,12,0,0">
+                                        <Border Style="{StaticResource SettingsInfoChipBorderStyle}">
+                                            <StackPanel>
+                                                <TextBlock Style="{StaticResource SettingsInfoChipLabelTextStyle}" Text="服务状态" />
+                                                <TextBlock Style="{StaticResource SettingsInfoChipValueTextStyle}"
+                                                           Text="{Binding Mcp.ServerStatusText}" />
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Style="{StaticResource SettingsInfoChipBorderStyle}">
+                                            <StackPanel>
+                                                <TextBlock Style="{StaticResource SettingsInfoChipLabelTextStyle}" Text="桥接状态" />
+                                                <TextBlock Style="{StaticResource SettingsInfoChipValueTextStyle}"
+                                                           Text="{Binding Mcp.BridgeStatusText}" />
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Style="{StaticResource SettingsInfoChipBorderStyle}">
+                                            <StackPanel>
+                                                <TextBlock Style="{StaticResource SettingsInfoChipLabelTextStyle}" Text="工具数" />
+                                                <TextBlock Style="{StaticResource SettingsInfoChipValueTextStyle}"
+                                                           Text="{Binding Mcp.ToolCount}" />
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Style="{StaticResource SettingsInfoChipBorderStyle}">
+                                            <StackPanel>
+                                                <TextBlock Style="{StaticResource SettingsInfoChipLabelTextStyle}" Text="刷新时间" />
+                                                <TextBlock Style="{StaticResource SettingsInfoChipValueTextStyle}"
+                                                           Text="{Binding Mcp.LastCheckedText}" />
+                                            </StackPanel>
+                                        </Border>
+                                    </WrapPanel>
 
-                                        <TextBlock Style="{StaticResource SettingsMetaLabelTextStyle}" Text="服务状态" />
-                                        <TextBlock Grid.Column="1"
-                                                   Style="{StaticResource SettingsMetaValueTextStyle}"
-                                                   Text="{Binding Mcp.ServerStatusText}" />
+                                    <Border Margin="0,4,0,0"
+                                            Background="#F8FBFF"
+                                            BorderBrush="#E4EBF5"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Padding="10,8">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="60" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Style="{StaticResource SettingsMetaLabelTextStyle}" Text="入口" />
+                                            <TextBlock Grid.Column="1"
+                                                       Style="{StaticResource SettingsMetaValueTextStyle}"
+                                                       Text="{Binding Mcp.EndpointUrl}" />
+                                        </Grid>
+                                    </Border>
 
-                                        <TextBlock Grid.Row="1"
-                                                   Style="{StaticResource SettingsMetaLabelTextStyle}"
-                                                   Text="桥接状态" />
-                                        <TextBlock Grid.Row="1"
-                                                   Grid.Column="1"
-                                                   Style="{StaticResource SettingsMetaValueTextStyle}"
-                                                   Text="{Binding Mcp.BridgeStatusText}" />
-
-                                        <TextBlock Grid.Row="2"
-                                                   Style="{StaticResource SettingsMetaLabelTextStyle}"
-                                                   Text="本地入口" />
-                                        <TextBlock Grid.Row="2"
-                                                   Grid.Column="1"
-                                                   Style="{StaticResource SettingsMetaValueTextStyle}"
-                                                   Text="{Binding Mcp.EndpointUrl}" />
-
-                                        <TextBlock Grid.Row="3"
-                                                   Style="{StaticResource SettingsMetaLabelTextStyle}"
-                                                   Text="桥接路径" />
-                                        <TextBlock Grid.Row="3"
-                                                   Grid.Column="1"
-                                                   Style="{StaticResource SettingsMetaValueTextStyle}"
-                                                   TextWrapping="Wrap"
-                                                   Text="{Binding Mcp.BridgeExecutablePath}" />
-
-                                        <TextBlock Grid.Row="4"
-                                                   Style="{StaticResource SettingsMetaLabelTextStyle}"
-                                                   Text="工具数" />
-                                        <TextBlock Grid.Row="4"
-                                                   Grid.Column="1"
-                                                   Style="{StaticResource SettingsMetaValueTextStyle}"
-                                                   Text="{Binding Mcp.ToolCount}" />
-
-                                        <TextBlock Grid.Row="5"
-                                                   Style="{StaticResource SettingsMetaLabelTextStyle}"
-                                                   Text="刷新时间" />
-                                        <TextBlock Grid.Row="5"
-                                                   Grid.Column="1"
-                                                   Style="{StaticResource SettingsMetaValueTextStyle}"
-                                                   Text="{Binding Mcp.LastCheckedText}" />
-                                    </Grid>
-
-                                    <StackPanel Margin="0,16,0,0" Orientation="Horizontal">
-                                        <Button Margin="0,0,10,0"
+                                    <DockPanel Margin="0,12,0,0" LastChildFill="False">
+                                        <Button DockPanel.Dock="Right"
                                                 Style="{StaticResource SettingsSmallActionButtonStyle}"
                                                 Click="RefreshMcp_Click"
                                                 Content="刷新状态" />
-                                        <Button Style="{StaticResource SettingsPrimaryActionButtonStyle}"
+                                    </DockPanel>
+
+                                    <Grid Margin="0,12,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="60" />
+                                            <ColumnDefinition Width="210" />
+                                            <ColumnDefinition Width="10" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock VerticalAlignment="Center"
+                                                   Style="{StaticResource SettingsMetaLabelTextStyle}"
+                                                   Text="客户端" />
+                                        <ComboBox Grid.Column="1"
+                                                  HorizontalAlignment="Left"
+                                                  Width="190"
+                                                  ItemsSource="{StaticResource McpClientItems}"
+                                                  SelectedItem="{Binding Mcp.ClientKind, Mode=TwoWay}"
+                                                  Style="{StaticResource SettingsCompactComboBoxStyle}" />
+                                        <Button Grid.Column="3"
+                                                Style="{StaticResource SettingsPrimaryActionButtonStyle}"
                                                 Click="CopyMcpConfig_Click"
-                                                Content="复制客户端配置" />
-                                    </StackPanel>
+                                                Content="复制配置" />
+                                    </Grid>
+
+                                    <TextBlock Margin="0,8,0,0"
+                                               Style="{StaticResource SettingsPageHintTextStyle}"
+                                               Text="{Binding Mcp.ClientConfigHintText}" />
+                                    <TextBox Height="132"
+                                             Margin="0,8,0,0"
+                                             Style="{StaticResource SettingsReadOnlyMonospaceTextBoxStyle}"
+                                             Text="{Binding Mcp.ClientConfigText, Mode=OneWay}" />
+                                    <TextBlock Margin="0,8,0,0"
+                                               Style="{StaticResource SettingsPageHintTextStyle}"
+                                               Foreground="#C3602C"
+                                               Text="{Binding Mcp.LastError}" />
                                 </StackPanel>
                             </Border>
-
-                            <Border Style="{StaticResource SettingsSectionDividerStyle}" />
-
-                            <TextBlock Margin="0,14,0,0" Style="{StaticResource SettingsGroupTitleTextStyle}" Text="客户端配置片段" />
-                            <Grid Margin="0,10,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="72" />
-                                    <ColumnDefinition Width="220" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock VerticalAlignment="Center"
-                                           Style="{StaticResource SettingsFieldLabelTextStyle}"
-                                           Text="客户端" />
-                                <ComboBox Grid.Column="1"
-                                          HorizontalAlignment="Left"
-                                          ItemsSource="{StaticResource McpClientItems}"
-                                          SelectedItem="{Binding Mcp.ClientKind, Mode=TwoWay}"
-                                          Style="{StaticResource SettingsCompactComboBoxStyle}" />
-                            </Grid>
-                            <TextBlock Margin="0,8,0,0"
-                                       Style="{StaticResource SettingsPageHintTextStyle}"
-                                       Text="{Binding Mcp.ClientConfigHintText}" />
-                            <TextBox Height="180"
-                                     Margin="0,12,0,0"
-                                     Style="{StaticResource SettingsReadOnlyMonospaceTextBoxStyle}"
-                                     Text="{Binding Mcp.ClientConfigText, Mode=OneWay}" />
-                            <TextBlock Margin="0,12,0,0"
-                                       Style="{StaticResource SettingsPageHintTextStyle}"
-                                       Foreground="#C3602C"
-                                       Text="{Binding Mcp.LastError}" />
                         </StackPanel>
 
                         <StackPanel x:Name="SslSectionPanel" Visibility="Collapsed">
