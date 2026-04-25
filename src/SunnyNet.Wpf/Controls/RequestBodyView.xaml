@@ -9,7 +9,7 @@
         </Grid.RowDefinitions>
 
         <Border x:Name="ModeBar"
-                Margin="0,0,0,8"
+                Margin="0,0,0,6"
                 Padding="2"
                 HorizontalAlignment="Left"
                 Background="{StaticResource SurfaceAltBrush}"

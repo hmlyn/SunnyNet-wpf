@@ -7,19 +7,19 @@
             <Setter Property="Background" Value="#F8FAFD" />
             <Setter Property="BorderBrush" Value="#E7ECF3" />
             <Setter Property="BorderThickness" Value="0,0,0,1" />
-            <Setter Property="Padding" Value="12,8" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="FontSize" Value="11.5" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
 
         <Style x:Key="NameValueRowStyle" TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
-            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="MinHeight" Value="30" />
             <Setter Property="BorderThickness" Value="0,0,0,1" />
             <Setter Property="BorderBrush" Value="#EEF2F7" />
         </Style>
 
         <Style x:Key="NameValueCellStyle" TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
-            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="Padding" Value="7,3" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="Background" Value="Transparent" />
         </Style>
@@ -34,13 +34,13 @@
         <Style x:Key="ValueBodyTextStyle" TargetType="TextBlock" BasedOn="{StaticResource DetailValueCellTextStyle}">
             <Setter Property="Margin" Value="0" />
             <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
-            <Setter Property="LineHeight" Value="16" />
+            <Setter Property="LineHeight" Value="15" />
         </Style>
 
         <Style x:Key="ExtraBodyTextStyle" TargetType="TextBlock" BasedOn="{StaticResource DetailExtraCellTextStyle}">
             <Setter Property="Margin" Value="0" />
             <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
-            <Setter Property="LineHeight" Value="16" />
+            <Setter Property="LineHeight" Value="15" />
         </Style>
     </UserControl.Resources>
 
@@ -51,7 +51,7 @@
             SnapsToDevicePixels="True">
         <Grid>
             <DataGrid x:Name="RowsGrid"
-                      Margin="8"
+                      Margin="6"
                       ItemsSource="{Binding Rows, RelativeSource={RelativeSource AncestorType=controls:NameValueTableControl}}"
                       AutoGenerateColumns="False"
                       Background="Transparent"
@@ -72,12 +72,12 @@
                     <DataGridTemplateColumn Header="名称" Width="176" MinWidth="118">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <Grid Margin="0,1,8,1"
+                                <Grid Margin="0,1,6,1"
                                       HorizontalAlignment="Left"
                                       VerticalAlignment="Center">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="3" />
-                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="7" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <Border Grid.Column="0"
@@ -129,7 +129,7 @@
             </DataGrid>
 
             <Border x:Name="EmptyPanel"
-                    Margin="8"
+                    Margin="6"
                     Background="#F8FAFD"
                     CornerRadius="8"
                     IsHitTestVisible="False">

@@ -5,8 +5,8 @@
         xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="SunnyNet"
-        Width="1540"
-        Height="860"
+        Width="1460"
+        Height="820"
         MinWidth="980"
         MinHeight="620"
         WindowStyle="None"
@@ -17,6 +17,53 @@
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="0" ResizeBorderThickness="8" CornerRadius="0" GlassFrameThickness="0" />
     </shell:WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <Style x:Key="DetailSectionTitleTextStyle" TargetType="{x:Type TextBlock}" BasedOn="{StaticResource SectionTitleTextStyle}">
+            <Setter Property="FontSize" Value="14" />
+        </Style>
+
+        <Style x:Key="DetailHeaderIconButtonStyle" TargetType="{x:Type Button}" BasedOn="{StaticResource HeaderIconButtonStyle}">
+            <Setter Property="MinWidth" Value="28" />
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="Padding" Value="6,4" />
+        </Style>
+
+        <Style x:Key="DetailBadgeBorderStyle" TargetType="{x:Type Border}" BasedOn="{StaticResource BadgeBorderStyle}">
+            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="Margin" Value="8,0,0,0" />
+            <Setter Property="CornerRadius" Value="7" />
+        </Style>
+
+        <Style x:Key="DetailBreakpointButtonStyle" TargetType="{x:Type Button}" BasedOn="{StaticResource BreakpointButtonStyle}">
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="FontSize" Value="11.5" />
+        </Style>
+
+        <Style x:Key="DetailBreakpointWarningButtonStyle" TargetType="{x:Type Button}" BasedOn="{StaticResource DetailBreakpointButtonStyle}">
+            <Setter Property="Foreground" Value="{StaticResource WarningBrush}" />
+            <Setter Property="Background" Value="{StaticResource WarningSoftBrush}" />
+            <Setter Property="BorderBrush" Value="#F3D7A6" />
+        </Style>
+
+        <Style x:Key="DetailBreakpointSuccessButtonStyle" TargetType="{x:Type Button}" BasedOn="{StaticResource DetailBreakpointButtonStyle}">
+            <Setter Property="Foreground" Value="{StaticResource SuccessBrush}" />
+            <Setter Property="Background" Value="{StaticResource SuccessSoftBrush}" />
+            <Setter Property="BorderBrush" Value="#BDE2CB" />
+        </Style>
+
+        <Style x:Key="DetailBreakpointDangerButtonStyle" TargetType="{x:Type Button}" BasedOn="{StaticResource DetailBreakpointButtonStyle}">
+            <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+            <Setter Property="Background" Value="{StaticResource DangerSoftBrush}" />
+            <Setter Property="BorderBrush" Value="#F4C3C6" />
+        </Style>
+
+        <Style x:Key="DetailTabItemStyle" TargetType="{x:Type TabItem}" BasedOn="{StaticResource {x:Type TabItem}}">
+            <Setter Property="Padding" Value="11,5" />
+            <Setter Property="Margin" Value="0,0,3,0" />
+            <Setter Property="MinHeight" Value="30" />
+        </Style>
+    </Window.Resources>
 
     <Border Margin="0"
             Background="{StaticResource WindowBackgroundBrush}"
@@ -779,7 +826,7 @@
                         <Grid x:Name="RequestResponseGrid">
                             <Grid.RowDefinitions>
                                 <RowDefinition x:Name="RequestPanelRow" Height="*" />
-                                <RowDefinition x:Name="DetailSplitterRow" Height="10" />
+                                <RowDefinition x:Name="DetailSplitterRow" Height="8" />
                                 <RowDefinition x:Name="ResponsePanelRow" Height="*" />
                             </Grid.RowDefinitions>
 
@@ -788,7 +835,7 @@
                                     Style="{StaticResource PanelSectionBorderStyle}">
                                 <Grid>
                                     <Grid.RowDefinitions>
-                                        <RowDefinition Height="42" />
+                                        <RowDefinition Height="36" />
                                         <RowDefinition Height="*" />
                                     </Grid.RowDefinitions>
 
@@ -797,15 +844,15 @@
                                             BorderBrush="{StaticResource DividerBrush}"
                                             BorderThickness="0,0,0,1"
                                             CornerRadius="8,8,0,0">
-                                        <DockPanel Margin="14,0" LastChildFill="False">
+                                        <DockPanel Margin="10,0" LastChildFill="False">
                                             <Button DockPanel.Dock="Right"
-                                                    Style="{StaticResource HeaderIconButtonStyle}"
+                                                    Style="{StaticResource DetailHeaderIconButtonStyle}"
                                                     Click="RequestZoom_Click"
                                                     ToolTip="放大/还原请求区域">
                                                 <TextBlock x:Name="RequestZoomGlyph" Style="{StaticResource GlyphTextStyle}" Text="&#xE740;" />
                                             </Button>
-                                            <TextBlock VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="请求内容" />
-                                            <Border DockPanel.Dock="Right" Style="{StaticResource BadgeBorderStyle}">
+                                            <TextBlock VerticalAlignment="Center" Style="{StaticResource DetailSectionTitleTextStyle}" Text="请求内容" />
+                                            <Border DockPanel.Dock="Right" Style="{StaticResource DetailBadgeBorderStyle}">
                                                 <TextBlock Text="{Binding Detail.RequestMethod}" />
                                             </Border>
                                         </DockPanel>
@@ -826,7 +873,8 @@
                                         </TextBlock>
 
                                         <TabControl x:Name="RequestTabControl"
-                                                    Margin="10,6,10,10"
+                                                    Margin="8,4,8,8"
+                                                    ItemContainerStyle="{StaticResource DetailTabItemStyle}"
                                                     SelectionChanged="RequestTabControl_SelectionChanged">
                                             <TabControl.Style>
                                                 <Style TargetType="TabControl" BasedOn="{StaticResource {x:Type TabControl}}">
@@ -855,7 +903,7 @@
                                                     <TextBox AcceptsReturn="True"
                                                              AcceptsTab="True"
                                                              FontFamily="Consolas, Microsoft YaHei UI"
-                                                             FontSize="12"
+                                                             FontSize="11.5"
                                                              HorizontalScrollBarVisibility="Auto"
                                                              Text="{Binding Detail.EditableRequestRaw, UpdateSourceTrigger=PropertyChanged}"
                                                              TextWrapping="NoWrap"
@@ -863,7 +911,7 @@
                                                         <TextBox.Style>
                                                             <Style TargetType="{x:Type TextBox}" BasedOn="{StaticResource {x:Type TextBox}}">
                                                                 <Setter Property="Visibility" Value="Collapsed" />
-                                                                <Setter Property="Padding" Value="12" />
+                                                                <Setter Property="Padding" Value="10" />
                                                                 <Setter Property="BorderThickness" Value="0" />
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding Detail.IsRequestInlineEditing}" Value="True">
@@ -925,7 +973,7 @@
 
                             <GridSplitter x:Name="RequestResponseSplitter"
                                           Grid.Row="1"
-                                          Height="10"
+                                          Height="8"
                                           HorizontalAlignment="Stretch"
                                           ResizeDirection="Rows"
                                           ResizeBehavior="PreviousAndNext"
@@ -936,7 +984,7 @@
                                     Style="{StaticResource PanelSectionBorderStyle}">
                                 <Grid>
                                     <Grid.RowDefinitions>
-                                        <RowDefinition Height="46" />
+                                        <RowDefinition Height="38" />
                                         <RowDefinition Height="*" />
                                     </Grid.RowDefinitions>
 
@@ -945,9 +993,9 @@
                                             BorderBrush="{StaticResource DividerBrush}"
                                             BorderThickness="0,0,0,1"
                                             CornerRadius="8,8,0,0">
-                                        <DockPanel Margin="14,0" LastChildFill="False">
+                                        <DockPanel Margin="10,0" LastChildFill="False">
                                             <Button DockPanel.Dock="Right"
-                                                    Style="{StaticResource HeaderIconButtonStyle}"
+                                                    Style="{StaticResource DetailHeaderIconButtonStyle}"
                                                     Click="ResponseZoom_Click"
                                                     ToolTip="放大/还原响应区域">
                                                 <TextBlock x:Name="ResponseZoomGlyph" Style="{StaticResource GlyphTextStyle}" Text="&#xE740;" />
@@ -957,20 +1005,20 @@
                                                         VerticalAlignment="Center"
                                                         Visibility="{Binding IsSelectedSessionIntercepted, Converter={StaticResource BooleanToVisibilityConverter}}">
                                                 <Button Margin="0,0,8,0"
-                                                        Style="{StaticResource BreakpointWarningButtonStyle}"
+                                                        Style="{StaticResource DetailBreakpointWarningButtonStyle}"
                                                         Command="{Binding ResendSelectedCommand}"
                                                         Content="放行当前" />
                                                 <Button Margin="0,0,8,0"
-                                                        Style="{StaticResource BreakpointSuccessButtonStyle}"
+                                                        Style="{StaticResource DetailBreakpointSuccessButtonStyle}"
                                                         Command="{Binding ReleaseCurrentCommand}"
                                                         Content="运行到结束" />
-                                                <Button Style="{StaticResource BreakpointDangerButtonStyle}"
+                                                <Button Style="{StaticResource DetailBreakpointDangerButtonStyle}"
                                                         Command="{Binding CloseSessionCommand}"
                                                         Content="断开连接" />
                                             </StackPanel>
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="响应内容" />
-                                                <Border Style="{StaticResource BadgeBorderStyle}">
+                                                <TextBlock Style="{StaticResource DetailSectionTitleTextStyle}" Text="响应内容" />
+                                                <Border Style="{StaticResource DetailBadgeBorderStyle}">
                                                     <TextBlock Text="{Binding Detail.ResponseStateCode}" />
                                                 </Border>
                                             </StackPanel>
@@ -996,7 +1044,8 @@
                                         </TextBlock>
 
                                         <TabControl x:Name="ResponseTabControl"
-                                                    Margin="10,6,10,10">
+                                                    Margin="8,4,8,8"
+                                                    ItemContainerStyle="{StaticResource DetailTabItemStyle}">
                                             <TabControl.Style>
                                                 <Style TargetType="TabControl" BasedOn="{StaticResource {x:Type TabControl}}">
                                                     <Setter Property="Visibility" Value="Visible" />
@@ -1024,7 +1073,7 @@
                                                     <TextBox AcceptsReturn="True"
                                                              AcceptsTab="True"
                                                              FontFamily="Consolas, Microsoft YaHei UI"
-                                                             FontSize="12"
+                                                             FontSize="11.5"
                                                              HorizontalScrollBarVisibility="Auto"
                                                              Text="{Binding Detail.EditableResponseRaw, UpdateSourceTrigger=PropertyChanged}"
                                                              TextWrapping="NoWrap"
@@ -1032,7 +1081,7 @@
                                                         <TextBox.Style>
                                                             <Style TargetType="{x:Type TextBox}" BasedOn="{StaticResource {x:Type TextBox}}">
                                                                 <Setter Property="Visibility" Value="Collapsed" />
-                                                                <Setter Property="Padding" Value="12" />
+                                                                <Setter Property="Padding" Value="10" />
                                                                 <Setter Property="BorderThickness" Value="0" />
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding Detail.IsResponseInlineEditing}" Value="True">

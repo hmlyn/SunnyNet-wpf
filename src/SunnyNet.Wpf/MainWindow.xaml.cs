@@ -658,13 +658,36 @@ public partial class MainWindow : Window
 
     private void ApplySavedWindowLayout()
     {
-        Rect workArea = SystemParameters.WorkArea;
-        double width = IsValidLength(_layoutSettings.WindowWidth)
-            ? _layoutSettings.WindowWidth
-            : Width;
-        double height = IsValidLength(_layoutSettings.WindowHeight)
-            ? _layoutSettings.WindowHeight
-            : Height;
+        Rect workArea = ResolveTargetWorkArea(
+            _layoutSettings.WindowLeft,
+            _layoutSettings.WindowTop,
+            _layoutSettings.WindowWidth,
+            _layoutSettings.WindowHeight);
+
+        (double defaultWidth, double defaultHeight) = GetAdaptiveDefaultWindowSize(workArea);
+        bool hasSavedSize = IsValidLength(_layoutSettings.WindowWidth) && IsValidLength(_layoutSettings.WindowHeight);
+
+        double width = hasSavedSize ? _layoutSettings.WindowWidth : defaultWidth;
+        double height = hasSavedSize ? _layoutSettings.WindowHeight : defaultHeight;
+
+        bool hasStoredWorkArea = IsValidLength(_layoutSettings.WindowWorkAreaWidth) && IsValidLength(_layoutSettings.WindowWorkAreaHeight);
+        if (hasSavedSize && hasStoredWorkArea)
+        {
+            double scaleX = workArea.Width / _layoutSettings.WindowWorkAreaWidth;
+            double scaleY = workArea.Height / _layoutSettings.WindowWorkAreaHeight;
+            double scale = Math.Min(1d, Math.Min(scaleX, scaleY));
+            if (scale < 0.985)
+            {
+                width *= scale;
+                height *= scale;
+            }
+        }
+        else if (hasSavedSize && !_layoutSettings.IsWindowMaximized
+            && (width > workArea.Width * 0.88 || height > workArea.Height * 0.88))
+        {
+            width = Math.Min(width, defaultWidth);
+            height = Math.Min(height, defaultHeight);
+        }
 
         width = Clamp(width, MinWidth, Math.Max(MinWidth, workArea.Width));
         height = Clamp(height, MinHeight, Math.Max(MinHeight, workArea.Height));
@@ -735,10 +758,17 @@ public partial class MainWindow : Window
         CaptureInternalLayoutSettings();
 
         Rect bounds = WindowState == WindowState.Normal ? new Rect(Left, Top, Width, Height) : RestoreBounds;
+        Rect workArea = ResolveTargetWorkArea(bounds.Left, bounds.Top, bounds.Width, bounds.Height);
         if (IsValidSize(bounds.Width, bounds.Height))
         {
             _layoutSettings.WindowWidth = bounds.Width;
             _layoutSettings.WindowHeight = bounds.Height;
+        }
+
+        if (IsValidSize(workArea.Width, workArea.Height))
+        {
+            _layoutSettings.WindowWorkAreaWidth = workArea.Width;
+            _layoutSettings.WindowWorkAreaHeight = workArea.Height;
         }
 
         if (IsValidPosition(bounds.Left, bounds.Top, bounds.Width, bounds.Height))
@@ -974,7 +1004,7 @@ public partial class MainWindow : Window
 
     private static bool IsValidPosition(double left, double top, double width, double height)
     {
-        if (double.IsNaN(left) || double.IsInfinity(left) || double.IsNaN(top) || double.IsInfinity(top))
+        if (!IsFiniteCoordinate(left) || !IsFiniteCoordinate(top))
         {
             return false;
         }
@@ -985,6 +1015,58 @@ public partial class MainWindow : Window
             && top + visibleHeight >= SystemParameters.VirtualScreenTop
             && left <= SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth - visibleWidth
             && top <= SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight - visibleHeight;
+    }
+
+    private (double Width, double Height) GetAdaptiveDefaultWindowSize(Rect workArea)
+    {
+        double preferredWidth = Math.Min(1460, Math.Floor(workArea.Width * 0.8));
+        double preferredHeight = Math.Min(820, Math.Floor(workArea.Height * 0.8));
+        double width = Clamp(preferredWidth, MinWidth, Math.Max(MinWidth, workArea.Width));
+        double height = Clamp(preferredHeight, MinHeight, Math.Max(MinHeight, workArea.Height));
+        return (width, height);
+    }
+
+    private static bool IsFiniteCoordinate(double value)
+    {
+        return !double.IsNaN(value) && !double.IsInfinity(value);
+    }
+
+    private static Rect ResolveTargetWorkArea(double left, double top, double width, double height)
+    {
+        if (!IsValidLength(width) || !IsValidLength(height))
+        {
+            return SystemParameters.WorkArea;
+        }
+
+        RectInt rect = new()
+        {
+            Left = (int)Math.Round(IsFiniteCoordinate(left) ? left : SystemParameters.WorkArea.Left),
+            Top = (int)Math.Round(IsFiniteCoordinate(top) ? top : SystemParameters.WorkArea.Top),
+            Right = (int)Math.Round((IsFiniteCoordinate(left) ? left : SystemParameters.WorkArea.Left) + width),
+            Bottom = (int)Math.Round((IsFiniteCoordinate(top) ? top : SystemParameters.WorkArea.Top) + height)
+        };
+
+        IntPtr monitor = MonitorFromRect(ref rect, MonitorDefaultToNearest);
+        if (monitor == IntPtr.Zero)
+        {
+            return SystemParameters.WorkArea;
+        }
+
+        MonitorInfo monitorInfo = new()
+        {
+            CbSize = Marshal.SizeOf<MonitorInfo>()
+        };
+        if (!GetMonitorInfo(monitor, ref monitorInfo))
+        {
+            return SystemParameters.WorkArea;
+        }
+
+        RectInt workArea = monitorInfo.RcWork;
+        return new Rect(
+            workArea.Left,
+            workArea.Top,
+            Math.Max(0, workArea.Right - workArea.Left),
+            Math.Max(0, workArea.Bottom - workArea.Top));
     }
 
     private void ColumnCheckChanged(object sender, RoutedEventArgs routedEventArgs)
@@ -1731,6 +1813,9 @@ public partial class MainWindow : Window
 
     [DllImport("user32.dll")]
     private static extern IntPtr MonitorFromWindow(IntPtr hwnd, int flags);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromRect(ref RectInt rect, int flags);
 
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo monitorInfo);
