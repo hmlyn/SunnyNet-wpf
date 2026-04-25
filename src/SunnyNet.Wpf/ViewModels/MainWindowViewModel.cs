@@ -437,6 +437,66 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         StatusRight = "断开会话请求已提交";
     }
 
+    public CaptureEntry[] GetMcpSessionsSnapshot()
+    {
+        return Sessions.ToArray();
+    }
+
+    public CaptureEntry? FindMcpSession(int theology)
+    {
+        return Sessions.FirstOrDefault(entry => entry.Theology == theology || entry.Index == theology);
+    }
+
+    public async Task<SessionDetail> LoadMcpSessionDetailAsync(int theology)
+    {
+        CaptureEntry? entry = FindMcpSession(theology);
+        if (entry is null)
+        {
+            throw new InvalidOperationException($"未找到会话：{theology}");
+        }
+
+        SelectedSession = entry;
+        await LoadSelectedSessionAsync();
+        return Detail;
+    }
+
+    public async Task DeleteMcpSessionAsync(int theology)
+    {
+        CaptureEntry? entry = FindMcpSession(theology);
+        if (entry is not null)
+        {
+            await DeleteSessionsAsync(new[] { entry });
+        }
+    }
+
+    public async Task ResendMcpSessionAsync(int theology, int mode)
+    {
+        CaptureEntry? entry = FindMcpSession(theology);
+        if (entry is not null)
+        {
+            await ResendSessionEntriesAsync(new[] { entry }, mode);
+        }
+    }
+
+    public async Task CloseMcpSessionAsync(int theology)
+    {
+        CaptureEntry? entry = FindMcpSession(theology);
+        if (entry is not null)
+        {
+            await CloseSessionEntriesAsync(new[] { entry });
+        }
+    }
+
+    public async Task ClearMcpSessionsAsync()
+    {
+        await ClearAllAsync();
+    }
+
+    public async Task ReleaseMcpAllAsync()
+    {
+        await ReleaseAllAsync();
+    }
+
     private async Task ResendSingleSessionWithInterceptEditorAsync(CaptureEntry entry, int mode)
     {
         TaskCompletionSource<CaptureEntry> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);

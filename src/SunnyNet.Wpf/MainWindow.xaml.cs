@@ -1,4 +1,7 @@
 using System.ComponentModel;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Windows.Threading;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -32,6 +35,7 @@ public partial class MainWindow : Window
     private bool _isCloseCleanupRunning;
     private CaptureEntry? _contextSessionEntry;
     private DispatcherTimer? _columnWidthSaveTimer;
+    private SunnyMcpServer? _mcpServer;
 
     public MainWindow()
     {
@@ -52,7 +56,97 @@ public partial class MainWindow : Window
         _viewModel.PropertyChanged += ViewModel_PropertyChanged;
         _viewModel.Detail.PropertyChanged += Detail_PropertyChanged;
         RegisterSessionColumnWidthListeners();
+        UpdateLanIpPopupItems();
+        StartMcpServer();
         UpdateFooterState();
+    }
+
+    private void StartMcpServer()
+    {
+        try
+        {
+            _mcpServer = new SunnyMcpServer(_viewModel);
+            int port = int.TryParse(Environment.GetEnvironmentVariable("SUNNYNET_MCP_PORT"), out int configuredPort)
+                ? configuredPort
+                : 20256;
+            _mcpServer.Start(port);
+            _viewModel.StatusRight = $"MCP 服务已启动: 127.0.0.1:{_mcpServer.Port}";
+        }
+        catch (Exception exception)
+        {
+            _viewModel.StatusRight = "MCP 服务启动失败";
+            ViewModel_NotificationRequested("MCP 启动失败", exception.Message);
+        }
+    }
+
+    private void UpdateLanIpPopupItems()
+    {
+        string[] addresses = GetLanIPv4Addresses();
+        LanIpItemsControl.ItemsSource = addresses.Length == 0 ? new[] { "未检测到" } : addresses;
+    }
+
+    private void LanIpIconBorder_MouseLeftButtonDown(object sender, MouseButtonEventArgs mouseButtonEventArgs)
+    {
+        ShowLanIpPopup();
+        mouseButtonEventArgs.Handled = true;
+    }
+
+    private void LanIpIconBorder_MouseEnter(object sender, MouseEventArgs mouseEventArgs)
+    {
+        ShowLanIpPopup();
+    }
+
+    private void ShowLanIpPopup()
+    {
+        UpdateLanIpPopupItems();
+        LanIpPopup.IsOpen = true;
+    }
+
+    private void LanIpCopyButton_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not string ip || ip == "未检测到")
+        {
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(ip);
+            _viewModel.StatusRight = $"已复制内网 IP：{ip}";
+            LanIpPopup.IsOpen = false;
+        }
+        catch
+        {
+        }
+    }
+
+    private static string[] GetLanIPv4Addresses()
+    {
+        try
+        {
+            return NetworkInterface.GetAllNetworkInterfaces()
+                .Where(static networkInterface => networkInterface.OperationalStatus == OperationalStatus.Up
+                    && networkInterface.NetworkInterfaceType != NetworkInterfaceType.Loopback
+                    && networkInterface.NetworkInterfaceType != NetworkInterfaceType.Tunnel)
+                .SelectMany(static networkInterface => networkInterface.GetIPProperties().UnicastAddresses)
+                .Where(static address => address.Address.AddressFamily == AddressFamily.InterNetwork && IsLanIPv4(address.Address))
+                .Select(static address => address.Address.ToString())
+                .Distinct()
+                .ToArray();
+        }
+        catch
+        {
+            return Array.Empty<string>();
+        }
+    }
+
+    private static bool IsLanIPv4(IPAddress address)
+    {
+        byte[] bytes = address.GetAddressBytes();
+        return bytes[0] == 10
+            || bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31
+            || bytes[0] == 192 && bytes[1] == 168
+            || bytes[0] == 169 && bytes[1] == 254;
     }
 
     private void MainWindow_SourceInitialized(object? sender, EventArgs eventArgs)
@@ -132,6 +226,10 @@ public partial class MainWindow : Window
         {
             SaveLayoutSettings();
             await _viewModel.DisableSystemProxyOnExitAsync();
+            if (_mcpServer is not null)
+            {
+                await _mcpServer.DisposeAsync();
+            }
             await _viewModel.DisposeAsync();
         }
         finally
