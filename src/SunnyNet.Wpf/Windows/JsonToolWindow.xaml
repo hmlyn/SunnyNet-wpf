@@ -55,6 +55,23 @@
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
 
+        <Style x:Key="JsonValueTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource JsonEditorTextBoxStyle}">
+            <Setter Property="AcceptsReturn" Value="False" />
+            <Setter Property="TextWrapping" Value="NoWrap" />
+            <Setter Property="VerticalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="MaxHeight" Value="30" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsStringValue}" Value="True">
+                    <Setter Property="AcceptsReturn" Value="True" />
+                    <Setter Property="TextWrapping" Value="Wrap" />
+                    <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+                    <Setter Property="MaxHeight" Value="78" />
+                    <Setter Property="VerticalContentAlignment" Value="Top" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="JsonTypeBadgeStyle" TargetType="Border">
             <Setter Property="CornerRadius" Value="9" />
             <Setter Property="Padding" Value="7,2" />
@@ -158,7 +175,7 @@
                         </StackPanel>
                     </DockPanel>
                     <Border Grid.Row="1" Margin="12,0,12,12" BorderBrush="#DDE7F2" BorderThickness="1" CornerRadius="8" Background="White">
-                        <TextBox x:Name="JsonInputTextBox" Margin="10" AcceptsReturn="True" Background="White" BorderThickness="0" Foreground="#1F2D3D" CaretBrush="#1E50C8" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" FontFamily="Consolas, Microsoft YaHei UI" FontSize="13" TextWrapping="NoWrap" />
+                        <TextBox x:Name="JsonInputTextBox" Margin="10" AcceptsReturn="True" Background="White" BorderThickness="0" Foreground="#1F2D3D" CaretBrush="#1E50C8" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" FontFamily="Consolas, Microsoft YaHei UI" FontSize="13" TextWrapping="Wrap" />
                     </Border>
                 </Grid>
             </Border>
@@ -179,10 +196,7 @@
                             <Button Style="{StaticResource JsonToolButtonStyle}" Click="CollapseAll_Click" Content="折叠" />
                             <Button Style="{StaticResource JsonToolButtonStyle}" Click="AddRootChild_Click" Content="新增" />
                         </StackPanel>
-                        <StackPanel>
-                            <TextBlock FontWeight="SemiBold" Foreground="#1F2D3D" Text="JSON 结构编辑器" />
-                            <TextBlock Margin="0,3,0,0" Style="{StaticResource JsonSubtitleTextStyle}" Text="值颜色自动区分类型，右侧小按钮可切换类型。" />
-                        </StackPanel>
+                        <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Foreground="#1F2D3D" Text="JSON 结构编辑器" />
                     </DockPanel>
 
                     <Border Grid.Row="1" Margin="12,0,12,12" BorderBrush="#DDE7F2" BorderThickness="1" CornerRadius="8" Background="White">
@@ -270,10 +284,10 @@
                                                     <ColumnDefinition Width="*" />
                                                 </Grid.ColumnDefinitions>
                                                 <Grid Width="{Binding Indent}" MinWidth="0">
-                                                    <Line X1="10" Y1="0" X2="10" Y2="36" Stroke="#D4DEE9" StrokeDashArray="2,3" StrokeThickness="1" HorizontalAlignment="Right" Margin="0,0,8,0" />
+                                                    <Line X1="10" Y1="0" X2="10" Y2="36" Stroke="#AEBFD2" StrokeDashArray="2,3" StrokeThickness="1" HorizontalAlignment="Right" Margin="0,0,8,0" />
                                                 </Grid>
                                                 <Grid Grid.Column="1">
-                                                    <Line X1="0" Y1="15" X2="16" Y2="15" Stroke="#D4DEE9" StrokeDashArray="2,3" StrokeThickness="1" />
+                                                    <Line X1="0" Y1="15" X2="16" Y2="15" Stroke="#AEBFD2" StrokeDashArray="2,3" StrokeThickness="1" />
                                                     <Button Width="16" Height="16" Padding="0" Background="Transparent" BorderThickness="0" Click="ToggleNode_Click" CommandParameter="{Binding}">
                                                         <Button.Style>
                                                             <Style TargetType="Button">
@@ -307,7 +321,7 @@
                                                 <TextBox Grid.Column="3" Style="{StaticResource JsonEditorTextBoxStyle}" Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" LostFocus="JsonNodeChanged" />
                                             </Grid>
 
-                                            <TextBox Grid.Column="1" Style="{StaticResource JsonEditorTextBoxStyle}" Foreground="{Binding ValueBrush}" Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" GotKeyboardFocus="JsonValueTextBox_GotKeyboardFocus" LostFocus="JsonNodeChanged" KeyDown="JsonValueTextBox_KeyDown" />
+                                            <TextBox Grid.Column="1" Style="{StaticResource JsonValueTextBoxStyle}" Foreground="{Binding ValueBrush}" Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" GotKeyboardFocus="JsonValueTextBox_GotKeyboardFocus" LostFocus="JsonNodeChanged" KeyDown="JsonValueTextBox_KeyDown" />
 
                                             <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                                 <ComboBox Width="34" Height="24" Padding="0" FontSize="11" SelectedValue="{Binding Type, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" SelectedValuePath="Tag" DropDownClosed="JsonTypeDropDownClosed" ToolTip="切换节点类型">

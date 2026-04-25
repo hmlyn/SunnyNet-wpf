@@ -245,6 +245,11 @@ public partial class JsonToolWindow : Window
             return;
         }
 
+        if ((sender as FrameworkElement)?.DataContext is JsonEditorNode { IsStringValue: true } && Keyboard.Modifiers != ModifierKeys.Control)
+        {
+            return;
+        }
+
         JsonNodeChanged(sender, new RoutedEventArgs());
         keyEventArgs.Handled = true;
     }

@@ -44,6 +44,7 @@ public sealed class JsonEditorNode : INotifyPropertyChanged
             OnPropertyChanged(nameof(CanHaveChildren));
             OnPropertyChanged(nameof(TypeBadge));
             OnPropertyChanged(nameof(ValueBrush));
+            OnPropertyChanged(nameof(IsStringValue));
             OnPropertyChanged(nameof(HasChildren));
         }
     }
@@ -79,6 +80,8 @@ public sealed class JsonEditorNode : INotifyPropertyChanged
     public ObservableCollection<JsonEditorNode> Children { get; } = new();
 
     public bool CanHaveChildren => Type is "object" or "array";
+
+    public bool IsStringValue => Type == "string";
 
     public bool HasChildren => Children.Count > 0;
 
