@@ -11,6 +11,7 @@
   <PropertyGroup>
     <BackendDir>$(MSBuildThisFileDirectory)..\..\backend\</BackendDir>
     <ZigExe>$(MSBuildThisFileDirectory)..\..\_toolchain\zig-x86_64-windows-0.15.2\zig.exe</ZigExe>
+    <McpBridgeSource>$(MSBuildThisFileDirectory)..\..\sunnymcptool\build\bin\sunnynet-mcp.exe</McpBridgeSource>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
@@ -22,6 +23,13 @@
     <MakeDir Directories="$(TargetDir)backend" />
     <Error Condition="!Exists('$(ZigExe)')" Text="缺少 Zig 工具链：$(ZigExe)" />
     <Exec Command="set CC=$(ZigExe) cc -target x86_64-windows-gnu &amp;&amp; set CXX=$(ZigExe) c++ -target x86_64-windows-gnu &amp;&amp; go build -tags cshared -buildmode=c-shared -o &quot;$(TargetDir)backend\SunnyNetBridge.dll&quot; ." WorkingDirectory="$(BackendDir)" />
+  </Target>
+
+  <Target Name="CopyMcpBridge" AfterTargets="Build" Condition="'$(DesignTimeBuild)' != 'true' and Exists('$(McpBridgeSource)')">
+    <MakeDir Directories="$(TargetDir)mcp" />
+    <Copy SourceFiles="$(McpBridgeSource)"
+          DestinationFiles="$(TargetDir)mcp\sunnynet-mcp.exe"
+          SkipUnchangedFiles="true" />
   </Target>
 
 </Project>

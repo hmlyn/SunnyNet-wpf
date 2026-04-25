@@ -13,15 +13,29 @@ public sealed class McpIntegrationState : ViewModelBase
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
+    private bool _enabled;
     private int _port = 29999;
     private bool _serverRunning;
     private int _toolCount;
     private string _serverStatusText = "未检测";
-    private string _bridgeExecutablePath = "";
     private bool _bridgeExists;
-    private string _bridgeStatusText = "未配置";
     private string _lastCheckedText = "未刷新";
     private string _lastError = "";
+    private string _clientKind = "Cursor / Claude";
+
+    public bool Enabled
+    {
+        get => _enabled;
+        set
+        {
+            if (!SetProperty(ref _enabled, value))
+            {
+                return;
+            }
+
+            RaiseDerivedStateProperties();
+        }
+    }
 
     public int Port
     {
@@ -40,46 +54,74 @@ public sealed class McpIntegrationState : ViewModelBase
     public bool ServerRunning
     {
         get => _serverRunning;
-        set => SetProperty(ref _serverRunning, value);
+        set
+        {
+            if (!SetProperty(ref _serverRunning, value))
+            {
+                return;
+            }
+
+            RaiseDerivedStateProperties();
+        }
     }
 
     public int ToolCount
     {
         get => _toolCount;
-        set => SetProperty(ref _toolCount, value);
+        set
+        {
+            if (!SetProperty(ref _toolCount, value))
+            {
+                return;
+            }
+
+            OnPropertyChanged(nameof(FooterStatusText));
+        }
     }
 
     public string ServerStatusText
     {
         get => _serverStatusText;
-        set => SetProperty(ref _serverStatusText, value ?? "未检测");
-    }
-
-    public string BridgeExecutablePath
-    {
-        get => _bridgeExecutablePath;
         set
         {
-            if (!SetProperty(ref _bridgeExecutablePath, value ?? ""))
+            if (!SetProperty(ref _serverStatusText, value ?? "未检测"))
             {
                 return;
             }
 
-            OnPropertyChanged(nameof(BridgeDirectoryPath));
-            OnPropertyChanged(nameof(ClientConfigJson));
+            OnPropertyChanged(nameof(FooterStatusText));
         }
     }
 
     public bool BridgeExists
     {
         get => _bridgeExists;
-        set => SetProperty(ref _bridgeExists, value);
+        set
+        {
+            if (!SetProperty(ref _bridgeExists, value))
+            {
+                return;
+            }
+
+            RaiseDerivedStateProperties();
+        }
     }
 
-    public string BridgeStatusText
+    public string BridgeStatusText => BridgeExists ? "桥接已就绪" : "缺少 sunnynet-mcp.exe";
+
+    public string ClientKind
     {
-        get => _bridgeStatusText;
-        set => SetProperty(ref _bridgeStatusText, value ?? "未配置");
+        get => _clientKind;
+        set
+        {
+            if (!SetProperty(ref _clientKind, value ?? "Cursor / Claude"))
+            {
+                return;
+            }
+
+            OnPropertyChanged(nameof(ClientConfigText));
+            OnPropertyChanged(nameof(ClientConfigHintText));
+        }
     }
 
     public string LastCheckedText
@@ -91,7 +133,15 @@ public sealed class McpIntegrationState : ViewModelBase
     public string LastError
     {
         get => _lastError;
-        set => SetProperty(ref _lastError, value ?? "");
+        set
+        {
+            if (!SetProperty(ref _lastError, value ?? ""))
+            {
+                return;
+            }
+
+            OnPropertyChanged(nameof(FooterStatusText));
+        }
     }
 
     public string BaseUrl => $"http://127.0.0.1:{Port}";
@@ -102,17 +152,47 @@ public sealed class McpIntegrationState : ViewModelBase
 
     public string SseUrl => $"{BaseUrl}/mcp/sse";
 
-    public string BridgeDirectoryPath => string.IsNullOrWhiteSpace(BridgeExecutablePath)
-        ? ""
-        : Path.GetDirectoryName(BridgeExecutablePath) ?? "";
+    public string BridgeExecutablePath => Path.Combine(AppContext.BaseDirectory, "mcp", "sunnynet-mcp.exe");
 
-    public string ClientConfigJson
+    public string BridgeDirectoryPath => Path.GetDirectoryName(BridgeExecutablePath) ?? "";
+
+    public string FooterStatusText
     {
         get
         {
-            string command = string.IsNullOrWhiteSpace(BridgeExecutablePath)
-                ? @"C:\path\to\sunnynet-mcp.exe"
-                : BridgeExecutablePath;
+            if (!Enabled)
+            {
+                return "MCP 已关闭";
+            }
+
+            if (!ServerRunning)
+            {
+                return string.IsNullOrWhiteSpace(LastError) ? "MCP 未启动" : "MCP 启动失败";
+            }
+
+            return BridgeExists
+                ? $"MCP 运行中 · {ToolCount} 项工具"
+                : "MCP 运行中 · 缺少桥接";
+        }
+    }
+
+    public string ClientConfigHintText => string.Equals(ClientKind, "Codex", StringComparison.Ordinal)
+        ? @"追加到 `%USERPROFILE%\.codex\config.toml` 的 MCP 配置段。"
+        : "适用于 Cursor / Claude Desktop 的 MCP 配置段。";
+
+    public string ClientConfigText
+    {
+        get
+        {
+            if (string.Equals(ClientKind, "Codex", StringComparison.Ordinal))
+            {
+                return string.Join(Environment.NewLine,
+                [
+                    "[mcp_servers.sunnynet]",
+                    $"command = \"{EscapeToml(BridgeExecutablePath)}\"",
+                    $"args = [\"-port\", \"{Port}\"]"
+                ]);
+            }
 
             return JsonSerializer.Serialize(new
             {
@@ -120,8 +200,8 @@ public sealed class McpIntegrationState : ViewModelBase
                 {
                     ["sunnynet"] = new
                     {
-                        command,
-                        args = Array.Empty<string>()
+                        command = BridgeExecutablePath,
+                        args = new[] { "-port", Port.ToString() }
                     }
                 }
             }, JsonOptions);
@@ -134,5 +214,17 @@ public sealed class McpIntegrationState : ViewModelBase
         OnPropertyChanged(nameof(EndpointUrl));
         OnPropertyChanged(nameof(HealthUrl));
         OnPropertyChanged(nameof(SseUrl));
+        OnPropertyChanged(nameof(ClientConfigText));
+    }
+
+    private void RaiseDerivedStateProperties()
+    {
+        OnPropertyChanged(nameof(BridgeStatusText));
+        OnPropertyChanged(nameof(FooterStatusText));
+    }
+
+    private static string EscapeToml(string value)
+    {
+        return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
     }
 }

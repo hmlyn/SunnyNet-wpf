@@ -1,5 +1,3 @@
-using System.Diagnostics;
-using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -69,7 +67,7 @@ public partial class SettingsWindow : Window
 
         (string title, string subtitle) = sectionKey switch
         {
-            "Mcp" => ("MCP 集成", "查看内置 MCP 服务状态，并生成 sunnynet-mcp.exe 的客户端配置。"),
+            "Mcp" => ("MCP 集成", "固定使用程序目录下的 mcp 桥接目录，并生成 Cursor / Claude / Codex 可用的配置片段。"),
             "Ssl" => ("SSL 证书", "配置默认证书或自定义 CA / KEY 文件。"),
             "MustTcp" => ("强制走 TCP", "通过规则控制指定流量强制转为 TCP。"),
             "Proxy" => ("上游网关", "设置上游代理地址以及命中规则。"),
@@ -136,62 +134,14 @@ public partial class SettingsWindow : Window
         await RunActionAsync(() => _viewModel.ApplyBasicSettingsAsync());
     }
 
-    private async void SaveMcp_Click(object sender, RoutedEventArgs routedEventArgs)
-    {
-        await RunActionAsync(() => _viewModel.SaveMcpSettingsAsync());
-    }
-
     private async void RefreshMcp_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         await RunActionAsync(() => _viewModel.RefreshMcpStatusAsync());
     }
 
-    private void BrowseMcpBridge_Click(object sender, RoutedEventArgs routedEventArgs)
-    {
-        OpenFileDialog dialog = new()
-        {
-            Title = "选择 sunnynet-mcp.exe",
-            Filter = "可执行文件 (*.exe)|*.exe|所有文件 (*.*)|*.*",
-            FileName = string.IsNullOrWhiteSpace(_viewModel.Mcp.BridgeExecutablePath)
-                ? "sunnynet-mcp.exe"
-                : Path.GetFileName(_viewModel.Mcp.BridgeExecutablePath)
-        };
-
-        if (dialog.ShowDialog(this) == true)
-        {
-            _viewModel.Mcp.BridgeExecutablePath = dialog.FileName;
-        }
-    }
-
-    private void OpenMcpBridgeFolder_Click(object sender, RoutedEventArgs routedEventArgs)
-    {
-        string directory = _viewModel.Mcp.BridgeDirectoryPath;
-        if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
-        {
-            MessageBox.Show(this, "当前桥接目录不存在。", "MCP", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-
-        Process.Start(new ProcessStartInfo
-        {
-            FileName = directory,
-            UseShellExecute = true
-        });
-    }
-
     private void CopyMcpConfig_Click(object sender, RoutedEventArgs routedEventArgs)
     {
-        CopyText(_viewModel.Mcp.ClientConfigJson, "已复制 MCP 客户端配置。");
-    }
-
-    private void CopyMcpEndpoint_Click(object sender, RoutedEventArgs routedEventArgs)
-    {
-        CopyText(_viewModel.Mcp.EndpointUrl, "已复制 MCP 接入地址。");
-    }
-
-    private void CopyMcpHealth_Click(object sender, RoutedEventArgs routedEventArgs)
-    {
-        CopyText(_viewModel.Mcp.HealthUrl, "已复制 MCP 健康检查地址。");
+        CopyText(_viewModel.Mcp.ClientConfigText, "已复制 MCP 客户端配置。");
     }
 
     private static void CopyText(string text, string message)

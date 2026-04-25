@@ -33,6 +33,7 @@ public partial class MainWindow : Window
     private bool _isUpdatingCaptureScope;
     private bool _isCloseConfirmed;
     private bool _isCloseCleanupRunning;
+    private bool _isApplyingMcpState;
     private CaptureEntry? _contextSessionEntry;
     private DispatcherTimer? _columnWidthSaveTimer;
     private SunnyNetCompatibleMcpServer? _mcpServer;
@@ -54,6 +55,7 @@ public partial class MainWindow : Window
         _viewModel.NotificationRequested += ViewModel_NotificationRequested;
         _viewModel.ScrollToEntryRequested += ViewModel_ScrollToEntryRequested;
         _viewModel.PropertyChanged += ViewModel_PropertyChanged;
+        _viewModel.Mcp.PropertyChanged += Mcp_PropertyChanged;
         _viewModel.Detail.PropertyChanged += Detail_PropertyChanged;
         RegisterSessionColumnWidthListeners();
         UpdateLanIpPopupItems();
@@ -185,7 +187,7 @@ public partial class MainWindow : Window
             WindowState = WindowState.Maximized;
         }
 
-        StartCompatibleMcpServer();
+        await ApplyMcpServerStateAsync(_viewModel.Mcp.Enabled);
         await _viewModel.InitializeAsync();
         UpdateFooterState();
     }
@@ -207,6 +209,7 @@ public partial class MainWindow : Window
         try
         {
             SaveLayoutSettings();
+            _viewModel.Mcp.PropertyChanged -= Mcp_PropertyChanged;
             if (_mcpServer is not null)
             {
                 await _mcpServer.DisposeAsync();
@@ -226,6 +229,28 @@ public partial class MainWindow : Window
     private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs propertyChangedEventArgs)
     {
         if (propertyChangedEventArgs.PropertyName is nameof(MainWindowViewModel.BreakpointMode) or nameof(MainWindowViewModel.IeProxyEnabled) or nameof(MainWindowViewModel.IsCapturing) or nameof(MainWindowViewModel.Settings))
+        {
+            UpdateFooterState();
+        }
+    }
+
+    private void Mcp_PropertyChanged(object? sender, PropertyChangedEventArgs propertyChangedEventArgs)
+    {
+        if (propertyChangedEventArgs.PropertyName is nameof(McpIntegrationState.Enabled))
+        {
+            if (!_isApplyingMcpState)
+            {
+                _ = ApplyMcpServerStateAsync(_viewModel.Mcp.Enabled);
+            }
+
+            UpdateFooterState();
+            return;
+        }
+
+        if (propertyChangedEventArgs.PropertyName is nameof(McpIntegrationState.ServerRunning)
+            or nameof(McpIntegrationState.BridgeExists)
+            or nameof(McpIntegrationState.ServerStatusText)
+            or nameof(McpIntegrationState.ToolCount))
         {
             UpdateFooterState();
         }
@@ -358,7 +383,56 @@ public partial class MainWindow : Window
         catch (Exception exception)
         {
             _mcpServer = null;
+            _viewModel.Mcp.ServerRunning = false;
+            _viewModel.Mcp.ServerStatusText = "启动失败";
+            _viewModel.Mcp.LastError = exception.Message;
             _viewModel.StatusRight = $"MCP 启动失败: {exception.Message}";
+        }
+    }
+
+    private async Task StopCompatibleMcpServerAsync()
+    {
+        if (_mcpServer is null)
+        {
+            _viewModel.Mcp.ServerRunning = false;
+            _viewModel.Mcp.ServerStatusText = "已关闭";
+            return;
+        }
+
+        await _mcpServer.DisposeAsync();
+        _mcpServer = null;
+        _viewModel.Mcp.ServerRunning = false;
+        _viewModel.Mcp.ServerStatusText = "已关闭";
+    }
+
+    private async Task ApplyMcpServerStateAsync(bool enabled)
+    {
+        if (_isApplyingMcpState)
+        {
+            return;
+        }
+
+        _isApplyingMcpState = true;
+        try
+        {
+            if (enabled)
+            {
+                _viewModel.Mcp.LastError = "";
+                StartCompatibleMcpServer();
+                _viewModel.StatusRight = "MCP 已开启";
+            }
+            else
+            {
+                await StopCompatibleMcpServerAsync();
+                _viewModel.StatusRight = "MCP 已关闭";
+            }
+
+            await _viewModel.RefreshMcpStatusAsync();
+        }
+        finally
+        {
+            _isApplyingMcpState = false;
+            UpdateFooterState();
         }
     }
 

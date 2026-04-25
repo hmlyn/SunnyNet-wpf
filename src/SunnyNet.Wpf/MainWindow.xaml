@@ -1143,6 +1143,32 @@
                             </StackPanel>
                         </Button>
                         <Border Width="1" Margin="8,8" Background="{StaticResource DividerBrush}" />
+                        <primitives:ToggleButton MinWidth="72"
+                                                 Style="{StaticResource ToolbarToggleButtonStyle}"
+                                                 IsChecked="{Binding Mcp.Enabled, Mode=TwoWay}"
+                                                 ToolTip="启用或关闭内置 MCP 服务">
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center">
+                                    <Ellipse.Style>
+                                        <Style TargetType="{x:Type Ellipse}">
+                                            <Setter Property="Fill" Value="#C3602C" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Mcp.Enabled}" Value="False">
+                                                    <Setter Property="Fill" Value="#B6C2D2" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Mcp.ServerRunning}" Value="True">
+                                                    <Setter Property="Fill" Value="#28A35B" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Ellipse.Style>
+                                </Ellipse>
+                                <TextBlock VerticalAlignment="Center" Text="MCP" />
+                            </StackPanel>
+                        </primitives:ToggleButton>
+                        <Border Width="1" Margin="8,8" Background="{StaticResource DividerBrush}" />
+                        <TextBlock VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" Text="{Binding Mcp.FooterStatusText}" />
+                        <Border Width="1" Margin="8,8" Background="{StaticResource DividerBrush}" />
                         <TextBlock VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" Text="{Binding StatusRight}" />
                     </StackPanel>
                 </DockPanel>

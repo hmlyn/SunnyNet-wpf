@@ -28,7 +28,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     };
 
     private readonly GoBackendClient _backend = new();
-    private readonly McpIntegrationSettings _mcpSettings;
     private readonly Dictionary<int, CaptureEntry> _sessionMap = new();
     private readonly HashSet<string> _favoriteKeys = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _selectedProcessFilterKeys = new(StringComparer.OrdinalIgnoreCase);
@@ -60,7 +59,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
     public MainWindowViewModel()
     {
-        _mcpSettings = McpIntegrationSettingsStore.Load();
         SessionsView = CollectionViewSource.GetDefaultView(Sessions);
         SessionsView.Filter = FilterSession;
         ClearAllCommand = new AsyncRelayCommand(ClearAllAsync);
@@ -71,9 +69,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         CloseSessionCommand = new AsyncRelayCommand(CloseSelectedSessionAsync, () => SelectedSession is not null && IsSelectedSessionIntercepted);
         ReleaseCurrentCommand = new AsyncRelayCommand(ReleaseCurrentInterceptAsync, () => SelectedSession is not null && IsSelectedSessionIntercepted);
         Mcp.Port = SunnyNetCompatibleMcpServer.DefaultPort;
-        Mcp.BridgeExecutablePath = string.IsNullOrWhiteSpace(_mcpSettings.BridgeExecutablePath)
-            ? DetectDefaultMcpBridgePath()
-            : _mcpSettings.BridgeExecutablePath;
         UpdateMcpBridgeStatus();
         RefreshSessionFilterItems();
     }
@@ -1376,20 +1371,19 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         await _backend.InvokeAsync("导出默认证书", new { Path = filePath });
     }
 
-    public async Task SaveMcpSettingsAsync()
-    {
-        _mcpSettings.BridgeExecutablePath = Mcp.BridgeExecutablePath.Trim();
-        McpIntegrationSettingsStore.Save(_mcpSettings);
-        UpdateMcpBridgeStatus();
-        await RefreshMcpStatusAsync();
-        StatusRight = "MCP 配置已保存";
-    }
-
     public async Task RefreshMcpStatusAsync()
     {
         UpdateMcpBridgeStatus();
         Mcp.ToolCount = 0;
         Mcp.LastError = "";
+
+        if (!Mcp.Enabled)
+        {
+            Mcp.ServerRunning = false;
+            Mcp.ServerStatusText = "已关闭";
+            Mcp.LastCheckedText = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            return;
+        }
 
         try
         {
@@ -2237,41 +2231,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
     private void UpdateMcpBridgeStatus()
     {
-        string path = Mcp.BridgeExecutablePath.Trim();
-        bool exists = !string.IsNullOrWhiteSpace(path) && File.Exists(path);
+        bool exists = File.Exists(Mcp.BridgeExecutablePath);
         Mcp.BridgeExists = exists;
-        Mcp.BridgeStatusText = exists
-            ? "已找到 sunnynet-mcp.exe"
-            : string.IsNullOrWhiteSpace(path)
-                ? "未配置桥接程序路径"
-                : "桥接程序不存在";
-    }
-
-    private static string DetectDefaultMcpBridgePath()
-    {
-        HashSet<string> roots = new(StringComparer.OrdinalIgnoreCase)
-        {
-            AppContext.BaseDirectory,
-            Environment.CurrentDirectory
-        };
-
-        foreach (string root in roots)
-        {
-            string? current = root;
-            while (!string.IsNullOrWhiteSpace(current))
-            {
-                string candidate = Path.Combine(current, "sunnymcptool", "build", "bin", "sunnynet-mcp.exe");
-                if (File.Exists(candidate))
-                {
-                    return candidate;
-                }
-
-                DirectoryInfo? parent = Directory.GetParent(current);
-                current = parent?.FullName;
-            }
-        }
-
-        return "";
     }
 
     private void RefreshSelectedSessionInterceptState()
