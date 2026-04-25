@@ -31,3 +31,7 @@ src\SunnyNet.Wpf\bin\Debug\net8.0-windows\SunnyNet.Wpf.exe
 ```
 
 WPF 前端会直接加载同目录下的 `backend/SunnyNetBridge.dll`。
+
+## 文档
+
+- `docs/MCP工具清单.md`：当前 WPF 版实际支持的 MCP 工具、参数与返回字段说明
