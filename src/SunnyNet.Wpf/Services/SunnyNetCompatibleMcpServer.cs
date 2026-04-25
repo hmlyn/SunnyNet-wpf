@@ -15,7 +15,7 @@ namespace SunnyNet.Wpf.Services;
 
 public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
 {
-    private const int DefaultPort = 29999;
+    public const int DefaultPort = 29999;
     private const int RequestBodyPreviewLimit = 256 * 1024;
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)

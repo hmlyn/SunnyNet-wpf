@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
+using System.Net.Http;
 using System.Windows.Data;
 using System.Text;
 using System.Text.Json;
@@ -20,7 +22,13 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         WriteIndented = true
     };
 
+    private static readonly HttpClient McpHttpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(5)
+    };
+
     private readonly GoBackendClient _backend = new();
+    private readonly McpIntegrationSettings _mcpSettings;
     private readonly Dictionary<int, CaptureEntry> _sessionMap = new();
     private readonly HashSet<string> _favoriteKeys = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _selectedProcessFilterKeys = new(StringComparer.OrdinalIgnoreCase);
@@ -52,6 +60,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
     public MainWindowViewModel()
     {
+        _mcpSettings = McpIntegrationSettingsStore.Load();
         SessionsView = CollectionViewSource.GetDefaultView(Sessions);
         SessionsView.Filter = FilterSession;
         ClearAllCommand = new AsyncRelayCommand(ClearAllAsync);
@@ -61,6 +70,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         ResendSelectedCommand = new AsyncRelayCommand(ReleaseCurrentInterceptAsync, () => SelectedSession is not null && IsSelectedSessionIntercepted);
         CloseSessionCommand = new AsyncRelayCommand(CloseSelectedSessionAsync, () => SelectedSession is not null && IsSelectedSessionIntercepted);
         ReleaseCurrentCommand = new AsyncRelayCommand(ReleaseCurrentInterceptAsync, () => SelectedSession is not null && IsSelectedSessionIntercepted);
+        Mcp.Port = SunnyNetCompatibleMcpServer.DefaultPort;
+        Mcp.BridgeExecutablePath = string.IsNullOrWhiteSpace(_mcpSettings.BridgeExecutablePath)
+            ? DetectDefaultMcpBridgePath()
+            : _mcpSettings.BridgeExecutablePath;
+        UpdateMcpBridgeStatus();
         RefreshSessionFilterItems();
     }
 
@@ -71,6 +85,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     public ICollectionView SessionsView { get; }
     public SessionDetail Detail { get; } = new();
     public AppConfigState Settings { get; } = new();
+    public McpIntegrationState Mcp { get; } = new();
     public ObservableCollection<SessionFilterItem> ProcessFilters { get; } = new();
     public ObservableCollection<SessionFilterItem> DomainFilters { get; } = new();
     public ObservableCollection<HostsRuleItem> HostsRuleItems { get; } = new();
@@ -595,6 +610,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             await _backend.StartAsync();
             StatusRight = "Go DLL 已加载";
             await _backend.InvokeAsync("init");
+            await RefreshMcpStatusAsync();
         }
         catch (Exception exception)
         {
@@ -1358,6 +1374,64 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     public async Task ExportDefaultCertificateAsync(string filePath)
     {
         await _backend.InvokeAsync("导出默认证书", new { Path = filePath });
+    }
+
+    public async Task SaveMcpSettingsAsync()
+    {
+        _mcpSettings.BridgeExecutablePath = Mcp.BridgeExecutablePath.Trim();
+        McpIntegrationSettingsStore.Save(_mcpSettings);
+        UpdateMcpBridgeStatus();
+        await RefreshMcpStatusAsync();
+        StatusRight = "MCP 配置已保存";
+    }
+
+    public async Task RefreshMcpStatusAsync()
+    {
+        UpdateMcpBridgeStatus();
+        Mcp.ToolCount = 0;
+        Mcp.LastError = "";
+
+        try
+        {
+            using HttpResponseMessage healthResponse = await McpHttpClient.GetAsync(Mcp.HealthUrl);
+            healthResponse.EnsureSuccessStatusCode();
+            string healthJson = await healthResponse.Content.ReadAsStringAsync();
+            using JsonDocument healthDocument = JsonDocument.Parse(healthJson);
+            JsonElement root = healthDocument.RootElement;
+            bool running = GetBool(root, "running");
+            string status = GetString(root, "status", running ? "ok" : "offline");
+
+            Mcp.ServerRunning = running;
+            Mcp.ServerStatusText = running && status.Equals("ok", StringComparison.OrdinalIgnoreCase)
+                ? "内置服务运行中"
+                : "内置服务未就绪";
+
+            string toolsRequest = JsonSerializer.Serialize(new
+            {
+                jsonrpc = "2.0",
+                id = "tools-list",
+                method = "tools/list",
+                @params = new { }
+            });
+
+            using StringContent content = new(toolsRequest, Encoding.UTF8, "application/json");
+            using HttpResponseMessage toolsResponse = await McpHttpClient.PostAsync(Mcp.EndpointUrl, content);
+            toolsResponse.EnsureSuccessStatusCode();
+            string toolsJson = await toolsResponse.Content.ReadAsStringAsync();
+            using JsonDocument toolsDocument = JsonDocument.Parse(toolsJson);
+            JsonElement tools = GetProperty(GetProperty(toolsDocument.RootElement, "result"), "tools");
+            Mcp.ToolCount = tools.ValueKind == JsonValueKind.Array ? tools.GetArrayLength() : 0;
+        }
+        catch (Exception exception)
+        {
+            Mcp.ServerRunning = false;
+            Mcp.ServerStatusText = "内置服务不可用";
+            Mcp.LastError = exception.Message;
+        }
+        finally
+        {
+            Mcp.LastCheckedText = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        }
     }
 
     public async Task ToggleIeProxyAsync()
@@ -2159,6 +2233,45 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         {
             Detail.RequestHeaders = exception.Message;
         }
+    }
+
+    private void UpdateMcpBridgeStatus()
+    {
+        string path = Mcp.BridgeExecutablePath.Trim();
+        bool exists = !string.IsNullOrWhiteSpace(path) && File.Exists(path);
+        Mcp.BridgeExists = exists;
+        Mcp.BridgeStatusText = exists
+            ? "已找到 sunnynet-mcp.exe"
+            : string.IsNullOrWhiteSpace(path)
+                ? "未配置桥接程序路径"
+                : "桥接程序不存在";
+    }
+
+    private static string DetectDefaultMcpBridgePath()
+    {
+        HashSet<string> roots = new(StringComparer.OrdinalIgnoreCase)
+        {
+            AppContext.BaseDirectory,
+            Environment.CurrentDirectory
+        };
+
+        foreach (string root in roots)
+        {
+            string? current = root;
+            while (!string.IsNullOrWhiteSpace(current))
+            {
+                string candidate = Path.Combine(current, "sunnymcptool", "build", "bin", "sunnynet-mcp.exe");
+                if (File.Exists(candidate))
+                {
+                    return candidate;
+                }
+
+                DirectoryInfo? parent = Directory.GetParent(current);
+                current = parent?.FullName;
+            }
+        }
+
+        return "";
     }
 
     private void RefreshSelectedSessionInterceptState()
