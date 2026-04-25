@@ -5,6 +5,7 @@
         xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="SunnyNet"
+        Icon="Resources/AppIcon.ico"
         Width="1460"
         Height="820"
         MinWidth="980"
