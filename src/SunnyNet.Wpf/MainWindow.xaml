@@ -1189,7 +1189,7 @@
                         <Button Style="{StaticResource FooterButtonStyle}" Click="BreakpointMode_Click">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock x:Name="BreakpointGlyph" Style="{StaticResource GlyphTextStyle}" Text="&#xF127;" />
-                                <TextBlock x:Name="BreakpointLabel" Margin="6,0,0,0" VerticalAlignment="Center" Text="空白" />
+                                <TextBlock x:Name="BreakpointLabel" Margin="6,0,0,0" VerticalAlignment="Center" Visibility="Collapsed" />
                             </StackPanel>
                         </Button>
                         <Border Width="1" Margin="8,8" Background="{StaticResource DividerBrush}" />

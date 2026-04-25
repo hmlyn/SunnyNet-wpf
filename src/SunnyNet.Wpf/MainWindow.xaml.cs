@@ -304,16 +304,19 @@ public partial class MainWindow : Window
         {
             BreakpointGlyph.Text = "\uE7BA";
             BreakpointLabel.Text = "拦截上行";
+            BreakpointLabel.Visibility = Visibility.Visible;
         }
         else if (_viewModel.BreakpointMode == 2)
         {
             BreakpointGlyph.Text = "\uE7BF";
             BreakpointLabel.Text = "拦截下行";
+            BreakpointLabel.Visibility = Visibility.Visible;
         }
         else
         {
             BreakpointGlyph.Text = "\uF127";
-            BreakpointLabel.Text = "空白";
+            BreakpointLabel.Text = string.Empty;
+            BreakpointLabel.Visibility = Visibility.Collapsed;
         }
     }
 
