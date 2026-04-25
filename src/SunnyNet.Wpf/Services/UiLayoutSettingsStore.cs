@@ -17,6 +17,8 @@ public static class UiLayoutSettingsStore
         try
         {
             string path = GetSettingsPath();
+            MigrateLegacySettings(path);
+
             if (!File.Exists(path))
             {
                 return new UiLayoutSettings();
@@ -47,6 +49,29 @@ public static class UiLayoutSettingsStore
     private static string GetSettingsPath()
     {
         string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        return Path.Combine(appData, "SunnyNet", "layout.json");
+    }
+
+    private static string GetLegacySettingsPath()
+    {
+        string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         return Path.Combine(appData, "SunnyNet.Wpf", "layout.json");
+    }
+
+    private static void MigrateLegacySettings(string path)
+    {
+        if (File.Exists(path))
+        {
+            return;
+        }
+
+        string legacyPath = GetLegacySettingsPath();
+        if (!File.Exists(legacyPath))
+        {
+            return;
+        }
+
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.Copy(legacyPath, path, overwrite: false);
     }
 }

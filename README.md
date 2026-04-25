@@ -27,7 +27,7 @@ dotnet build SunnyNet.sln
 直接启动：
 
 ```powershell
-src\SunnyNet.Wpf\bin\Debug\net8.0-windows\SunnyNet.Wpf.exe
+src\SunnyNet.Wpf\bin\Debug\net8.0-windows\SunnyNet.exe
 ```
 
 WPF 前端会直接加载同目录下的 `backend/SunnyNetBridge.dll`。

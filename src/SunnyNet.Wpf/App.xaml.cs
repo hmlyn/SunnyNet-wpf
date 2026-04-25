@@ -53,7 +53,7 @@ public partial class App : Application
         try
         {
             string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            string logDirectory = Path.Combine(appData, "SunnyNet.Wpf", "logs");
+            string logDirectory = Path.Combine(appData, "SunnyNet", "logs");
             Directory.CreateDirectory(logDirectory);
             string logPath = Path.Combine(logDirectory, "crash.log");
             File.AppendAllText(

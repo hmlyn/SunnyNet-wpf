@@ -6,6 +6,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <AssemblyName>SunnyNet</AssemblyName>
+    <AssemblyTitle>SunnyNet</AssemblyTitle>
+    <Product>SunnyNet</Product>
+    <Company>SunnyNet</Company>
+    <Description>SunnyNet Windows 抓包分析工具</Description>
     <ApplicationIcon>Resources\AppIcon.ico</ApplicationIcon>
   </PropertyGroup>
 
@@ -31,6 +36,13 @@
     <Copy SourceFiles="$(McpBridgeSource)"
           DestinationFiles="$(TargetDir)mcp\sunnynet-mcp.exe"
           SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="RemoveLegacyOutputName" AfterTargets="Build" Condition="'$(DesignTimeBuild)' != 'true'">
+    <ItemGroup>
+      <LegacyOutput Include="$(TargetDir)SunnyNet.Wpf.*" />
+    </ItemGroup>
+    <Delete Files="@(LegacyOutput)" TreatErrorsAsWarnings="true" />
   </Target>
 
   <ItemGroup>
