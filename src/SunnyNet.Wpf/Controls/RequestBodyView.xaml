@@ -32,7 +32,9 @@
         <controls:HttpSyntaxTextBox x:Name="RawViewer"
                                     Grid.Row="1"
                                     SourceText="{Binding RawText, RelativeSource={RelativeSource AncestorType=controls:RequestBodyView}}"
-                                    HighlightMode="Body" />
+                                    HighlightMode="Body"
+                                    SearchText="{Binding SearchText, RelativeSource={RelativeSource AncestorType=controls:RequestBodyView}}"
+                                    SearchIgnoreCase="{Binding SearchIgnoreCase, RelativeSource={RelativeSource AncestorType=controls:RequestBodyView}}" />
 
         <controls:NameValueTableControl x:Name="UrlEncodedGrid"
                                         Grid.Row="1"

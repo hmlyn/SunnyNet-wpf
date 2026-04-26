@@ -46,6 +46,9 @@ public sealed class SessionDetail : ViewModelBase
     private string _summary = "请选择一个会话";
     private bool _hasRequestDisplayBody;
     private bool _hasResponseDisplayBody;
+    private string _requestSearchText = "";
+    private string _responseSearchText = "";
+    private bool _detailSearchIgnoreCase = true;
     private SocketEntry? _selectedSocketEntry;
 
     public bool HasSelection
@@ -331,6 +334,24 @@ public sealed class SessionDetail : ViewModelBase
         set => SetProperty(ref _hasResponseDisplayBody, value);
     }
 
+    public string RequestSearchText
+    {
+        get => _requestSearchText;
+        set => SetProperty(ref _requestSearchText, value ?? "");
+    }
+
+    public string ResponseSearchText
+    {
+        get => _responseSearchText;
+        set => SetProperty(ref _responseSearchText, value ?? "");
+    }
+
+    public bool DetailSearchIgnoreCase
+    {
+        get => _detailSearchIgnoreCase;
+        set => SetProperty(ref _detailSearchIgnoreCase, value);
+    }
+
     public SocketEntry? SelectedSocketEntry
     {
         get => _selectedSocketEntry;
@@ -397,6 +418,9 @@ public sealed class SessionDetail : ViewModelBase
         Summary = "请选择一个会话";
         HasRequestDisplayBody = false;
         HasResponseDisplayBody = false;
+        RequestSearchText = "";
+        ResponseSearchText = "";
+        DetailSearchIgnoreCase = true;
         SelectedSocketEntry = null;
         SocketEntries.Clear();
         RequestHeaderRows.Clear();

@@ -105,6 +105,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     private int _runningPort;
     private RunningProcessItem? _selectedRunningProcess;
     private ProcessCaptureNameItem? _selectedProcessCaptureName;
+    private SearchRequest? _lastTextSearchRequest;
 
     public MainWindowViewModel()
     {
@@ -1697,6 +1698,15 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         List<int> matchedTheology = GetIntArray(result, "SearchResult");
         string color = GetString(result, "Color", request.Color);
         CaptureEntry? firstMatch = null;
+        _lastTextSearchRequest = matchedTheology.Count > 0 && IsTextDetailSearchRequest(request)
+            ? request
+            : null;
+        if (_lastTextSearchRequest is null && request.ClearPrevious)
+        {
+            Detail.RequestSearchText = "";
+            Detail.ResponseSearchText = "";
+            Detail.DetailSearchIgnoreCase = true;
+        }
 
         foreach (int theology in matchedTheology)
         {
@@ -1737,6 +1747,39 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         {
             socketEntry.SearchColor = "";
         }
+
+        _lastTextSearchRequest = null;
+        Detail.RequestSearchText = "";
+        Detail.ResponseSearchText = "";
+        Detail.DetailSearchIgnoreCase = true;
+    }
+
+    private void ApplyDetailTextSearch(CaptureEntry selected)
+    {
+        if (_lastTextSearchRequest is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(selected.SearchColor))
+        {
+            Detail.RequestSearchText = "";
+            Detail.ResponseSearchText = "";
+            Detail.DetailSearchIgnoreCase = true;
+            return;
+        }
+
+        Detail.DetailSearchIgnoreCase = _lastTextSearchRequest.IgnoreCase;
+        bool searchRequest = _lastTextSearchRequest.Range is "全部" or "HTTP请求";
+        bool searchResponse = _lastTextSearchRequest.Range is "全部" or "HTTP响应";
+        Detail.RequestSearchText = searchRequest ? _lastTextSearchRequest.Value : "";
+        Detail.ResponseSearchText = searchResponse ? _lastTextSearchRequest.Value : "";
+    }
+
+    private static bool IsTextDetailSearchRequest(SearchRequest request)
+    {
+        return (request.Type is "UTF8" or "GBK")
+            && (request.Range is "全部" or "HTTP请求" or "HTTP响应");
     }
 
     private void OnBackendEventReceived(object? sender, BackendEventEnvelope envelope)
@@ -2405,6 +2448,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             }
 
             ApplySessionDetail(selected, result.Value);
+            ApplyDetailTextSearch(selected);
             _ = LoadRequestMultipartImageAsync(selected);
             if (selected.BreakMode is 1 or 2)
             {

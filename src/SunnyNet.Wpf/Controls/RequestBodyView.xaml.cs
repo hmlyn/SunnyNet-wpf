@@ -15,6 +15,12 @@ public partial class RequestBodyView : UserControl
     public static readonly DependencyProperty HasUrlEncodedRowsProperty =
         DependencyProperty.Register(nameof(HasUrlEncodedRows), typeof(bool), typeof(RequestBodyView), new PropertyMetadata(false, OnHasUrlEncodedRowsChanged));
 
+    public static readonly DependencyProperty SearchTextProperty =
+        DependencyProperty.Register(nameof(SearchText), typeof(string), typeof(RequestBodyView), new PropertyMetadata(""));
+
+    public static readonly DependencyProperty SearchIgnoreCaseProperty =
+        DependencyProperty.Register(nameof(SearchIgnoreCase), typeof(bool), typeof(RequestBodyView), new PropertyMetadata(true));
+
     public RequestBodyView()
     {
         InitializeComponent();
@@ -37,6 +43,23 @@ public partial class RequestBodyView : UserControl
     {
         get => (bool)GetValue(HasUrlEncodedRowsProperty);
         set => SetValue(HasUrlEncodedRowsProperty, value);
+    }
+
+    public string SearchText
+    {
+        get => (string)GetValue(SearchTextProperty);
+        set => SetValue(SearchTextProperty, value);
+    }
+
+    public bool SearchIgnoreCase
+    {
+        get => (bool)GetValue(SearchIgnoreCaseProperty);
+        set => SetValue(SearchIgnoreCaseProperty, value);
+    }
+
+    public bool MoveToNextMatch()
+    {
+        return RawViewer.Visibility == Visibility.Visible && RawViewer.MoveToNextMatch();
     }
 
     private static void OnHasUrlEncodedRowsChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs args)

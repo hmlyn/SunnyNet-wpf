@@ -64,6 +64,26 @@
             <Setter Property="Margin" Value="0,0,3,0" />
             <Setter Property="MinHeight" Value="30" />
         </Style>
+
+        <Style x:Key="DetailSearchLabelTextStyle" TargetType="{x:Type TextBlock}">
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+        </Style>
+
+        <Style x:Key="DetailSearchTextBoxStyle" TargetType="{x:Type TextBox}" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Width" Value="154" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="MinHeight" Value="26" />
+            <Setter Property="Padding" Value="8,0" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Background" Value="White" />
+            <Setter Property="BorderBrush" Value="#DCE5F1" />
+            <Setter Property="ToolTip" Value="输入关键词高亮匹配，Enter 查找下一个" />
+        </Style>
     </Window.Resources>
 
     <Border Margin="0"
@@ -935,6 +955,16 @@
                                                     ToolTip="放大/还原请求区域">
                                                 <TextBlock x:Name="RequestZoomGlyph" Style="{StaticResource GlyphTextStyle}" Text="&#xE740;" />
                                             </Button>
+                                            <StackPanel DockPanel.Dock="Right"
+                                                        Margin="10,0,0,0"
+                                                        Orientation="Horizontal"
+                                                        VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource DetailSearchLabelTextStyle}" Text="查找" />
+                                                <TextBox x:Name="RequestDetailSearchTextBox"
+                                                         Style="{StaticResource DetailSearchTextBoxStyle}"
+                                                         KeyDown="RequestDetailSearchTextBox_KeyDown"
+                                                         Text="{Binding Detail.RequestSearchText, UpdateSourceTrigger=PropertyChanged}" />
+                                            </StackPanel>
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                 <TextBlock Style="{StaticResource DetailSectionTitleTextStyle}" Text="请求内容" />
                                                 <Border Style="{StaticResource DetailBadgeBorderStyle}"
@@ -978,7 +1008,11 @@
                                             </TabControl.Style>
                                             <TabItem Header="原始视图">
                                                 <Grid>
-                                                    <controls:HttpSyntaxTextBox SourceText="{Binding Detail.RequestRaw}" HighlightMode="RequestRaw">
+                                                    <controls:HttpSyntaxTextBox x:Name="RequestRawViewer"
+                                                                                SourceText="{Binding Detail.RequestRaw}"
+                                                                                HighlightMode="RequestRaw"
+                                                                                SearchText="{Binding Detail.RequestSearchText}"
+                                                                                SearchIgnoreCase="{Binding Detail.DetailSearchIgnoreCase}">
                                                         <controls:HttpSyntaxTextBox.Style>
                                                             <Style TargetType="{x:Type controls:HttpSyntaxTextBox}">
                                                                 <Setter Property="Visibility" Value="Visible" />
@@ -1020,7 +1054,10 @@
                                                 <controls:NameValueTableControl Rows="{Binding Detail.RequestQueryRows}" EmptyText="无请求参数" />
                                             </TabItem>
                                             <TabItem Header="请求数据">
-                                                <controls:RequestBodyView RawText="{Binding Detail.RequestBody}"
+                                                <controls:RequestBodyView x:Name="RequestBodyViewer"
+                                                                          RawText="{Binding Detail.RequestBody}"
+                                                                          SearchText="{Binding Detail.RequestSearchText}"
+                                                                          SearchIgnoreCase="{Binding Detail.DetailSearchIgnoreCase}"
                                                                           UrlEncodedRows="{Binding Detail.RequestBodyRows}"
                                                                           HasUrlEncodedRows="{Binding Detail.HasRequestBodyRows}" />
                                             </TabItem>
@@ -1050,11 +1087,6 @@
                                                                                    SelectedEntry="{Binding Detail.SelectedSocketEntry, Mode=TwoWay}"
                                                                                    DisplayMode="Flow"
                                                                                    Theology="{Binding SelectedSession.Theology, TargetNullValue=0}" />
-                                            </TabItem>
-                                            <TabItem Header="图片视图">
-                                                <controls:ImagePreviewControl ImageBytes="{Binding Detail.RequestImageBytes}"
-                                                                              ImageType="{Binding Detail.RequestImageType}"
-                                                                              EmptyText="暂无图片请求" />
                                             </TabItem>
                                         </TabControl>
                                     </Grid>
@@ -1090,6 +1122,16 @@
                                                     ToolTip="放大/还原响应区域">
                                                 <TextBlock x:Name="ResponseZoomGlyph" Style="{StaticResource GlyphTextStyle}" Text="&#xE740;" />
                                             </Button>
+                                            <StackPanel DockPanel.Dock="Right"
+                                                        Margin="10,0,0,0"
+                                                        Orientation="Horizontal"
+                                                        VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource DetailSearchLabelTextStyle}" Text="查找" />
+                                                <TextBox x:Name="ResponseDetailSearchTextBox"
+                                                         Style="{StaticResource DetailSearchTextBoxStyle}"
+                                                         KeyDown="ResponseDetailSearchTextBox_KeyDown"
+                                                         Text="{Binding Detail.ResponseSearchText, UpdateSourceTrigger=PropertyChanged}" />
+                                            </StackPanel>
                                             <StackPanel DockPanel.Dock="Right"
                                                         Orientation="Horizontal"
                                                         VerticalAlignment="Center"
@@ -1152,7 +1194,11 @@
                                             </TabControl.Style>
                                             <TabItem Header="原始响应">
                                                 <Grid>
-                                                    <controls:HttpSyntaxTextBox SourceText="{Binding Detail.ResponseRaw}" HighlightMode="ResponseRaw">
+                                                    <controls:HttpSyntaxTextBox x:Name="ResponseRawViewer"
+                                                                                SourceText="{Binding Detail.ResponseRaw}"
+                                                                                HighlightMode="ResponseRaw"
+                                                                                SearchText="{Binding Detail.ResponseSearchText}"
+                                                                                SearchIgnoreCase="{Binding Detail.DetailSearchIgnoreCase}">
                                                         <controls:HttpSyntaxTextBox.Style>
                                                             <Style TargetType="{x:Type controls:HttpSyntaxTextBox}">
                                                                 <Setter Property="Visibility" Value="Visible" />
@@ -1191,7 +1237,11 @@
                                                 <controls:NameValueTableControl Rows="{Binding Detail.ResponseHeaderRows}" EmptyText="无响应协议头" />
                                             </TabItem>
                                             <TabItem Header="响应文本">
-                                                <controls:HttpSyntaxTextBox SourceText="{Binding Detail.ResponseText}" HighlightMode="Body" />
+                                                <controls:HttpSyntaxTextBox x:Name="ResponseTextViewer"
+                                                                            SourceText="{Binding Detail.ResponseText}"
+                                                                            HighlightMode="Body"
+                                                                            SearchText="{Binding Detail.ResponseSearchText}"
+                                                                            SearchIgnoreCase="{Binding Detail.DetailSearchIgnoreCase}" />
                                             </TabItem>
                                             <TabItem Header="图片视图">
                                                 <controls:ImagePreviewControl ImageBytes="{Binding Detail.ResponseImageBytes}"

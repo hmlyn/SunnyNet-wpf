@@ -611,6 +611,42 @@ public partial class MainWindow : Window
         }
     }
 
+    private void RequestDetailSearchTextBox_KeyDown(object sender, KeyEventArgs keyEventArgs)
+    {
+        if (keyEventArgs.Key != Key.Enter)
+        {
+            return;
+        }
+
+        keyEventArgs.Handled = true;
+        string selectedHeader = (RequestTabControl.SelectedItem as TabItem)?.Header?.ToString() ?? "";
+        if (string.Equals(selectedHeader, "请求数据", StringComparison.Ordinal))
+        {
+            RequestBodyViewer.MoveToNextMatch();
+            return;
+        }
+
+        RequestRawViewer.MoveToNextMatch();
+    }
+
+    private void ResponseDetailSearchTextBox_KeyDown(object sender, KeyEventArgs keyEventArgs)
+    {
+        if (keyEventArgs.Key != Key.Enter)
+        {
+            return;
+        }
+
+        keyEventArgs.Handled = true;
+        string selectedHeader = (ResponseTabControl.SelectedItem as TabItem)?.Header?.ToString() ?? "";
+        if (string.Equals(selectedHeader, "响应文本", StringComparison.Ordinal))
+        {
+            ResponseTextViewer.MoveToNextMatch();
+            return;
+        }
+
+        ResponseRawViewer.MoveToNextMatch();
+    }
+
     private void RequestPanelButton_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         RequestDataPanel.Visibility = Visibility.Visible;
