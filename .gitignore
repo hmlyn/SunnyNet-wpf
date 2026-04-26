@@ -35,6 +35,8 @@ packages/
 # Local reference sources and toolchains
 _source/
 _toolchain/
+sunnymcptool/
+.codex/skills/playwright-cli/
 
 # Logs and OS files
 *.log
