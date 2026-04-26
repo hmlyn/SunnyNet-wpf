@@ -702,8 +702,15 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             return;
         }
 
-        await _backend.InvokeAsync("创建请求代码", new { Data = theologyIds, Lang = lang, Module = module });
-        StatusRight = $"已生成请求代码：{lang} / {module}";
+        JsonElement? result = await _backend.InvokeAsync("获取请求代码", new { Data = theologyIds, Lang = lang, Module = module });
+        string code = result?.ValueKind == JsonValueKind.String ? result.Value.GetString() ?? "" : "";
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            throw new InvalidOperationException("没有生成可复制的请求代码。");
+        }
+
+        Clipboard.SetText(code);
+        StatusRight = $"已复制请求代码：{lang} / {module}";
     }
 
     public async Task InitializeAsync()

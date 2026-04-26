@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -27,7 +28,7 @@ func CreateRequestCode(TheologyArray []int, Lang string, module string) string {
 			if e != nil {
 				continue
 			}
-			mm := &CreateRequest{URL: u, Header: h.Header, Body: h.Body, Method: h.Method}
+			mm := &CreateRequest{URL: u, Header: cloneHeader(h.Header), Body: h.Body, Method: h.Method}
 			index++
 			mm.FuncName = "SunnyNetCreateRequest" + strconv.Itoa(index)
 			mm.Cookie = mm.Header.Get("Cookie")
@@ -40,6 +41,10 @@ func CreateRequestCode(TheologyArray []int, Lang string, module string) string {
 				code += mm.Go(module)
 			} else if Lang == "Python" {
 				code += mm.Python(module)
+			} else if Lang == "Java" {
+				code += mm.Java(module)
+			} else if Lang == "JavaScript" {
+				code += mm.JavaScript(module)
 			} else if Lang == "火山" {
 				code += mm.Hs(module)
 			}
@@ -48,9 +53,23 @@ func CreateRequestCode(TheologyArray []int, Lang string, module string) string {
 	if Lang == "E" {
 		code = ".版本 2\n.支持库 spec\n\n" + code
 	}
+	if Lang == "Java" {
+		code = wrapJavaCode(code, module, index)
+	}
+	if Lang == "JavaScript" {
+		code = wrapJavaScriptCode(code, index)
+	}
 	code = strings.ReplaceAll(code, "\r", "")
 	code = strings.ReplaceAll(code, "\n", "\r\n")
 	return code
+}
+
+func cloneHeader(header http.Header) http.Header {
+	cloned := make(http.Header, len(header))
+	for key, values := range header {
+		cloned[key] = append([]string(nil), values...)
+	}
+	return cloned
 }
 func reText(string2 string) string {
 	s := strings.ReplaceAll(string2, "\\", "\\\\")
@@ -376,6 +395,266 @@ func (e *CreateRequest) Python(module string) string {
 		return code
 	}
 	return code
+}
+
+func wrapJavaCode(code string, module string, count int) string {
+	if count == 0 || code == "" {
+		return ""
+	}
+
+	imports := `import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+`
+	if module == "OkHttp" {
+		imports += `import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+`
+	} else {
+		imports += `import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URI;
+import java.net.URL;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+`
+	}
+
+	main := "    public static void main(String[] args) throws Exception {\n"
+	for index := 1; index <= count; index++ {
+		main += "        SunnyNetCreateRequest" + strconv.Itoa(index) + "();\n"
+	}
+	main += "    }\n\n"
+	return imports + "\npublic class SunnyNetRequestCode {\n" + main + code + "}\n"
+}
+
+func wrapJavaScriptCode(code string, count int) string {
+	if count == 0 || code == "" {
+		return ""
+	}
+
+	main := "(async () => {\n"
+	for index := 1; index <= count; index++ {
+		main += "    await SunnyNetCreateRequest" + strconv.Itoa(index) + "();\n"
+	}
+	main += "})();\n\n"
+	return main + code
+}
+
+func (e *CreateRequest) Java(module string) string {
+	switch module {
+	case "OkHttp":
+		return e.JavaOkHttp()
+	case "HttpURLConnection":
+		return e.JavaHttpURLConnection()
+	default:
+		return e.JavaHttpClient()
+	}
+}
+
+func (e *CreateRequest) JavaHttpClient() string {
+	headers := ""
+	for k, v := range e.Header {
+		if skipGeneratedHeader(k) {
+			continue
+		}
+		headers += "        builder.header(" + codeString(k) + ", " + codeString(firstHeaderValue(v)) + ");\n"
+	}
+	if e.Cookie != "" {
+		headers += "        builder.header(\"Cookie\", " + codeString(e.Cookie) + ");\n"
+	}
+
+	bodyPublisher := "HttpRequest.BodyPublishers.noBody()"
+	if e.AllowsRequestBody() {
+		bodyPublisher = "HttpRequest.BodyPublishers.ofByteArray(body)"
+	}
+
+	return `    public static void ` + e.FuncName + `() throws Exception {
+        String url = ` + codeString(e.URL.String()) + `;
+        byte[] body = Base64.getDecoder().decode(` + codeString(base64.StdEncoding.EncodeToString(e.Body)) + `);
+
+        HttpClient client = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build();
+
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .method(` + codeString(e.Method) + `, ` + bodyPublisher + `);
+` + headers + `
+        HttpResponse<byte[]> response = client.send(builder.build(), HttpResponse.BodyHandlers.ofByteArray());
+        System.out.println("Status: " + response.statusCode());
+        System.out.println(new String(response.body(), StandardCharsets.UTF_8));
+    }
+
+`
+}
+
+func (e *CreateRequest) JavaOkHttp() string {
+	headers := ""
+	for k, v := range e.Header {
+		if skipGeneratedHeader(k) {
+			continue
+		}
+		headers += "                .addHeader(" + codeString(k) + ", " + codeString(firstHeaderValue(v)) + ")\n"
+	}
+	if e.Cookie != "" {
+		headers += "                .addHeader(\"Cookie\", " + codeString(e.Cookie) + ")\n"
+	}
+
+	contentType := e.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	bodyLine := "        RequestBody requestBody = null;\n"
+	if e.AllowsRequestBody() {
+		bodyLine = "        RequestBody requestBody = RequestBody.create(MediaType.parse(" + codeString(contentType) + "), body);\n"
+	}
+
+	return `    public static void ` + e.FuncName + `() throws Exception {
+        String url = ` + codeString(e.URL.String()) + `;
+        byte[] body = Base64.getDecoder().decode(` + codeString(base64.StdEncoding.EncodeToString(e.Body)) + `);
+
+        OkHttpClient client = new OkHttpClient();
+` + bodyLine + `
+        Request request = new Request.Builder()
+                .url(url)
+                .method(` + codeString(e.Method) + `, requestBody)
+` + headers + `                .build();
+
+        try (Response response = client.newCall(request).execute()) {
+            System.out.println("Status: " + response.code());
+            System.out.println(response.body() == null ? "" : response.body().string());
+        }
+    }
+
+`
+}
+
+func (e *CreateRequest) JavaHttpURLConnection() string {
+	headers := ""
+	for k, v := range e.Header {
+		if skipGeneratedHeader(k) {
+			continue
+		}
+		headers += "        connection.setRequestProperty(" + codeString(k) + ", " + codeString(firstHeaderValue(v)) + ");\n"
+	}
+	if e.Cookie != "" {
+		headers += "        connection.setRequestProperty(\"Cookie\", " + codeString(e.Cookie) + ");\n"
+	}
+
+	writeBody := ""
+	if e.AllowsRequestBody() {
+		writeBody = `        connection.setDoOutput(true);
+        try (OutputStream output = connection.getOutputStream()) {
+            output.write(body);
+        }
+`
+	}
+
+	return `    public static void ` + e.FuncName + `() throws Exception {
+        URL url = new URL(` + codeString(e.URL.String()) + `);
+        byte[] body = Base64.getDecoder().decode(` + codeString(base64.StdEncoding.EncodeToString(e.Body)) + `);
+
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod(` + codeString(e.Method) + `);
+        connection.setInstanceFollowRedirects(true);
+` + headers + writeBody + `
+        int status = connection.getResponseCode();
+        byte[] response = (status >= 400 ? connection.getErrorStream() : connection.getInputStream()).readAllBytes();
+        System.out.println("Status: " + status);
+        System.out.println(new String(response, StandardCharsets.UTF_8));
+        connection.disconnect();
+    }
+
+`
+}
+
+func (e *CreateRequest) JavaScript(module string) string {
+	if module != "fetch" {
+		return ""
+	}
+
+	headers := ""
+	for k, v := range e.Header {
+		if strings.ToUpper(k) == "CONTENT-LENGTH" {
+			continue
+		}
+		headers += "        " + codeString(k) + ": " + codeString(firstHeaderValue(v)) + ",\n"
+	}
+	if e.Cookie != "" {
+		headers += "        \"Cookie\": " + codeString(e.Cookie) + ",\n"
+	}
+
+	bodyOption := ""
+	if e.AllowsRequestBody() {
+		bodyOption = "        body,\n"
+	}
+
+	return `async function ` + e.FuncName + `() {
+    const url = ` + codeString(e.URL.String()) + `;
+    const body = Buffer.from(` + codeString(base64.StdEncoding.EncodeToString(e.Body)) + `, "base64");
+    const response = await fetch(url, {
+        method: ` + codeString(e.Method) + `,
+        headers: {
+` + headers + `        },
+` + bodyOption + `    });
+    console.log("Status:", response.status);
+    console.log(await response.text());
+}
+
+`
+}
+
+func (e *CreateRequest) AllowsRequestBody() bool {
+	method := strings.ToUpper(e.Method)
+	return method != "" && method != "GET" && method != "HEAD"
+}
+
+func skipGeneratedHeader(name string) bool {
+	switch strings.ToUpper(name) {
+	case "CONTENT-LENGTH", "HOST":
+		return true
+	default:
+		return false
+	}
+}
+
+func firstHeaderValue(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	return values[0]
+}
+
+func codeString(value string) string {
+	var builder strings.Builder
+	builder.WriteByte('"')
+	for _, r := range value {
+		switch r {
+		case '\\':
+			builder.WriteString("\\\\")
+		case '"':
+			builder.WriteString("\\\"")
+		case '\r':
+			builder.WriteString("\\r")
+		case '\n':
+			builder.WriteString("\\n")
+		case '\t':
+			builder.WriteString("\\t")
+		default:
+			if r < 0x20 || r == 0x2028 || r == 0x2029 {
+				builder.WriteString(fmt.Sprintf("\\u%04X", r))
+			} else {
+				builder.WriteRune(r)
+			}
+		}
+	}
+	builder.WriteByte('"')
+	return builder.String()
 }
 func strReplaceAll(abody []byte) string {
 	ss := strings.ReplaceAll(string(abody), "\\", "\\\\")

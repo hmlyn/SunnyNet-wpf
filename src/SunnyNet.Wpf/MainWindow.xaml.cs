@@ -1341,7 +1341,7 @@ public partial class MainWindow : Window
         }
         catch (Exception exception)
         {
-            ViewModel_NotificationRequested("生成失败", exception.Message);
+            ViewModel_NotificationRequested("复制失败", exception.Message);
         }
     }
 

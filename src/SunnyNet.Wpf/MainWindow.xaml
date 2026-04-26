@@ -704,12 +704,30 @@
                                             <MenuItem Header="HOST" Click="CopySelectedSessionHosts_Click" />
                                             <MenuItem Header="会话摘要" Click="CopySelectedSessionSummary_Click" />
                                         </MenuItem>
-                                        <MenuItem x:Name="GenerateCodeSessionsMenuItem" Header="生成请求代码">
-                                            <MenuItem Header="C# HttpClient" Tag="C#|HttpClient" Click="GenerateRequestCode_Click" />
-                                            <MenuItem Header="C# RestSharp" Tag="C#|RestSharp" Click="GenerateRequestCode_Click" />
+                                        <MenuItem x:Name="GenerateCodeSessionsMenuItem" Header="复制请求代码">
+                                            <MenuItem Header="C#">
+                                                <MenuItem Header="HttpClient" Tag="C#|HttpClient" Click="GenerateRequestCode_Click" />
+                                                <MenuItem Header="RestSharp" Tag="C#|RestSharp" Click="GenerateRequestCode_Click" />
+                                            </MenuItem>
+                                            <MenuItem Header="Java">
+                                                <MenuItem Header="HttpClient (Java 11+)" Tag="Java|HttpClient" Click="GenerateRequestCode_Click" />
+                                                <MenuItem Header="OkHttp" Tag="Java|OkHttp" Click="GenerateRequestCode_Click" />
+                                                <MenuItem Header="HttpURLConnection" Tag="Java|HttpURLConnection" Click="GenerateRequestCode_Click" />
+                                            </MenuItem>
                                             <Separator />
                                             <MenuItem Header="Go net/http" Tag="Go|net/http" Click="GenerateRequestCode_Click" />
                                             <MenuItem Header="Python requests" Tag="Python|requests" Click="GenerateRequestCode_Click" />
+                                            <MenuItem Header="JavaScript fetch" Tag="JavaScript|fetch" Click="GenerateRequestCode_Click" />
+                                            <Separator />
+                                            <MenuItem Header="易语言">
+                                                <MenuItem Header="WinInet" Tag="E|WinInet" Click="GenerateRequestCode_Click" />
+                                                <MenuItem Header="WinHttpW" Tag="E|WinHttpW" Click="GenerateRequestCode_Click" />
+                                                <MenuItem Header="WinHttpR" Tag="E|WinHttpR" Click="GenerateRequestCode_Click" />
+                                                <MenuItem Header="E2EE" Tag="E|e2ee" Click="GenerateRequestCode_Click" />
+                                                <MenuItem Header="网页_访问" Tag="E|网页_访问" Click="GenerateRequestCode_Click" />
+                                                <MenuItem Header="网页_访问_对象" Tag="E|网页_访问_对象" Click="GenerateRequestCode_Click" />
+                                            </MenuItem>
+                                            <MenuItem Header="火山 WinHttpW" Tag="火山|WinHttpW" Click="GenerateRequestCode_Click" />
                                         </MenuItem>
                                         <MenuItem x:Name="FavoriteSelectedSessionsMenuItem" Header="标记收藏" Click="FavoriteSelectedSessions_Click" />
                                         <MenuItem x:Name="MarkColorSelectedSessionsMenuItem" Header="标记颜色">

@@ -228,11 +228,19 @@ func event(command string, args *JSON.SyJson) any {
 		Code := CreateRequestCode(TheologyArray, Lang, Module)
 		er := ClipboardText(Code)
 		if er == nil {
-			CallJs("弹出成功信息", "请求代码已复制到剪辑版")
+			CallJs("弹出成功信息", "请求代码已复制到剪贴板")
 		} else {
-			CallJs("弹出成功信息", "请求代码复制到剪辑版失败:"+er.Error())
+			CallJs("弹出成功信息", "请求代码复制到剪贴板失败:"+er.Error())
 		}
 		return true
+	case "获取请求代码":
+		var TheologyArray []int
+		Lang := args.GetData("Lang")
+		Module := args.GetData("Module")
+		for i := 0; i < args.GetNum("Data"); i++ {
+			TheologyArray = append(TheologyArray, getInt(args.GetData("Data["+strconv.Itoa(i)+"]")))
+		}
+		return CreateRequestCode(TheologyArray, Lang, Module)
 	case "保存文件":
 		var TheologyArray []int
 		Path := strings.ReplaceAll(args.GetData("Path"), "\\\\", "\\")
