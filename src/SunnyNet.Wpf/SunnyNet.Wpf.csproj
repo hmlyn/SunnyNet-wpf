@@ -48,6 +48,7 @@
   <ItemGroup>
     <Resource Include="Resources\AppIcon.ico" />
     <Resource Include="Resources\AppIcon.png" />
+    <Resource Include="Resources\SponsorWeChat.png" Condition="Exists('Resources\SponsorWeChat.png')" />
   </ItemGroup>
 
 </Project>

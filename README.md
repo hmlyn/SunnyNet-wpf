@@ -2,9 +2,13 @@
 
 基于 SunnyNet Go 核心的 Windows 抓包分析工具。项目使用 `C# + WPF` 重绘桌面界面，核心抓包、代理、脚本与协议处理仍由 Go 后端提供，并以 `c-shared DLL` 方式供 WPF 直接调用。
 
-GitHub 仓库描述建议：
+> 仓库地址：https://github.com/hmlyn/SunnyNet-wpf
 
-> SunnyNet WPF 是基于 SunnyNet Go 核心的 Windows 抓包分析工具，使用 C# + WPF 重绘界面，支持 HTTP/HTTPS、WebSocket、TCP/UDP、断点拦截、重放、脚本解密、MCP 与常用调试工具。
+作者：`hmlyn`
+
+仓库描述：
+
+> SunnyNet WPF 是基于 SunnyNet Go 核心的 Windows 抓包分析工具，使用 C# + WPF 重绘界面，支持 HTTP/HTTPS、WebSocket、TCP/UDP、断点拦截、重放、脚本解密、请求构造器、MCP 与常用调试工具。
 
 ## 功能概览
 
@@ -13,10 +17,26 @@ GitHub 仓库描述建议：
 - 支持 HTTP/HTTPS、WebSocket、TCP、UDP 抓包展示。
 - 支持会话筛选、进程筛选、域名筛选、收藏、备注、列宽与布局记忆。
 - 支持断点拦截、请求/响应修改、重放、替换规则、请求证书、Hosts 规则。
+- 支持请求构造器，可从会话重放并缓存历史记录。
+- 支持会话右键复制请求代码，包含 C#、Java、Go、Python、JavaScript、易语言与火山等模板。
+- 支持请求/响应文本关键词高亮，查找窗口命中后可联动右侧详情视图。
 - 支持 WebSocket 消息流、消息重放、HEX/原文/Protobuf 视图。
 - 支持脚本扩展，并提供显示层解密能力，不破坏原始请求/响应数据。
 - 内置文本工具、JSON 结构编辑器、加密/解密工具。
 - 支持 SunnyNet MCP，可让 AI 会话读取、搜索、标记和分析抓包会话。
+- 内置开源协议与赞赏页面，赞赏二维码作为 WPF 内嵌资源打包。
+
+## 发布版本
+
+当前发布版本：`v0.1.1`
+
+发布包命名：
+
+```text
+SunnyNet-wpf-v0.1.1-win-x64.zip
+```
+
+Release 包含 Windows x64 可运行程序、Go 后端 DLL 与可选 MCP 桥接程序。
 
 ## 目录结构
 
@@ -158,3 +178,9 @@ backend/SunnyNetBridge.dll
 ## 文档
 
 - `docs/MCP工具清单.md`：当前 WPF 版支持的 MCP 工具、参数与返回字段说明。
+
+## 开源协议
+
+SunnyNet WPF 版采用 MIT 协议开源。你可以自由使用、复制、修改、合并、发布、分发或二次开发本项目，但需要保留原始版权声明和协议声明。
+
+本项目仅用于合法的网络调试、接口分析、测试与技术研究场景。请勿将本工具用于未授权抓包、绕过访问控制、攻击或其它违法用途。

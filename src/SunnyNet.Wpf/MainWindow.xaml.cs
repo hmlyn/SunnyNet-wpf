@@ -519,6 +519,11 @@ public partial class MainWindow : Window
         new CertificateGuideWindow(_viewModel) { Owner = this }.Show();
     }
 
+    private void OpenSource_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        new OpenSourceWindow { Owner = this }.Show();
+    }
+
     private void Find_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         ShowSearchWindow();

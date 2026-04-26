@@ -307,6 +307,12 @@
                                     <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="证书教程" />
                                 </StackPanel>
                             </Button>
+                            <Button Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}" Click="OpenSource_Click" ToolTip="开源协议">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE82D;" />
+                                    <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="开源协议" />
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
                     </ScrollViewer>
                 </DockPanel>
