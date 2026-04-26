@@ -205,6 +205,19 @@
                                 <ComboBoxItem Content="SHA3-384" />
                                 <ComboBoxItem Content="SHA3-512" />
                             </ComboBox>
+                            <TextBlock Margin="12,0,6,0" VerticalAlignment="Center" Text="HMAC密钥" />
+                            <TextBox x:Name="HashHmacKeyTextBox"
+                                     Width="220"
+                                     Height="30"
+                                     Padding="9,5"
+                                     VerticalContentAlignment="Center"
+                                     ToolTip="为空时使用普通哈希；不为空时使用 HMAC 模式。" />
+                            <TextBlock Margin="12,0,6,0" VerticalAlignment="Center" Text="密钥格式" />
+                            <ComboBox x:Name="HashHmacKeyFormatComboBox" Width="88" SelectedIndex="0">
+                                <ComboBoxItem Content="文本" />
+                                <ComboBoxItem Content="Base64" />
+                                <ComboBoxItem Content="HEX" />
+                            </ComboBox>
                             <TextBlock Margin="12,0,6,0" VerticalAlignment="Center" Text="输入" />
                             <ComboBox x:Name="HashInputFormatComboBox" Width="88" SelectedIndex="0">
                                 <ComboBoxItem Content="文本" />

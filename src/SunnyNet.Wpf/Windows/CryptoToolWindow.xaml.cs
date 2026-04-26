@@ -23,6 +23,7 @@ public partial class CryptoToolWindow : Window
         RsaOutputTextBox.Clear();
         HashInputTextBox.Clear();
         HashOutputTextBox.Clear();
+        HashHmacKeyTextBox.Clear();
         ToolSummaryTextBlock.Text = "支持 AES/DES、RSA 和常用哈希，输入/输出支持文本、Base64、HEX。";
     }
 
@@ -162,10 +163,17 @@ public partial class CryptoToolWindow : Window
     {
         RunAction(() =>
         {
+            string algorithm = GetComboText(HashAlgorithmComboBox);
             byte[] input = DecodeData(HashInputTextBox.Text, GetComboText(HashInputFormatComboBox));
-            byte[] output = ComputeHash(input, GetComboText(HashAlgorithmComboBox));
+            string hmacKeyText = HashHmacKeyTextBox.Text ?? "";
+            bool useHmac = !string.IsNullOrWhiteSpace(hmacKeyText);
+            byte[] output = useHmac
+                ? ComputeHmac(input, DecodeData(hmacKeyText, GetComboText(HashHmacKeyFormatComboBox)), algorithm)
+                : ComputeHash(input, algorithm);
             HashOutputTextBox.Text = EncodeData(output, GetComboText(HashOutputFormatComboBox));
-            ToolSummaryTextBlock.Text = $"哈希计算完成：{GetComboText(HashAlgorithmComboBox)}，{output.Length:N0} Bytes。";
+            ToolSummaryTextBlock.Text = useHmac
+                ? $"HMAC 计算完成：HMAC-{algorithm}，{output.Length:N0} Bytes。"
+                : $"哈希计算完成：{algorithm}，{output.Length:N0} Bytes。";
         }, "哈希计算失败");
     }
 
@@ -183,6 +191,24 @@ public partial class CryptoToolWindow : Window
             "SHA3-256" or "SHA3-384" or "SHA3-512" => throw new PlatformNotSupportedException($"当前 .NET/系统不支持 {algorithm}。"),
             _ => SHA256.HashData(input)
         };
+    }
+
+    private static byte[] ComputeHmac(byte[] input, byte[] key, string algorithm)
+    {
+        using HMAC hmac = algorithm switch
+        {
+            "MD5" => new HMACMD5(key),
+            "SHA1" => new HMACSHA1(key),
+            "SHA384" => new HMACSHA384(key),
+            "SHA512" => new HMACSHA512(key),
+            "SHA3-256" when HMACSHA3_256.IsSupported => new HMACSHA3_256(key),
+            "SHA3-384" when HMACSHA3_384.IsSupported => new HMACSHA3_384(key),
+            "SHA3-512" when HMACSHA3_512.IsSupported => new HMACSHA3_512(key),
+            "SHA3-256" or "SHA3-384" or "SHA3-512" => throw new PlatformNotSupportedException($"当前 .NET/系统不支持 HMAC-{algorithm}。"),
+            _ => new HMACSHA256(key)
+        };
+
+        return hmac.ComputeHash(input);
     }
 
 
