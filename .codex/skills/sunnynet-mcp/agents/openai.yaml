@@ -1,0 +1,13 @@
+interface:
+  display_name: "SunnyNet MCP"
+  short_description: "Inspect and manage SunnyNet captured traffic via MCP"
+  brand_color: "#1E50C8"
+  default_prompt: "Use $sunnynet-mcp to list current SunnyNet sessions and summarize the most relevant requests."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "sunnynet"
+      description: "SunnyNet WPF MCP server for capture sessions, rules, proxy, favorites, and notes"
+      transport: "stdio"
+policy:
+  allow_implicit_invocation: true
