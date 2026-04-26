@@ -188,24 +188,40 @@
                                     <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="设置" />
                                 </StackPanel>
                             </Button>
-                            <Button Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}" Command="{Binding ClearAllCommand}" ToolTip="清空所有记录">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE74D;" />
-                                    <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="清空" />
-                                </StackPanel>
-                            </Button>
                             <Button Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}" Click="Find_Click" ToolTip="搜索/查找 (Ctrl+F)">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE721;" />
                                     <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="查找" />
                                 </StackPanel>
                             </Button>
-                            <Button Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}" Click="ClearFilters_Click" ToolTip="清空全部过滤条件">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE71C;" />
-                                    <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="清筛选" />
-                                </StackPanel>
-                            </Button>
+                            <Menu Margin="6,0,0,0" VerticalAlignment="Center">
+                                <MenuItem x:Name="ClearSessionsMenuItem"
+                                          Padding="10,6"
+                                          ToolTip="按类型清除会话列表">
+                                    <MenuItem.Header>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE74D;" />
+                                            <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="清除" />
+                                            <TextBlock Margin="4,1,0,0"
+                                                       VerticalAlignment="Center"
+                                                       FontFamily="Segoe UI Symbol"
+                                                       FontSize="9"
+                                                       Text="▼" />
+                                        </StackPanel>
+                                    </MenuItem.Header>
+                                    <MenuItem Header="清除所有" Tag="All" Click="ClearSessionsByRule_Click" />
+                                    <MenuItem Header="清除资源" Tag="Resources" Click="ClearSessionsByRule_Click" />
+                                    <MenuItem Header="清除无响应" Tag="NoResponse" Click="ClearSessionsByRule_Click" />
+                                    <MenuItem Header="清除失败请求" Tag="Failed" Click="ClearSessionsByRule_Click" />
+                                    <MenuItem Header="清除重定向" Tag="Redirect" Click="ClearSessionsByRule_Click" />
+                                    <Separator />
+                                    <MenuItem Header="清除未收藏" Tag="Unfavorite" Click="ClearSessionsByRule_Click" />
+                                    <MenuItem Header="清除未标记" Tag="Untagged" Click="ClearSessionsByRule_Click" />
+                                    <MenuItem Header="清除当前筛选结果" Tag="CurrentFilter" Click="ClearSessionsByRule_Click" />
+                                    <Separator />
+                                    <MenuItem Header="清除过滤条件" Click="ClearFilters_Click" />
+                                </MenuItem>
+                            </Menu>
                             <Button Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}" Command="{Binding ReleaseAllCommand}" ToolTip="全部放行">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE768;" />

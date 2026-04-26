@@ -1458,6 +1458,23 @@ public partial class MainWindow : Window
         SaveFavoriteSettings();
     }
 
+    private async void ClearSessionsByRule_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        if (sender is not MenuItem menuItem || !Enum.TryParse(menuItem.Tag?.ToString(), out SessionClearRule rule))
+        {
+            return;
+        }
+
+        try
+        {
+            await _viewModel.DeleteSessionEntriesByRuleAsync(rule);
+        }
+        catch (Exception exception)
+        {
+            ViewModel_NotificationRequested("清除失败", exception.Message);
+        }
+    }
+
     private void FavoriteSession_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         if (sender is not FrameworkElement { DataContext: CaptureEntry entry })

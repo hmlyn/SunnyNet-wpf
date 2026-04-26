@@ -16,6 +16,49 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 {
     private const int LargePayloadPreviewBytes = 32 * 1024;
     private const int LargePayloadThresholdBytes = 512 * 1024;
+    private static readonly string[] ResourceTypeTokens =
+    {
+        "javascript",
+        "ecmascript",
+        "css",
+        "image/",
+        "font",
+        "woff",
+        "ttf",
+        "otf",
+        "svg",
+        "audio/",
+        "video/",
+        "wasm"
+    };
+
+    private static readonly string[] ResourceUrlExtensions =
+    {
+        ".js",
+        ".mjs",
+        ".css",
+        ".map",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".webp",
+        ".bmp",
+        ".ico",
+        ".svg",
+        ".avif",
+        ".woff",
+        ".woff2",
+        ".ttf",
+        ".otf",
+        ".eot",
+        ".mp3",
+        ".mp4",
+        ".m4a",
+        ".webm",
+        ".wav",
+        ".wasm"
+    };
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -489,6 +532,23 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     public async Task DeleteSessionEntriesAsync(IEnumerable<CaptureEntry> entries)
     {
         await DeleteSessionsAsync(NormalizeSessionEntries(entries));
+    }
+
+    public async Task<int> DeleteSessionEntriesByRuleAsync(SessionClearRule rule)
+    {
+        CaptureEntry[] entries = rule == SessionClearRule.CurrentFilter
+            ? SessionsView.OfType<CaptureEntry>().ToArray()
+            : Sessions.Where(entry => MatchesClearRule(entry, rule)).ToArray();
+
+        if (entries.Length == 0)
+        {
+            StatusRight = "没有符合清除条件的会话";
+            return 0;
+        }
+
+        await DeleteSessionsAsync(entries);
+        StatusRight = $"已清除 {entries.Length} 条会话";
+        return entries.Length;
     }
 
     public async Task MarkSessionEntriesAsync(IEnumerable<CaptureEntry> entries, string? tagColor)
@@ -2432,6 +2492,106 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         RefreshSessionFilterItems();
     }
 
+    private static bool MatchesClearRule(CaptureEntry entry, SessionClearRule rule)
+    {
+        return rule switch
+        {
+            SessionClearRule.All => true,
+            SessionClearRule.Resources => IsResourceSession(entry),
+            SessionClearRule.NoResponse => IsNoResponseSession(entry),
+            SessionClearRule.Failed => IsFailedSession(entry),
+            SessionClearRule.Redirect => IsRedirectSession(entry),
+            SessionClearRule.Unfavorite => !entry.IsFavorite,
+            SessionClearRule.Untagged => !entry.HasTagColor,
+            SessionClearRule.CurrentFilter => true,
+            _ => false
+        };
+    }
+
+    private static bool IsResourceSession(CaptureEntry entry)
+    {
+        string responseType = entry.ResponseType.Trim();
+        if (ResourceTypeTokens.Any(token => responseType.Contains(token, StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        string icon = entry.Icon.Trim();
+        if (icon is "img" or "js" or "css" or "font" or "audio" or "video" or "Flash")
+        {
+            return true;
+        }
+
+        string path = ExtractUrlPath(entry.Url);
+        return ResourceUrlExtensions.Any(extension => path.EndsWith(extension, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsNoResponseSession(CaptureEntry entry)
+    {
+        int statusCode = ExtractStatusCode(entry.State);
+        if (statusCode > 0)
+        {
+            return false;
+        }
+
+        return string.IsNullOrWhiteSpace(entry.ResponseLength)
+            || entry.ResponseLength.Equals("0", StringComparison.OrdinalIgnoreCase)
+            || entry.ResponseLength.Equals("0/0", StringComparison.OrdinalIgnoreCase)
+            || entry.State.Contains("-", StringComparison.OrdinalIgnoreCase)
+            || entry.State.Contains("等待", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsFailedSession(CaptureEntry entry)
+    {
+        int statusCode = ExtractStatusCode(entry.State);
+        return statusCode >= 400
+            || entry.Icon.Equals("error", StringComparison.OrdinalIgnoreCase)
+            || entry.ResponseType.Contains("error", StringComparison.OrdinalIgnoreCase)
+            || entry.State.Contains("error", StringComparison.OrdinalIgnoreCase)
+            || entry.State.Contains("错误", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsRedirectSession(CaptureEntry entry)
+    {
+        int statusCode = ExtractStatusCode(entry.State);
+        return statusCode is >= 300 and < 400;
+    }
+
+    private static string ExtractUrlPath(string value)
+    {
+        if (Uri.TryCreate(value, UriKind.Absolute, out Uri? uri))
+        {
+            return uri.AbsolutePath;
+        }
+
+        int queryIndex = value.IndexOf('?', StringComparison.Ordinal);
+        return queryIndex >= 0 ? value[..queryIndex] : value;
+    }
+
+    private static int ExtractStatusCode(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return 0;
+        }
+
+        for (int index = 0; index <= value.Length - 3; index++)
+        {
+            if (!char.IsDigit(value[index]) || !char.IsDigit(value[index + 1]) || !char.IsDigit(value[index + 2]))
+            {
+                continue;
+            }
+
+            int statusCode = ((value[index] - '0') * 100) + ((value[index + 1] - '0') * 10) + (value[index + 2] - '0');
+            if (statusCode is >= 100 and <= 599)
+            {
+                return statusCode;
+            }
+        }
+
+        return 0;
+    }
+
     private static CaptureEntry[] NormalizeSessionEntries(IEnumerable<CaptureEntry> entries)
     {
         List<CaptureEntry> result = new();
@@ -3462,3 +3622,15 @@ internal sealed record PendingInterceptReplay(
     CaptureEntry SourceEntry,
     int Mode,
     TaskCompletionSource<CaptureEntry> Completion);
+
+public enum SessionClearRule
+{
+    All,
+    Resources,
+    NoResponse,
+    Failed,
+    Redirect,
+    Unfavorite,
+    Untagged,
+    CurrentFilter
+}
