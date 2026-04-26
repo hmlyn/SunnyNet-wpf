@@ -643,6 +643,10 @@
                                       CanUserAddRows="False"
                                       CanUserDeleteRows="False"
                                       EnableRowVirtualization="True"
+                                      EnableColumnVirtualization="True"
+                                      VirtualizingPanel.IsVirtualizing="True"
+                                      VirtualizingPanel.VirtualizationMode="Recycling"
+                                      ScrollViewer.CanContentScroll="True"
                                       PreviewMouseRightButtonDown="SessionsGrid_PreviewMouseRightButtonDown"
                                       CellEditEnding="SessionsGrid_CellEditEnding">
                                 <DataGrid.ContextMenu>

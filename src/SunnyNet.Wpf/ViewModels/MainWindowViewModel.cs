@@ -6,6 +6,7 @@ using System.Windows.Data;
 using System.Text;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Threading;
 using SunnyNet.Wpf.Models;
 using SunnyNet.Wpf.Services;
 
@@ -33,9 +34,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     private readonly HashSet<string> _selectedProcessFilterKeys = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _selectedDomainFilterKeys = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<PendingInterceptReplay> _pendingInterceptReplays = new();
+    private readonly DispatcherTimer _sessionFilterRefreshTimer;
     private const string AllProcessFilterKey = "__all_process__";
     private const string AllDomainFilterKey = "__all_domain__";
     private int _nextIndex = 1;
+    private int _favoriteCount;
     private CaptureEntry? _selectedSession;
     private bool _showFavoritesOnly;
     private bool _isBusy;
@@ -43,6 +46,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     private bool _isCapturing = true;
     private bool _ieProxyEnabled;
     private bool _isSelectedSessionIntercepted;
+    private bool _sessionFilterRefreshPending;
+    private bool _sessionViewRefreshPending;
     private bool _proxyClearedOnExit;
     private bool _disposed;
     private int _breakpointMode;
@@ -61,6 +66,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     {
         SessionsView = CollectionViewSource.GetDefaultView(Sessions);
         SessionsView.Filter = FilterSession;
+        _sessionFilterRefreshTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromMilliseconds(650)
+        };
+        _sessionFilterRefreshTimer.Tick += SessionFilterRefreshTimer_Tick;
         ClearAllCommand = new AsyncRelayCommand(ClearAllAsync);
         ReleaseAllCommand = new AsyncRelayCommand(ReleaseAllAsync);
         ToggleCaptureCommand = new AsyncRelayCommand(ToggleCaptureAsync);
@@ -266,7 +276,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         }
     }
 
-    public int FavoriteCount => Sessions.Count(static entry => entry.IsFavorite);
+    public int FavoriteCount => _favoriteCount;
 
     public string FavoriteSummaryText => FavoriteCount > 0
         ? $"已收藏 {FavoriteCount} 条"
@@ -376,6 +386,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             ApplyFavoriteState(entry, forceRefresh: true);
         }
 
+        _favoriteCount = Sessions.Count(static entry => entry.IsFavorite);
         ShowFavoritesOnly = showFavoritesOnly;
         NotifyFavoriteSummaryChanged();
     }
@@ -400,10 +411,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         if (next)
         {
             _favoriteKeys.Add(favoriteKey);
+            _favoriteCount++;
         }
         else
         {
             _favoriteKeys.Remove(favoriteKey);
+            _favoriteCount = Math.Max(0, _favoriteCount - 1);
         }
 
         NotifyFavoriteSummaryChanged();
@@ -626,6 +639,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         }
 
         _disposed = true;
+        _sessionFilterRefreshTimer.Stop();
         await DisableSystemProxyOnExitAsync();
         await _backend.DisposeAsync();
     }
@@ -1486,6 +1500,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         Sessions.Clear();
         _sessionMap.Clear();
         _nextIndex = 1;
+        _favoriteCount = 0;
         NotifyFavoriteSummaryChanged();
         RefreshSessionFilterItems();
         Detail.Clear();
@@ -1742,7 +1757,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
         if (changed)
         {
-            RefreshSessionFilterItems();
+            ScheduleSessionFilterRefresh(refreshSessionView: HasActiveSessionFilter);
         }
 
         OpenInterceptedSession(interceptedEntry);
@@ -1790,7 +1805,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
         if (changed)
         {
-            RefreshSessionFilterItems();
+            ScheduleSessionFilterRefresh(refreshSessionView: HasActiveSessionFilter);
         }
 
         OpenInterceptedSession(interceptedEntry);
@@ -2063,6 +2078,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
         entry.NormalizeDerivedFields();
         ApplyFavoriteState(entry, forceRefresh: true);
+        if (entry.IsFavorite)
+        {
+            _favoriteCount++;
+        }
         Sessions.Add(entry);
         _sessionMap[entry.Theology] = entry;
         NotifyFavoriteSummaryChanged();
@@ -2148,7 +2167,31 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         SessionsView.Refresh();
     }
 
-    private void RefreshSessionFilterItems()
+    private void ScheduleSessionFilterRefresh(bool refreshSessionView)
+    {
+        _sessionFilterRefreshPending = true;
+        _sessionViewRefreshPending |= refreshSessionView;
+        if (!_sessionFilterRefreshTimer.IsEnabled)
+        {
+            _sessionFilterRefreshTimer.Start();
+        }
+    }
+
+    private void SessionFilterRefreshTimer_Tick(object? sender, EventArgs eventArgs)
+    {
+        _sessionFilterRefreshTimer.Stop();
+        if (!_sessionFilterRefreshPending)
+        {
+            return;
+        }
+
+        bool refreshSessionView = _sessionViewRefreshPending;
+        _sessionFilterRefreshPending = false;
+        _sessionViewRefreshPending = false;
+        RefreshSessionFilterItems(refreshSessionView);
+    }
+
+    private void RefreshSessionFilterItems(bool refreshSessionView = true)
     {
         IReadOnlyList<CaptureEntry> filterSource = GetSessionFilterSource();
         List<SessionFilterItem> processItems = BuildSessionFilterItems(filterSource, static entry => entry.Process, "未知进程");
@@ -2170,7 +2213,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             IsRefreshingSessionFilters = false;
         }
 
-        RefreshSessionView();
+        if (refreshSessionView)
+        {
+            RefreshSessionView();
+        }
+
         OnPropertyChanged(nameof(SelectedProcessFilterKey));
         OnPropertyChanged(nameof(SelectedDomainFilterKey));
         OnPropertyChanged(nameof(HasActiveSessionFilter));
@@ -2284,6 +2331,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
         bool deletedSelectedSession = SelectedSession is not null
             && entries.Any(entry => entry.Theology == SelectedSession.Theology);
+        int deletedFavorites = entries.Count(static entry => entry.IsFavorite);
 
         foreach (CaptureEntry entry in entries)
         {
@@ -2299,6 +2347,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             SelectedSession = null;
         }
 
+        if (deletedFavorites > 0)
+        {
+            _favoriteCount = Math.Max(0, _favoriteCount - deletedFavorites);
+        }
         NotifyFavoriteSummaryChanged();
         RefreshSessionFilterItems();
     }
