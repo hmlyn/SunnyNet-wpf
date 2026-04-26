@@ -23,7 +23,6 @@ GitHub 仓库描述建议：
 - `backend/`：Go 后端桥接层，编译为 `backend/SunnyNetBridge.dll`。
 - `src/SunnyNet.Wpf/`：WPF 桌面程序。
 - `docs/`：项目文档与脚本示例。
-- `docs/scripts/game-display-decrypt.goc`：显示层解密脚本示例。
 - `build-debug.bat`：Debug 构建脚本，输出到 `artifacts/Debug/`。
 - `build-release.bat`：Release 构建脚本，输出到 `artifacts/Release/`，不生成 pdb。
 
@@ -159,4 +158,3 @@ backend/SunnyNetBridge.dll
 ## 文档
 
 - `docs/MCP工具清单.md`：当前 WPF 版支持的 MCP 工具、参数与返回字段说明。
-- `docs/scripts/game-display-decrypt.goc`：对指定域名 POST 请求进行显示层解密的脚本示例。
