@@ -509,6 +509,11 @@ public partial class MainWindow : Window
         new CryptoToolWindow { Owner = this }.Show();
     }
 
+    private void RequestBuilder_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        new RequestBuilderWindow(_viewModel) { Owner = this }.Show();
+    }
+
     private void CertificateGuide_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         new CertificateGuideWindow(_viewModel) { Owner = this }.Show();
@@ -535,6 +540,16 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (keyEventArgs.Key == Key.X
+            && Keyboard.Modifiers == ModifierKeys.Control
+            && IsKeyboardFocusWithinSessionsGrid()
+            && !IsTextEditorFocused())
+        {
+            _ = ClearAllSessionsFromShortcutAsync();
+            keyEventArgs.Handled = true;
+            return;
+        }
+
         if (IsKeyboardFocusWithinSessionsGrid()
             && !IsTextEditorFocused()
             && TryResolveSessionMarkShortcut(keyEventArgs, out string tagColor))
@@ -551,6 +566,18 @@ public partial class MainWindow : Window
 
         ShowSearchWindow();
         keyEventArgs.Handled = true;
+    }
+
+    private async Task ClearAllSessionsFromShortcutAsync()
+    {
+        try
+        {
+            await _viewModel.ClearSessionsQuietAsync();
+        }
+        catch (Exception exception)
+        {
+            ViewModel_NotificationRequested("清空失败", exception.Message);
+        }
     }
 
     private void ShowSearchWindow()
@@ -1403,6 +1430,18 @@ public partial class MainWindow : Window
         {
             ViewModel_NotificationRequested("重放失败", exception.Message);
         }
+    }
+
+    private void ResendFromBuilder_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        CaptureEntry? entry = GetSelectedSessionEntries().FirstOrDefault();
+        if (entry is null)
+        {
+            new RequestBuilderWindow(_viewModel) { Owner = this }.Show();
+            return;
+        }
+
+        new RequestBuilderWindow(_viewModel, entry) { Owner = this }.Show();
     }
 
     private async void CloseSelectedConnections_Click(object sender, RoutedEventArgs routedEventArgs)

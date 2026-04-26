@@ -1,16 +1,19 @@
 package MapHash
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"github.com/qtgolang/SunnyNet/SunnyNet"
 	"github.com/qtgolang/SunnyNet/public"
 	"github.com/qtgolang/SunnyNet/src/GoWinHttp"
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"strconv"
@@ -599,6 +602,228 @@ type UpdateSocketData struct {
 type RequestImg struct {
 	Body string `json:"Body"`
 	Type string `json:"Type"`
+}
+
+type BuiltHttpResult struct {
+	StatusCode int         `json:"StatusCode"`
+	Status     string      `json:"Status"`
+	Proto      string      `json:"Proto"`
+	Header     http.Header `json:"Header"`
+	Body       []byte      `json:"Body"`
+}
+
+func SendBuiltHttp(method, rawURL, proto string, header http.Header, body []byte, sunnyNetPort int) (*BuiltHttpResult, error) {
+	requestURL, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, err
+	}
+	if requestURL.Scheme != "http" && requestURL.Scheme != "https" {
+		return nil, fmt.Errorf("仅支持 http/https 请求")
+	}
+	if requestURL.Hostname() == "" {
+		return nil, fmt.Errorf("URL 缺少主机")
+	}
+
+	conn, err := dialSunnySocks5("127.0.0.1:"+strconv.Itoa(sunnyNetPort), requestURL)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = conn.Close() }()
+
+	if requestURL.Scheme == "https" {
+		tlsConn := tls.Client(conn, &tls.Config{
+			ServerName:         requestURL.Hostname(),
+			InsecureSkipVerify: true,
+		})
+		if err = tlsConn.Handshake(); err != nil {
+			return nil, err
+		}
+		conn = tlsConn
+	}
+
+	requestProto, err := normalizeHttpProto(proto)
+	if err != nil {
+		return nil, err
+	}
+	if err = writeBuiltHttpRequest(conn, method, requestURL, requestProto, header, body); err != nil {
+		return nil, err
+	}
+
+	response, err := http.ReadResponse(bufio.NewReader(conn), nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = response.Body.Close() }()
+
+	responseBody, _ := io.ReadAll(response.Body)
+	return &BuiltHttpResult{
+		StatusCode: response.StatusCode,
+		Status:     response.Status,
+		Proto:      response.Proto,
+		Header:     response.Header,
+		Body:       responseBody,
+	}, nil
+}
+
+func dialSunnySocks5(proxyAddress string, requestURL *url.URL) (net.Conn, error) {
+	conn, err := net.DialTimeout("tcp", proxyAddress, 15*time.Second)
+	if err != nil {
+		return nil, err
+	}
+
+	fail := func(e error) (net.Conn, error) {
+		_ = conn.Close()
+		return nil, e
+	}
+
+	_ = conn.SetDeadline(time.Now().Add(20 * time.Second))
+	if _, err = conn.Write([]byte{0x05, 0x01, 0x00}); err != nil {
+		return fail(err)
+	}
+	reply := make([]byte, 2)
+	if _, err = io.ReadFull(conn, reply); err != nil {
+		return fail(err)
+	}
+	if reply[0] != 0x05 || reply[1] != 0x00 {
+		return fail(fmt.Errorf("Sunny SOCKS5 握手失败"))
+	}
+
+	host := requestURL.Hostname()
+	port := requestURL.Port()
+	if port == "" {
+		if requestURL.Scheme == "https" {
+			port = "443"
+		} else {
+			port = "80"
+		}
+	}
+	portNumber, err := strconv.Atoi(port)
+	if err != nil || portNumber <= 0 || portNumber > 65535 {
+		return fail(fmt.Errorf("目标端口无效"))
+	}
+
+	connectRequest := []byte{0x05, 0x01, 0x00}
+	if ip := net.ParseIP(host); ip != nil {
+		if ip4 := ip.To4(); ip4 != nil {
+			connectRequest = append(connectRequest, 0x01)
+			connectRequest = append(connectRequest, ip4...)
+		} else {
+			connectRequest = append(connectRequest, 0x04)
+			connectRequest = append(connectRequest, ip.To16()...)
+		}
+	} else {
+		if len(host) > 255 {
+			return fail(fmt.Errorf("目标主机名过长"))
+		}
+		connectRequest = append(connectRequest, 0x03, byte(len(host)))
+		connectRequest = append(connectRequest, []byte(host)...)
+	}
+	connectRequest = append(connectRequest, byte(portNumber>>8), byte(portNumber))
+	if _, err = conn.Write(connectRequest); err != nil {
+		return fail(err)
+	}
+
+	header := make([]byte, 4)
+	if _, err = io.ReadFull(conn, header); err != nil {
+		return fail(err)
+	}
+	if header[1] != 0x00 {
+		return fail(fmt.Errorf("Sunny SOCKS5 连接目标失败: %d", header[1]))
+	}
+
+	var skip int
+	switch header[3] {
+	case 0x01:
+		skip = 4
+	case 0x03:
+		length := make([]byte, 1)
+		if _, err = io.ReadFull(conn, length); err != nil {
+			return fail(err)
+		}
+		skip = int(length[0])
+	case 0x04:
+		skip = 16
+	default:
+		return fail(fmt.Errorf("Sunny SOCKS5 返回地址类型无效"))
+	}
+	if skip > 0 {
+		if _, err = io.ReadFull(conn, make([]byte, skip)); err != nil {
+			return fail(err)
+		}
+	}
+	if _, err = io.ReadFull(conn, make([]byte, 2)); err != nil {
+		return fail(err)
+	}
+	_ = conn.SetDeadline(time.Time{})
+	return conn, nil
+}
+
+func writeBuiltHttpRequest(conn net.Conn, method string, requestURL *url.URL, proto string, header http.Header, body []byte) error {
+	var builder strings.Builder
+	path := requestURL.RequestURI()
+	if path == "" {
+		path = "/"
+	}
+	builder.WriteString(strings.ToUpper(strings.TrimSpace(method)))
+	builder.WriteString(" ")
+	builder.WriteString(path)
+	builder.WriteString(" ")
+	builder.WriteString(proto)
+	builder.WriteString("\r\n")
+
+	hasHost := false
+	hasContentLength := false
+	for name, values := range header {
+		lowerName := strings.ToLower(name)
+		if lowerName == "host" {
+			hasHost = true
+		}
+		if lowerName == "content-length" {
+			hasContentLength = true
+			continue
+		}
+		for _, value := range values {
+			builder.WriteString(name)
+			builder.WriteString(": ")
+			builder.WriteString(value)
+			builder.WriteString("\r\n")
+		}
+	}
+	if !hasHost {
+		builder.WriteString("Host: ")
+		builder.WriteString(requestURL.Host)
+		builder.WriteString("\r\n")
+	}
+	if len(body) > 0 && !hasContentLength {
+		builder.WriteString("Content-Length: ")
+		builder.WriteString(strconv.Itoa(len(body)))
+		builder.WriteString("\r\n")
+	}
+	builder.WriteString("\r\n")
+
+	if _, err := conn.Write([]byte(builder.String())); err != nil {
+		return err
+	}
+	if len(body) == 0 {
+		return nil
+	}
+	_, err := conn.Write(body)
+	return err
+}
+
+func normalizeHttpProto(proto string) (string, error) {
+	switch strings.TrimSpace(strings.ToUpper(proto)) {
+	case "HTTP/1.0":
+		return "HTTP/1.0", nil
+	case "HTTP/1.2":
+		return "HTTP/1.2", nil
+	case "HTTP/2.0":
+		return "", fmt.Errorf("Sunny 构造发送暂不支持 HTTP/2.0 精确请求")
+	case "", "HTTP/1.1":
+		return "HTTP/1.1", nil
+	default:
+		return "", fmt.Errorf("不支持的 HTTP 版本: %s", proto)
+	}
 }
 
 var multipartTag = []byte("--")

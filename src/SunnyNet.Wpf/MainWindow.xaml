@@ -275,6 +275,12 @@
                                     <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="加密/解密" />
                                 </StackPanel>
                             </Button>
+                            <Button Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}" Click="RequestBuilder_Click" ToolTip="请求构造器">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE8F1;" />
+                                    <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="请求构造器" />
+                                </StackPanel>
+                            </Button>
                             <Button Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}" Click="CertificateGuide_Click" ToolTip="证书安装教程">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE7C3;" />
@@ -745,6 +751,8 @@
                                             <MenuItem Header="普通重放" Tag="3" Click="ResendSelectedSessions_Click" />
                                             <MenuItem Header="重放并拦截上行" Tag="1" Click="ResendSelectedSessions_Click" />
                                             <MenuItem Header="重放并拦截下行" Tag="2" Click="ResendSelectedSessions_Click" />
+                                            <Separator />
+                                            <MenuItem Header="从构造器重放" Click="ResendFromBuilder_Click" />
                                         </MenuItem>
                                         <MenuItem x:Name="CloseSelectedConnectionsMenuItem" Header="断开选中的会话连接" Click="CloseSelectedConnections_Click" />
                                         <Separator />

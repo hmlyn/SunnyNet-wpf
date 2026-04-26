@@ -28,6 +28,15 @@ import (
 var startWork = true
 var workLock sync.RWMutex
 
+type BuilderSendResult struct {
+	Ok         bool   `json:"Ok"`
+	Err        string `json:"Err"`
+	StatusCode int    `json:"StatusCode"`
+	Status     string `json:"Status"`
+	Proto      string `json:"Proto"`
+	Length     int    `json:"Length"`
+}
+
 func SetWorkingState(open bool) {
 	workLock.Lock()
 	defer workLock.Unlock()
@@ -38,6 +47,27 @@ func GetWorkingState() bool {
 	defer workLock.RUnlock()
 	A := startWork
 	return A
+}
+
+func parseBuilderHeaders(text string) http.Header {
+	header := make(http.Header)
+	for _, rawLine := range strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n") {
+		line := strings.TrimSpace(rawLine)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		index := strings.Index(line, ":")
+		if index <= 0 {
+			continue
+		}
+		name := strings.TrimSpace(line[:index])
+		value := strings.TrimSpace(line[index+1:])
+		if name == "" {
+			continue
+		}
+		header.Add(name, value)
+	}
+	return header
 }
 
 func errorText(err error) string {
@@ -283,6 +313,46 @@ func event(command string, args *JSON.SyJson) any {
 		}
 		HashMap.Resend(TheologyArray, mode, app.App.Port())
 		return true
+	case "构造请求发送":
+		result := &BuilderSendResult{}
+		if app == nil || app.App == nil {
+			result.Err = "SunnyNet 未初始化"
+			return result
+		}
+		if GlobalConfig.Authentication {
+			result.Err = "请在设置中关闭身份验证模式后再试！"
+			return result
+		}
+		bodyText := args.GetData("BodyBase64")
+		var body []byte
+		if bodyText != "" {
+			var decodeErr error
+			body, decodeErr = base64.StdEncoding.DecodeString(bodyText)
+			if decodeErr != nil {
+				result.Err = "Body Base64 解码失败: " + decodeErr.Error()
+				return result
+			}
+		}
+		response, sendErr := MapHash.SendBuiltHttp(
+			args.GetData("Method"),
+			args.GetData("URL"),
+			args.GetData("HttpVersion"),
+			parseBuilderHeaders(args.GetData("Headers")),
+			body,
+			app.App.Port(),
+		)
+		if sendErr != nil {
+			result.Err = sendErr.Error()
+			return result
+		}
+		result.Ok = true
+		if response != nil {
+			result.StatusCode = response.StatusCode
+			result.Status = response.Status
+			result.Proto = response.Proto
+			result.Length = len(response.Body)
+		}
+		return result
 	case "工作状态":
 		SetWorkingState(args.GetData("State") == "true")
 		return true
