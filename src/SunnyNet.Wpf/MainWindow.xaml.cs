@@ -535,6 +535,15 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (IsKeyboardFocusWithinSessionsGrid()
+            && !IsTextEditorFocused()
+            && TryResolveSessionMarkShortcut(keyEventArgs, out string tagColor))
+        {
+            _ = ApplySessionMarkAsync(tagColor);
+            keyEventArgs.Handled = true;
+            return;
+        }
+
         if (keyEventArgs.Key != Key.F || Keyboard.Modifiers != ModifierKeys.Control)
         {
             return;
@@ -1130,6 +1139,7 @@ public partial class MainWindow : Window
         FavoriteSelectedSessionsMenuItem.Header = hasSelection && entries.All(static entry => entry.IsFavorite)
             ? "取消收藏"
             : "标记收藏";
+        MarkColorSelectedSessionsMenuItem.IsEnabled = hasSelection;
         EditNotesSessionsMenuItem.IsEnabled = hasSelection;
         EditNotesSessionsMenuItem.Header = entries.Length > 1 ? $"编辑备注 ({entries.Length})..." : "编辑备注...";
         SelectSessionsMenuItem.IsEnabled = SessionsGrid.Items.Count > 0;
@@ -1290,6 +1300,30 @@ public partial class MainWindow : Window
         }
 
         SaveFavoriteSettings();
+    }
+
+    private async void MarkSelectedSessions_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        string tagColor = sender is MenuItem menuItem ? menuItem.Tag?.ToString() ?? "" : "";
+        await ApplySessionMarkAsync(tagColor);
+    }
+
+    private async Task ApplySessionMarkAsync(string tagColor)
+    {
+        CaptureEntry[] entries = GetSelectedSessionEntries();
+        if (entries.Length == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            await _viewModel.MarkSessionEntriesAsync(entries, tagColor);
+        }
+        catch (Exception exception)
+        {
+            ViewModel_NotificationRequested("标记失败", exception.Message);
+        }
     }
 
     private async void EditSelectedSessionNotes_Click(object sender, RoutedEventArgs routedEventArgs)
@@ -1497,6 +1531,46 @@ public partial class MainWindow : Window
 
         return SessionsGrid.IsKeyboardFocusWithin
             || FindVisualParent<DataGrid>(Keyboard.FocusedElement as DependencyObject) == SessionsGrid;
+    }
+
+    private static bool IsTextEditorFocused()
+    {
+        return Keyboard.FocusedElement is TextBoxBase
+            or PasswordBox
+            or ComboBox { IsEditable: true };
+    }
+
+    private static bool TryResolveSessionMarkShortcut(KeyEventArgs keyEventArgs, out string tagColor)
+    {
+        Key key = keyEventArgs.Key == Key.System ? keyEventArgs.SystemKey : keyEventArgs.Key;
+        ModifierKeys modifiers = Keyboard.Modifiers;
+
+        if (modifiers == ModifierKeys.None && (key is Key.Subtract or Key.OemMinus))
+        {
+            tagColor = CaptureEntry.StrikeTagColor;
+            return true;
+        }
+
+        if ((modifiers & ModifierKeys.Control) != ModifierKeys.Control
+            || (modifiers & (ModifierKeys.Alt | ModifierKeys.Windows)) != 0)
+        {
+            tagColor = "";
+            return false;
+        }
+
+        tagColor = key switch
+        {
+            Key.D1 or Key.NumPad1 => "#FF5252",
+            Key.D2 or Key.NumPad2 => "#2F7CF6",
+            Key.D3 or Key.NumPad3 => "#F4B400",
+            Key.D4 or Key.NumPad4 => "#22A06B",
+            Key.D5 or Key.NumPad5 => "#FF8A00",
+            Key.D6 or Key.NumPad6 => "#8B5CF6",
+            Key.D0 or Key.NumPad0 => "",
+            _ => "\0"
+        };
+
+        return tagColor != "\0";
     }
 
     private static bool IsParentRequest(CaptureEntry entry, CaptureEntry context)

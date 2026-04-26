@@ -51,6 +51,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     private bool _proxyClearedOnExit;
     private bool _disposed;
     private int _breakpointMode;
+    private int _selectedSessionLoadVersion;
     private bool _processDriverLoaded;
     private bool _captureAllProcesses;
     private readonly HashSet<int> _activeProcessPids = new();
@@ -123,7 +124,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             CloseSessionCommand.RaiseCanExecuteChanged();
             ReleaseCurrentCommand.RaiseCanExecuteChanged();
             RefreshSelectedSessionInterceptState();
-            _ = LoadSelectedSessionAsync();
+            ScheduleSelectedSessionLoad();
         }
     }
 
@@ -313,7 +314,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         }
 
         SelectedSession = entry;
-        await LoadSelectedSessionAsync();
+        await LoadSelectedSessionImmediatelyAsync();
     }
 
     public Task ClearSessionsQuietAsync()
@@ -490,6 +491,45 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         await DeleteSessionsAsync(NormalizeSessionEntries(entries));
     }
 
+    public async Task MarkSessionEntriesAsync(IEnumerable<CaptureEntry> entries, string? tagColor)
+    {
+        CaptureEntry[] selectedEntries = NormalizeSessionEntries(entries);
+        if (selectedEntries.Length == 0)
+        {
+            return;
+        }
+
+        string nextColor = tagColor ?? "";
+        int[] theologyIds = GetTheologyIds(selectedEntries);
+        if (theologyIds.Length > 0)
+        {
+            if (string.IsNullOrWhiteSpace(nextColor))
+            {
+                await _backend.InvokeAsync("标记颜色", new { empty = true, Data = theologyIds });
+            }
+            else
+            {
+                await _backend.InvokeAsync("标记颜色", new
+                {
+                    empty = false,
+                    Data = selectedEntries
+                        .Where(static entry => entry.Theology > 0)
+                        .Select(entry => new { id = entry.Theology, color = nextColor })
+                        .ToArray()
+                });
+            }
+        }
+
+        foreach (CaptureEntry entry in selectedEntries)
+        {
+            entry.TagColor = nextColor;
+        }
+
+        StatusRight = string.IsNullOrWhiteSpace(nextColor)
+            ? $"已取消 {selectedEntries.Length} 条会话标记"
+            : $"已标记 {selectedEntries.Length} 条会话";
+    }
+
     public async Task ResendSessionEntriesAsync(IEnumerable<CaptureEntry> entries, int mode)
     {
         int[] theologyIds = GetTheologyIds(entries);
@@ -565,7 +605,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         }
 
         SelectedSession = interceptedEntry;
-        await LoadSelectedSessionAsync();
+        await LoadSelectedSessionImmediatelyAsync();
         Detail.EnableInlineIntercept(mode);
         ScrollToEntryRequested?.Invoke(interceptedEntry);
     }
@@ -1613,7 +1653,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         {
             if (SelectedSession?.Theology == firstMatch.Theology)
             {
-                await LoadSelectedSessionAsync();
+                await LoadSelectedSessionImmediatelyAsync();
             }
             else
             {
@@ -2223,9 +2263,46 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         OnPropertyChanged(nameof(HasActiveSessionFilter));
     }
 
-    private async Task LoadSelectedSessionAsync()
+    private void ScheduleSelectedSessionLoad()
+    {
+        int loadVersion = ++_selectedSessionLoadVersion;
+        Dispatcher dispatcher = Application.Current.Dispatcher;
+        if (dispatcher.CheckAccess())
+        {
+            _ = LoadSelectedSessionAfterSelectionPaintAsync(loadVersion);
+            return;
+        }
+
+        dispatcher.BeginInvoke(
+            new Action(() => _ = LoadSelectedSessionAfterSelectionPaintAsync(loadVersion)),
+            DispatcherPriority.Background);
+    }
+
+    private async Task LoadSelectedSessionAfterSelectionPaintAsync(int loadVersion)
+    {
+        await Dispatcher.Yield(DispatcherPriority.Background);
+        if (loadVersion != _selectedSessionLoadVersion)
+        {
+            return;
+        }
+
+        await LoadSelectedSessionAsync(loadVersion);
+    }
+
+    private Task LoadSelectedSessionImmediatelyAsync()
+    {
+        int loadVersion = ++_selectedSessionLoadVersion;
+        return LoadSelectedSessionAsync(loadVersion);
+    }
+
+    private async Task LoadSelectedSessionAsync(int loadVersion)
     {
         CaptureEntry? selected = SelectedSession;
+        if (loadVersion != _selectedSessionLoadVersion)
+        {
+            return;
+        }
+
         if (selected is null)
         {
             Detail.Clear();
@@ -2262,7 +2339,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         try
         {
             JsonElement? result = await _backend.InvokeAsync("HTTP请求获取", new { Theology = selected.Theology });
-            if (SelectedSession?.Theology != selected.Theology || result is null)
+            if (loadVersion != _selectedSessionLoadVersion || SelectedSession?.Theology != selected.Theology || result is null)
             {
                 return;
             }

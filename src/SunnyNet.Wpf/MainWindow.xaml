@@ -670,6 +670,42 @@
                                             <MenuItem Header="Python requests" Tag="Python|requests" Click="GenerateRequestCode_Click" />
                                         </MenuItem>
                                         <MenuItem x:Name="FavoriteSelectedSessionsMenuItem" Header="标记收藏" Click="FavoriteSelectedSessions_Click" />
+                                        <MenuItem x:Name="MarkColorSelectedSessionsMenuItem" Header="标记颜色">
+                                            <MenuItem Header="删除线" InputGestureText="Minus" Tag="__strike__" Click="MarkSelectedSessions_Click" />
+                                            <Separator />
+                                            <MenuItem Header="红色" InputGestureText="Ctrl+1" Tag="#FF5252" Click="MarkSelectedSessions_Click">
+                                                <MenuItem.Icon>
+                                                    <Border Width="10" Height="10" CornerRadius="5" Background="#FF5252" />
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="蓝色" InputGestureText="Ctrl+2" Tag="#2F7CF6" Click="MarkSelectedSessions_Click">
+                                                <MenuItem.Icon>
+                                                    <Border Width="10" Height="10" CornerRadius="5" Background="#2F7CF6" />
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="金色" InputGestureText="Ctrl+3" Tag="#F4B400" Click="MarkSelectedSessions_Click">
+                                                <MenuItem.Icon>
+                                                    <Border Width="10" Height="10" CornerRadius="5" Background="#F4B400" />
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="绿色" InputGestureText="Ctrl+4" Tag="#22A06B" Click="MarkSelectedSessions_Click">
+                                                <MenuItem.Icon>
+                                                    <Border Width="10" Height="10" CornerRadius="5" Background="#22A06B" />
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="橙色" InputGestureText="Ctrl+5" Tag="#FF8A00" Click="MarkSelectedSessions_Click">
+                                                <MenuItem.Icon>
+                                                    <Border Width="10" Height="10" CornerRadius="5" Background="#FF8A00" />
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="紫色" InputGestureText="Ctrl+6" Tag="#8B5CF6" Click="MarkSelectedSessions_Click">
+                                                <MenuItem.Icon>
+                                                    <Border Width="10" Height="10" CornerRadius="5" Background="#8B5CF6" />
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                            <Separator />
+                                            <MenuItem Header="取消标记" InputGestureText="Ctrl+0" Tag="" Click="MarkSelectedSessions_Click" />
+                                        </MenuItem>
                                         <MenuItem x:Name="EditNotesSessionsMenuItem" Header="编辑备注..." Click="EditSelectedSessionNotes_Click" />
                                         <Separator />
                                         <MenuItem x:Name="SelectSessionsMenuItem" Header="选择">
@@ -727,45 +763,39 @@
                                         <Setter Property="Margin" Value="0" />
                                         <Setter Property="VerticalAlignment" Value="Center" />
                                         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                        <Setter Property="TextDecorations" Value="{Binding RowTextDecorations}" />
                                     </Style>
-                                    <Style x:Key="SessionIconBadgeStyle" TargetType="{x:Type Border}">
-                                        <Setter Property="Width" Value="23" />
-                                        <Setter Property="Height" Value="18" />
-                                        <Setter Property="CornerRadius" Value="4" />
-                                        <Setter Property="BorderThickness" Value="1" />
-                                        <Setter Property="Background" Value="{Binding SessionIconBackground}" />
-                                        <Setter Property="BorderBrush" Value="{Binding StatusBrush}" />
+                                    <Style x:Key="SessionIconImageStyle" TargetType="{x:Type Image}">
+                                        <Setter Property="Width" Value="16" />
+                                        <Setter Property="Height" Value="16" />
+                                        <Setter Property="Source" Value="{Binding SessionIconImage}" />
                                         <Setter Property="ToolTip" Value="{Binding SessionIconToolTip}" />
                                         <Setter Property="VerticalAlignment" Value="Center" />
-                                    </Style>
-                                    <Style x:Key="SessionIconGlyphStyle" TargetType="{x:Type TextBlock}">
                                         <Setter Property="HorizontalAlignment" Value="Center" />
-                                        <Setter Property="VerticalAlignment" Value="Center" />
-                                        <Setter Property="TextAlignment" Value="Center" />
-                                        <Setter Property="FontFamily" Value="Segoe UI Symbol, Segoe UI" />
-                                        <Setter Property="FontSize" Value="{Binding SessionIconFontSize}" />
-                                        <Setter Property="FontWeight" Value="Bold" />
-                                        <Setter Property="Foreground" Value="{Binding StatusBrush}" />
-                                        <Setter Property="LineHeight" Value="13" />
-                                        <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
-                                        <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+                                        <Setter Property="SnapsToDevicePixels" Value="True" />
+                                        <Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality" />
                                     </Style>
                                     <Style x:Key="SessionMethodTextStyle" TargetType="{x:Type TextBlock}" BasedOn="{StaticResource MethodCellTextStyle}">
                                         <Setter Property="Margin" Value="0" />
                                         <Setter Property="HorizontalAlignment" Value="Left" />
+                                        <Setter Property="TextDecorations" Value="{Binding RowTextDecorations}" />
                                     </Style>
                                     <Style x:Key="SessionStateTextStyle" TargetType="{x:Type TextBlock}">
                                         <Setter Property="VerticalAlignment" Value="Center" />
                                         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
                                         <Setter Property="FontWeight" Value="SemiBold" />
                                         <Setter Property="Foreground" Value="{Binding StatusBrush}" />
+                                        <Setter Property="TextDecorations" Value="{Binding RowTextDecorations}" />
                                     </Style>
                                     <Style x:Key="SessionTextCellTextStyle" TargetType="{x:Type TextBlock}">
                                         <Setter Property="VerticalAlignment" Value="Center" />
                                         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                        <Setter Property="TextDecorations" Value="{Binding RowTextDecorations}" />
                                     </Style>
                                     <Style x:Key="SessionUrlTextCellTextStyle" TargetType="{x:Type TextBlock}" BasedOn="{StaticResource SessionTextCellTextStyle}">
                                         <Setter Property="ToolTip" Value="{Binding Url}" />
+                                        <Setter Property="Foreground" Value="{Binding UrlForeground}" />
+                                        <Setter Property="FontWeight" Value="{Binding UrlFontWeight}" />
                                     </Style>
                                     <Style x:Key="SessionNotesEditingStyle" TargetType="{x:Type TextBox}">
                                         <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -797,17 +827,21 @@
                                     <DataGridTemplateColumn x:Name="IndexColumn" Header="#" Width="82" IsReadOnly="True" CellStyle="{StaticResource SessionIndexCellStyle}" HeaderStyle="{StaticResource SessionIndexHeaderStyle}">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
-                                                <StackPanel Margin="16,0,0,0"
-                                                            Orientation="Horizontal"
-                                                            VerticalAlignment="Center">
-                                                    <Border Style="{StaticResource SessionIconBadgeStyle}">
-                                                        <TextBlock Style="{StaticResource SessionIconGlyphStyle}"
-                                                                   Text="{Binding SessionIconGlyph}" />
-                                                    </Border>
-                                                    <TextBlock Margin="7,0,0,0"
-                                                               Style="{StaticResource SessionIndexTextStyle}"
-                                                               Text="{Binding Index}" />
-                                                </StackPanel>
+                                                <Grid>
+                                                    <Border Width="3"
+                                                            Margin="0,3,0,3"
+                                                            HorizontalAlignment="Left"
+                                                            Background="{Binding TagAccentBrush}"
+                                                            CornerRadius="0,2,2,0" />
+                                                    <StackPanel Margin="16,0,0,0"
+                                                                Orientation="Horizontal"
+                                                                VerticalAlignment="Center">
+                                                        <Image Style="{StaticResource SessionIconImageStyle}" />
+                                                        <TextBlock Margin="7,0,0,0"
+                                                                   Style="{StaticResource SessionIndexTextStyle}"
+                                                                   Text="{Binding Index}" />
+                                                    </StackPanel>
+                                                </Grid>
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
