@@ -1,13 +1,8 @@
 package main
 
 import (
-	"io"
-	"os"
-	"fmt"
-	"sync"
-	"net/http"
-	"net/url"
 	"bytes"
+	"compress/gzip"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/des"
@@ -22,8 +17,14 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
+	"io"
 	mathrand "math/rand"
+	"net/http"
+	"net/url"
+	"os"
 	"strings"
+	"sync"
 )
 
 import (
@@ -35,15 +36,53 @@ import (
 )
 
 var _____internal_______pidGetName func(int) string
+var _____internal_______httpDisplayBody func(int, bool, []byte) bool
 
 func _____internal_______setPidGetName(A func(int) string) {
 	_____internal_______pidGetName = A
+}
+func _____internal_______setHttpDisplayBody(A func(int, bool, []byte) bool) {
+	_____internal_______httpDisplayBody = A
 }
 func GoGetPidName(pid int) string {
 	if _____internal_______pidGetName != nil {
 		return _____internal_______pidGetName(pid)
 	}
 	return ""
+}
+func HTTPSetRequestDisplayBody(Sunny *HTTP, body any) bool {
+	return httpSetDisplayBody(Sunny, true, body)
+}
+func HTTPSetResponseDisplayBody(Sunny *HTTP, body any) bool {
+	return httpSetDisplayBody(Sunny, false, body)
+}
+func httpSetDisplayBody(Sunny *HTTP, request bool, body any) bool {
+	if Sunny == nil || _____internal_______httpDisplayBody == nil {
+		return false
+	}
+	switch v := body.(type) {
+	case string:
+		return _____internal_______httpDisplayBody(Sunny.uniqueId, request, []byte(v))
+	case []byte:
+		return _____internal_______httpDisplayBody(Sunny.uniqueId, request, v)
+	default:
+		return false
+	}
+}
+func GoGzipUnCompress(body []byte) []byte {
+	if len(body) < 1 {
+		return nil
+	}
+	reader, err := gzip.NewReader(bytes.NewReader(body))
+	if err != nil {
+		return nil
+	}
+	defer reader.Close()
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return nil
+	}
+	return data
 }
 func GoMD5(a any, key ...any) []byte {
 	_key := make([]byte, 0)
@@ -1074,7 +1113,6 @@ func BytesReplaceAll(a, b, c []byte) []byte {
 	return []byte(strings.ReplaceAll(string(a), string(b), string(c)))
 }
 
-
 // 你可以在HTTP回调函数中执行此函数,快速操作响应
 func HTTPResponse404(Sunny *HTTP) {
 	//响应状态码404,没有内容
@@ -1170,7 +1208,3 @@ func WriteFile(filePath string, data any) bool {
 	}
 	return os.WriteFile(filePath, _data, 777) == nil
 }
-
-
-
-

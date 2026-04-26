@@ -1077,12 +1077,14 @@ func event(command string, args *JSON.SyJson) any {
 			}
 			defer func() {
 				CallJs("更新响应", &UpdateCurrentResponse{
-					Theology:  Theology,
-					Header:    h.Response.Header,
-					Body:      h.Response.Body,
-					StateText: http.StatusText(h.Response.StateCode),
-					StateCode: h.Response.StateCode,
-					Break:     true,
+					Theology:       Theology,
+					Header:         h.Response.Header,
+					Body:           h.Response.Body,
+					DisplayBody:    h.Response.DisplayBody,
+					HasDisplayBody: h.Response.HasDisplayBody,
+					StateText:      http.StatusText(h.Response.StateCode),
+					StateCode:      h.Response.StateCode,
+					Break:          true,
 				})
 			}()
 			switch Tabs {

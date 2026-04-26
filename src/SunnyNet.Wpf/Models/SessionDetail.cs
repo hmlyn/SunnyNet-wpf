@@ -14,6 +14,7 @@ public sealed class SessionDetail : ViewModelBase
     private string _requestHeaders = "";
     private string _requestBody = "";
     private string _requestRaw = "";
+    private string _requestOriginalRaw = "";
     private string _editableRequestRaw = "";
     private string _requestQuery = "";
     private string _requestHex = "";
@@ -28,6 +29,7 @@ public sealed class SessionDetail : ViewModelBase
     private string _responseHeaders = "";
     private string _responseBody = "";
     private string _responseRaw = "";
+    private string _responseOriginalRaw = "";
     private string _editableResponseRaw = "";
     private string _responseText = "";
     private string _responseHex = "";
@@ -42,6 +44,8 @@ public sealed class SessionDetail : ViewModelBase
     private int _responseStateCode;
     private string _responseStateText = "";
     private string _summary = "请选择一个会话";
+    private bool _hasRequestDisplayBody;
+    private bool _hasResponseDisplayBody;
     private SocketEntry? _selectedSocketEntry;
 
     public bool HasSelection
@@ -87,6 +91,12 @@ public sealed class SessionDetail : ViewModelBase
                 }
             }
         }
+    }
+
+    public string RequestOriginalRaw
+    {
+        get => _requestOriginalRaw;
+        set => SetProperty(ref _requestOriginalRaw, value ?? "");
     }
 
     public string EditableRequestRaw
@@ -180,6 +190,12 @@ public sealed class SessionDetail : ViewModelBase
                 }
             }
         }
+    }
+
+    public string ResponseOriginalRaw
+    {
+        get => _responseOriginalRaw;
+        set => SetProperty(ref _responseOriginalRaw, value ?? "");
     }
 
     public string EditableResponseRaw
@@ -285,8 +301,8 @@ public sealed class SessionDetail : ViewModelBase
 
     public void EnableInlineIntercept(int mode)
     {
-        EditableRequestRaw = RequestRaw;
-        EditableResponseRaw = ResponseRaw;
+        EditableRequestRaw = string.IsNullOrEmpty(RequestOriginalRaw) ? RequestRaw : RequestOriginalRaw;
+        EditableResponseRaw = string.IsNullOrEmpty(ResponseOriginalRaw) ? ResponseRaw : ResponseOriginalRaw;
         _syncingEditableRaw = false;
         InlineInterceptMode = mode;
     }
@@ -301,6 +317,18 @@ public sealed class SessionDetail : ViewModelBase
     {
         get => _summary;
         set => SetProperty(ref _summary, value);
+    }
+
+    public bool HasRequestDisplayBody
+    {
+        get => _hasRequestDisplayBody;
+        set => SetProperty(ref _hasRequestDisplayBody, value);
+    }
+
+    public bool HasResponseDisplayBody
+    {
+        get => _hasResponseDisplayBody;
+        set => SetProperty(ref _hasResponseDisplayBody, value);
     }
 
     public SocketEntry? SelectedSocketEntry
@@ -335,6 +363,7 @@ public sealed class SessionDetail : ViewModelBase
         RequestHeaders = "";
         RequestBody = "";
         RequestRaw = "";
+        RequestOriginalRaw = "";
         EditableRequestRaw = "";
         RequestQuery = "";
         RequestHex = "";
@@ -349,6 +378,7 @@ public sealed class SessionDetail : ViewModelBase
         ResponseHeaders = "";
         ResponseBody = "";
         ResponseRaw = "";
+        ResponseOriginalRaw = "";
         EditableResponseRaw = "";
         ResponseText = "";
         ResponseHex = "";
@@ -365,6 +395,8 @@ public sealed class SessionDetail : ViewModelBase
         IsSocketSession = false;
         DisableInlineIntercept();
         Summary = "请选择一个会话";
+        HasRequestDisplayBody = false;
+        HasResponseDisplayBody = false;
         SelectedSocketEntry = null;
         SocketEntries.Clear();
         RequestHeaderRows.Clear();

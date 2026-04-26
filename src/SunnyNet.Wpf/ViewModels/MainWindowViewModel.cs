@@ -1858,6 +1858,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         {
             Detail.ResponseBody = DecodePayloadElement(GetProperty(args, "Body"));
             Detail.ResponseText = Detail.ResponseBody;
+            Detail.HasResponseDisplayBody = false;
             Detail.ResponseHex = ToHex(DecodePayloadBytes(GetProperty(args, "Body")));
             Detail.ResponseStateText = "error";
             Detail.ResponseStateCode = -1;
@@ -1880,16 +1881,23 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         JsonElement responseHeader = GetProperty(args, "Header");
         Detail.ResponseHeaders = FormatHeaders(responseHeader);
         byte[] responseBytes = DecodePayloadBytes(GetProperty(args, "Body"));
-        Detail.ResponseBody = BytesToPreviewText(responseBytes);
+        bool hasResponseDisplayBody = GetBool(args, "HasDisplayBody");
+        byte[] responseDisplayBytes = hasResponseDisplayBody
+            ? DecodePayloadBytes(GetProperty(args, "DisplayBody"))
+            : responseBytes;
+        Detail.HasResponseDisplayBody = hasResponseDisplayBody;
+        Detail.ResponseBody = BytesToPreviewText(responseDisplayBytes);
         Detail.ResponseText = Detail.ResponseBody;
         Detail.ResponseHex = responseBytes.Length > LargePayloadThresholdBytes ? "" : ToHex(responseBytes);
+        string responseOriginalBody = BytesToPreviewText(responseBytes);
         Detail.ResponseRaw = $"HTTP {GetInt(args, "StateCode")} {GetString(args, "StateText")}\r\n{Detail.ResponseHeaders}\r\n\r\n{Detail.ResponseBody}".Trim();
-        Detail.ResponseJson = responseBytes.Length > LargePayloadThresholdBytes ? "响应内容较大，已跳过 JSON 自动格式化。" : TryFormatJson(Detail.ResponseBody);
+        Detail.ResponseOriginalRaw = $"HTTP {GetInt(args, "StateCode")} {GetString(args, "StateText")}\r\n{Detail.ResponseHeaders}\r\n\r\n{responseOriginalBody}".Trim();
+        Detail.ResponseJson = responseDisplayBytes.Length > LargePayloadThresholdBytes ? "响应内容较大，已跳过 JSON 自动格式化。" : TryFormatJson(Detail.ResponseBody);
         Detail.ResponseCookies = ExtractCookies(responseHeader);
         Detail.ResponseStateText = GetString(args, "StateText");
         Detail.ResponseStateCode = GetInt(args, "StateCode");
         string responseContentType = GetHeaderValue(responseHeader, "Content-Type");
-        Detail.ResponseImageBytes = responseBytes.Length > LargePayloadThresholdBytes ? Array.Empty<byte>() : TryGetImageBytes(responseContentType, responseBytes);
+        Detail.ResponseImageBytes = responseDisplayBytes.Length > LargePayloadThresholdBytes ? Array.Empty<byte>() : TryGetImageBytes(responseContentType, responseDisplayBytes);
         Detail.ResponseImageType = ExtractImageType(responseContentType);
         (byte[] responseRawBytes, int responseHeaderLength) = BuildHttpBytes($"HTTP {GetInt(args, "StateCode")} {GetString(args, "StateText")}", Detail.ResponseHeaders, responseBytes);
         ApplyResponseRows(responseHeader, responseRawBytes, responseHeaderLength);
@@ -2588,20 +2596,26 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         JsonElement socketData = GetProperty(data, "SocketData");
         JsonElement requestHeader = GetProperty(data, "Header");
         byte[] requestBodyBytes = DecodePayloadBytes(GetProperty(data, "Body"));
+        bool hasRequestDisplayBody = GetBool(data, "HasDisplayBody");
+        byte[] requestDisplayBytes = hasRequestDisplayBody
+            ? DecodePayloadBytes(GetProperty(data, "DisplayBody"))
+            : requestBodyBytes;
         string requestContentType = GetHeaderValue(requestHeader, "Content-Type");
         Detail.RequestMethod = method;
         Detail.RequestUrl = url;
         Detail.IsSocketSession = IsSocketSession(selected, socketData);
         Detail.Summary = $"{method} {url}";
+        Detail.HasRequestDisplayBody = hasRequestDisplayBody;
         string requestHeadersText = FormatHeaders(requestHeader);
         Detail.RequestHeaders = $"{method} {url} {proto}\r\n{requestHeadersText}".Trim();
-        Detail.RequestBody = DecodePayloadElement(GetProperty(data, "Body"));
+        Detail.RequestBody = BytesToPreviewText(requestDisplayBytes);
         Detail.RequestRaw = $"{method} {url} {proto}\r\n{requestHeadersText}\r\n\r\n{Detail.RequestBody}".Trim();
+        Detail.RequestOriginalRaw = $"{method} {url} {proto}\r\n{requestHeadersText}\r\n\r\n{BytesToPreviewText(requestBodyBytes)}".Trim();
         Detail.RequestQuery = selected.Query;
         Detail.RequestHex = ToHex(requestBodyBytes);
         Detail.RequestCookies = ExtractCookies(requestHeader);
-        Detail.RequestJson = TryFormatJson(Detail.RequestBody);
-        Detail.RequestImageBytes = TryGetImageBytes(requestContentType, requestBodyBytes);
+        Detail.RequestJson = requestDisplayBytes.Length > LargePayloadThresholdBytes ? "请求内容较大，已跳过 JSON 自动格式化。" : TryFormatJson(Detail.RequestBody);
+        Detail.RequestImageBytes = requestDisplayBytes.Length > LargePayloadThresholdBytes ? Array.Empty<byte>() : TryGetImageBytes(requestContentType, requestDisplayBytes);
         Detail.RequestImageType = ExtractImageType(requestContentType);
         (byte[] requestRawBytes, int requestHeaderLength) = BuildHttpBytes($"{method} {url} {proto}", requestHeadersText, requestBodyBytes);
         ApplyRequestRows(url, requestHeader, requestRawBytes, requestHeaderLength);
@@ -2611,19 +2625,25 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         {
             JsonElement responseHeader = GetProperty(response, "Header");
             byte[] responseBodyBytes = DecodePayloadBytes(GetProperty(response, "Body"));
+            bool hasResponseDisplayBody = GetBool(response, "HasDisplayBody");
+            byte[] responseDisplayBytes = hasResponseDisplayBody
+                ? DecodePayloadBytes(GetProperty(response, "DisplayBody"))
+                : responseBodyBytes;
             string responseContentType = GetHeaderValue(responseHeader, "Content-Type");
             Detail.ResponseStateCode = GetInt(response, "StateCode");
             Detail.ResponseStateText = GetString(response, "StateText");
+            Detail.HasResponseDisplayBody = hasResponseDisplayBody;
             string responseHeadersText = FormatHeaders(responseHeader);
             Detail.ResponseHeaders = $"HTTP {Detail.ResponseStateCode} {Detail.ResponseStateText}\r\n{responseHeadersText}".Trim();
-            Detail.ResponseBody = BytesToPreviewText(responseBodyBytes);
+            Detail.ResponseBody = BytesToPreviewText(responseDisplayBytes);
             Detail.ResponseRaw = $"HTTP {Detail.ResponseStateCode} {Detail.ResponseStateText}\r\n{responseHeadersText}\r\n\r\n{Detail.ResponseBody}".Trim();
+            Detail.ResponseOriginalRaw = $"HTTP {Detail.ResponseStateCode} {Detail.ResponseStateText}\r\n{responseHeadersText}\r\n\r\n{BytesToPreviewText(responseBodyBytes)}".Trim();
             Detail.ResponseText = Detail.ResponseBody;
             Detail.ResponseHex = responseBodyBytes.Length > LargePayloadThresholdBytes ? "" : ToHex(responseBodyBytes);
             Detail.ResponseCookies = ExtractCookies(responseHeader);
-            Detail.ResponseJson = responseBodyBytes.Length > LargePayloadThresholdBytes ? "响应内容较大，已跳过 JSON 自动格式化。" : TryFormatJson(Detail.ResponseBody);
-            Detail.ResponseHtml = responseBodyBytes.Length > LargePayloadThresholdBytes ? "响应内容较大，已跳过 HTML 自动预览。" : Detail.ResponseBody;
-            Detail.ResponseImageBytes = responseBodyBytes.Length > LargePayloadThresholdBytes ? Array.Empty<byte>() : TryGetImageBytes(responseContentType, responseBodyBytes);
+            Detail.ResponseJson = responseDisplayBytes.Length > LargePayloadThresholdBytes ? "响应内容较大，已跳过 JSON 自动格式化。" : TryFormatJson(Detail.ResponseBody);
+            Detail.ResponseHtml = responseDisplayBytes.Length > LargePayloadThresholdBytes ? "响应内容较大，已跳过 HTML 自动预览。" : Detail.ResponseBody;
+            Detail.ResponseImageBytes = responseDisplayBytes.Length > LargePayloadThresholdBytes ? Array.Empty<byte>() : TryGetImageBytes(responseContentType, responseDisplayBytes);
             Detail.ResponseImageType = ExtractImageType(responseContentType);
             (byte[] responseRawBytes, int responseHeaderLength) = BuildHttpBytes($"HTTP {Detail.ResponseStateCode} {Detail.ResponseStateText}", responseHeadersText, responseBodyBytes);
             ApplyResponseRows(responseHeader, responseRawBytes, responseHeaderLength);
@@ -2637,6 +2657,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             Detail.ResponseHexHeaderLength = 0;
             Detail.ResponseImageBytes = Array.Empty<byte>();
             Detail.ResponseImageType = "";
+            Detail.HasResponseDisplayBody = false;
+            Detail.ResponseOriginalRaw = "";
         }
 
         Detail.SocketEntries.Clear();

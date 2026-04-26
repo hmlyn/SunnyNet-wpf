@@ -33,6 +33,17 @@
             GoBase64Decode(data)     Base64编码,返回值:字节数组([]byte)
                 data:要操作的数据,类型是string
 
+            GoGzipUnCompress(data)     GZIP解压，返回值:字节数组([]byte)
+                data:要操作的数据,类型是[]byte
+
+            HTTPSetRequestDisplayBody(Sunny,data)     设置请求显示层Body，不修改真实请求Body
+                Sunny:HTTP回调函数的Sunny对象
+                data:要显示的数据，类型可以是string或[]byte
+
+            HTTPSetResponseDisplayBody(Sunny,data)     设置响应显示层Body，不修改真实响应Body
+                Sunny:HTTP回调函数的Sunny对象
+                data:要显示的数据，类型可以是string或[]byte
+
             GoRsaPrivateDecrypt(key, data)  RSA私钥解密 两个返回值
                                                        返回值1:解密结果 类型 []byte
                                                        返回值2:错误信息 类型 error 成功等于 nil
@@ -132,6 +143,5 @@ HTTP请求快速响应
 
 
 */
-
 
 

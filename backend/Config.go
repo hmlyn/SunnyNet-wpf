@@ -360,6 +360,15 @@ func RunCode() (SErr string) {
 		return "setPidGetName"
 	}
 	setPidGetName(GetPidName)
+	v, err = iEval.Eval("main._____internal_______setHttpDisplayBody")
+	if err != nil {
+		return err.Error()
+	}
+	setHttpDisplayBody := v.Interface().(func(func(int, bool, []byte) bool))
+	if setHttpDisplayBody == nil {
+		return "setHttpDisplayBody"
+	}
+	setHttpDisplayBody(SetHTTPDisplayBody)
 	lock.Lock()
 	NewEval = iEval
 	httpFunc = _httpFunc
@@ -382,6 +391,15 @@ func GetPidName(pid int) string {
 		return ""
 	}
 	return process.Executable()
+}
+func SetHTTPDisplayBody(theology int, request bool, body []byte) bool {
+	if theology < 1 {
+		return false
+	}
+	if request {
+		return HashMap.SetRequestDisplayBody(theology, body)
+	}
+	return HashMap.SetResponseDisplayBody(theology, body)
 }
 func RunCodeLog() (Str string) {
 	defer func() {
@@ -420,6 +438,7 @@ func RunHTTPRequestScriptCode(Conn *SunnyNet.HttpConn) (_Display bool) {
 		Conn.Request.Body = io.NopCloser(bytes.NewBuffer(Body))
 	}
 	h.Conn = Conn
+	HashMap.SetRequest(Conn.Theology, h)
 
 	lock.Lock()
 	_Call := httpFunc

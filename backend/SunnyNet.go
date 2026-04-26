@@ -72,14 +72,16 @@ type ListInfo struct {
 }
 
 type UpdateCurrentResponse struct {
-	Theology  int         `json:"Theology"` //唯一ID
-	Header    http.Header `json:"Header"`
-	Body      []byte      `json:"Body"`
-	StateText string      `json:"StateText"`
-	StateCode int         `json:"StateCode"`
-	Break     bool        `json:"断点状态"`
-	Error     bool        `json:"Error"`
-	WebSocket bool        `json:"WebSocket"`
+	Theology       int         `json:"Theology"` //唯一ID
+	Header         http.Header `json:"Header"`
+	Body           []byte      `json:"Body"`
+	DisplayBody    []byte      `json:"DisplayBody"`
+	HasDisplayBody bool        `json:"HasDisplayBody"`
+	StateText      string      `json:"StateText"`
+	StateCode      int         `json:"StateCode"`
+	Break          bool        `json:"断点状态"`
+	Error          bool        `json:"Error"`
+	WebSocket      bool        `json:"WebSocket"`
 }
 type UpdateICO struct {
 	Theology int    `json:"Theology"` //唯一ID
@@ -389,13 +391,15 @@ func HttpCallback(Conn *SunnyNet.HttpConn) {
 				Insert.Unlock()
 				if isUpdateRequestInfo {
 					CallJs("更新响应", &UpdateCurrentResponse{
-						Theology:  Conn.Theology,
-						Header:    h.Response.Header,
-						Body:      h.Response.Body,
-						StateText: http.StatusText(h.Response.StateCode),
-						StateCode: h.Response.StateCode,
-						Break:     false,
-						Error:     false,
+						Theology:       Conn.Theology,
+						Header:         h.Response.Header,
+						Body:           h.Response.Body,
+						DisplayBody:    h.Response.DisplayBody,
+						HasDisplayBody: h.Response.HasDisplayBody,
+						StateText:      http.StatusText(h.Response.StateCode),
+						StateCode:      h.Response.StateCode,
+						Break:          false,
+						Error:          false,
 					})
 				}
 				Insert.Lock()
@@ -523,13 +527,15 @@ func HttpCallback(Conn *SunnyNet.HttpConn) {
 		}
 		if isUpdateRequestInfo {
 			CallJs("更新响应", &UpdateCurrentResponse{
-				Theology:  Conn.Theology,
-				Header:    h.Response.Header,
-				Body:      h.Response.Body,
-				StateText: http.StatusText(h.Response.StateCode),
-				StateCode: h.Response.StateCode,
-				Break:     IsBreak == 2,
-				Error:     false,
+				Theology:       Conn.Theology,
+				Header:         h.Response.Header,
+				Body:           h.Response.Body,
+				DisplayBody:    h.Response.DisplayBody,
+				HasDisplayBody: h.Response.HasDisplayBody,
+				StateText:      http.StatusText(h.Response.StateCode),
+				StateCode:      h.Response.StateCode,
+				Break:          IsBreak == 2,
+				Error:          false,
 			})
 		}
 		Insert.Lock()
@@ -608,12 +614,14 @@ func HttpCallback(Conn *SunnyNet.HttpConn) {
 		Insert.Unlock()
 		if isUpdateRequestInfo {
 			CallJs("更新响应", &UpdateCurrentResponse{
-				Theology:  Conn.Theology,
-				Body:      h.Response.Body,
-				StateText: "error",
-				StateCode: h.Response.StateCode,
-				Break:     false,
-				Error:     true,
+				Theology:       Conn.Theology,
+				Body:           h.Response.Body,
+				DisplayBody:    h.Response.DisplayBody,
+				HasDisplayBody: h.Response.HasDisplayBody,
+				StateText:      "error",
+				StateCode:      h.Response.StateCode,
+				Break:          false,
+				Error:          true,
 			})
 		}
 		Insert.Lock()

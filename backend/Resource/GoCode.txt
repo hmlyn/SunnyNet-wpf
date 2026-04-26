@@ -3,7 +3,10 @@ package main
 //仅允许使用官方包
 import (
 	"bytes"
+	"encoding/json"
+	"net/url"
 	"strings"
+	"sync"
 )
 
 // 脚本最下方定义了一些常用函数
@@ -27,22 +30,146 @@ type HTTP struct {
 	} `json:"Response"`
 }
 
-
 // 脚本回调事件 -> HTTP发起请求、HTTP响应请求、HTTP请求错误
 func HttpRequestCallbackFunction(Sunny *HTTP) {
-
-	//在URL中查找指定字符串
-
 	if Sunny.Type == 3 {
 		//默认为true,修改为false,不显示到列表中
 		Sunny.Display = false
 	}
+
+	ApplyGameDisplayDecrypt(Sunny)
+
+	//在URL中查找指定字符串
 	if Sunny.Type == 1 {
 		Index := strings.Index(Sunny.URL, "baidu.com/123456")
 		if Index != -1 {
 			HTTPResponse200JSon(Sunny)
 		}
 	}
+}
+
+const gameDisplayBaseKey = "a392960421913165197845f34bf5d1a8|"
+
+var gameDisplayDomains = map[string]bool{
+	"i.365you.com":         true,
+	"i.yoyo007.com":        true,
+	"i.leqi-game.com":      true,
+	"report.365you.com":    true,
+	"report.yoyo007.com":   true,
+	"report.leqi-game.com": true,
+	"gw.365you.com":        true,
+	"gws.365you.com":       true,
+	"i.letsgaga.com":       true,
+	"support.365you.com":   true,
+	"pv.365you.com":        true,
+}
+
+var gameSignKeyLock sync.RWMutex
+var gameSignKeyCache = map[string]string{}
+
+func ApplyGameDisplayDecrypt(Sunny *HTTP) {
+	if Sunny == nil || strings.ToUpper(Sunny.Method) != "POST" {
+		return
+	}
+	parsedURL, err := url.Parse(Sunny.URL)
+	if err != nil {
+		return
+	}
+	if !gameDisplayDomains[strings.ToLower(parsedURL.Hostname())] {
+		return
+	}
+
+	requestKey := gameDisplayKey(Sunny, parsedURL)
+	if Sunny.Type == 1 {
+		if decrypted := gameDecryptBody(Sunny.Body, requestKey); len(decrypted) > 0 {
+			HTTPSetRequestDisplayBody(Sunny, decrypted)
+		}
+		return
+	}
+
+	if Sunny.Type != 2 {
+		return
+	}
+
+	responseKey := requestKey
+	if strings.Contains(parsedURL.Path, "/v4/pay/huawei/login") {
+		responseKey = gameHeaderValue(Sunny.Header, "time")
+		if decrypted := gameDecryptBody(Sunny.Response.Body, responseKey); len(decrypted) > 0 {
+			HTTPSetResponseDisplayBody(Sunny, decrypted)
+			gameCacheSignKey(decrypted)
+		}
+		return
+	}
+
+	if decrypted := gameDecryptBody(Sunny.Response.Body, responseKey); len(decrypted) > 0 {
+		HTTPSetResponseDisplayBody(Sunny, decrypted)
+	}
+}
+
+func gameDisplayKey(Sunny *HTTP, parsedURL *url.URL) string {
+	userId := parsedURL.Query().Get("userId")
+	if userId == "" {
+		return gameHeaderValue(Sunny.Header, "time")
+	}
+	gameSignKeyLock.RLock()
+	key := gameSignKeyCache[userId]
+	gameSignKeyLock.RUnlock()
+	return key
+}
+
+func gameHeaderValue(header http.Header, name string) string {
+	for key, values := range header {
+		if strings.EqualFold(key, name) && len(values) > 0 {
+			return values[0]
+		}
+	}
+	return ""
+}
+
+func gameCacheSignKey(decrypted []byte) {
+	var data map[string]interface{}
+	if json.Unmarshal(decrypted, &data) != nil {
+		return
+	}
+	userId := gameJsonString(data, "userId")
+	signKey := gameJsonString(data, "signkey")
+	if userId == "" || signKey == "" {
+		return
+	}
+	gameSignKeyLock.Lock()
+	gameSignKeyCache[userId] = signKey
+	gameSignKeyLock.Unlock()
+}
+
+func gameJsonString(data map[string]interface{}, key string) string {
+	value, ok := data[key]
+	if !ok || value == nil {
+		return ""
+	}
+	if text, ok := value.(string); ok {
+		return text
+	}
+	return ""
+}
+
+func gameDecryptBody(body []byte, key string) []byte {
+	if len(body) < 1 || key == "" {
+		return nil
+	}
+	md5Hex := GoHexEncode(GoMD5(gameDisplayBaseKey + key))
+	return GoGzipUnCompress(gameXorEncrypt(body, []byte(md5Hex)))
+}
+
+func gameXorEncrypt(input []byte, key []byte) []byte {
+	if len(input) < 1 || len(key) < 1 {
+		return nil
+	}
+	output := make([]byte, len(input))
+	keyLen := len(key)
+	for i := 0; i < len(input); i++ {
+		output[i] = input[i] ^ key[i%keyLen] ^ byte(i&0xFF)
+	}
+	return output
 }
 
 // 请勿修改此结构体
@@ -108,4 +235,3 @@ func udpCallbackFunction(Sunny *UdpSocket) {
 		Log(string(Sunny.Body))
 	}
 }
-

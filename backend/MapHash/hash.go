@@ -53,19 +53,23 @@ func (v *WaitGroup) Wait() {
 }
 
 type Request struct {
-	PID      string      `json:"PID"`    //进程
-	Method   string      `json:"Method"` //方式
-	URL      string      `json:"URL"`    //请求地址
-	Proto    string      `json:"Proto"`
-	Header   http.Header `json:"Header"`
-	Body     []byte      `json:"Body"`
-	Display  bool        `json:"Display"` //是否需要显示到列表
-	Response struct {
-		Conn      *SunnyNet.HttpConn `json:"-"`
-		Header    http.Header        `json:"Header"`
-		Body      []byte             `json:"Body"`
-		StateCode int                `json:"StateCode"`
-		Error     bool               `json:"Error"`
+	PID            string      `json:"PID"`    //进程
+	Method         string      `json:"Method"` //方式
+	URL            string      `json:"URL"`    //请求地址
+	Proto          string      `json:"Proto"`
+	Header         http.Header `json:"Header"`
+	Body           []byte      `json:"Body"`
+	Display        bool        `json:"Display"` //是否需要显示到列表
+	DisplayBody    []byte      `json:"-"`
+	HasDisplayBody bool        `json:"-"`
+	Response       struct {
+		Conn           *SunnyNet.HttpConn `json:"-"`
+		Header         http.Header        `json:"Header"`
+		Body           []byte             `json:"Body"`
+		DisplayBody    []byte             `json:"-"`
+		HasDisplayBody bool               `json:"-"`
+		StateCode      int                `json:"StateCode"`
+		Error          bool               `json:"Error"`
 	} `json:"Response"`
 	Break   uint8              `json:"Break"`
 	Wait    WaitGroup          `json:"-"`
@@ -92,17 +96,21 @@ type Request struct {
 	} `json:"color"` //显示图标
 }
 type RequestWeb struct {
-	Method   string
-	URL      string
-	Proto    string //HTTP/1.1
-	Header   http.Header
-	Body     []byte
-	Response struct {
-		Header    http.Header
-		Body      []byte
-		StateCode int
-		StateText string
-		Error     bool
+	Method         string
+	URL            string
+	Proto          string //HTTP/1.1
+	Header         http.Header
+	Body           []byte
+	DisplayBody    []byte
+	HasDisplayBody bool
+	Response       struct {
+		Header         http.Header
+		Body           []byte
+		DisplayBody    []byte
+		HasDisplayBody bool
+		StateCode      int
+		StateText      string
+		Error          bool
 	}
 	SocketData []*UpdateSocketList
 	Options    struct {
@@ -145,6 +153,28 @@ func (m *Map) SetRequest(TheologyID int, h *Request) {
 	defer m.lock.Unlock()
 	m.Request[TheologyID] = h
 }
+func (m *Map) SetRequestDisplayBody(TheologyID int, body []byte) bool {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	h := m.Request[TheologyID]
+	if h == nil {
+		return false
+	}
+	h.DisplayBody = append(h.DisplayBody[:0], body...)
+	h.HasDisplayBody = true
+	return true
+}
+func (m *Map) SetResponseDisplayBody(TheologyID int, body []byte) bool {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	h := m.Request[TheologyID]
+	if h == nil {
+		return false
+	}
+	h.Response.DisplayBody = append(h.Response.DisplayBody[:0], body...)
+	h.Response.HasDisplayBody = true
+	return true
+}
 func (m *Map) CreateUniqueID() int {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -178,8 +208,12 @@ func (m *Map) GetRequestWeb(Theology int) *RequestWeb {
 	defer m.lock.Unlock()
 	h := m.Request[Theology]
 	r := &RequestWeb{Body: h.Body, URL: h.URL, Proto: h.Proto, Header: h.Header, Method: h.Method}
+	r.DisplayBody = h.DisplayBody
+	r.HasDisplayBody = h.HasDisplayBody
 	r.Response.Header = h.Response.Header
 	r.Response.Body = h.Response.Body
+	r.Response.DisplayBody = h.Response.DisplayBody
+	r.Response.HasDisplayBody = h.Response.HasDisplayBody
 	r.Response.StateText = http.StatusText(h.Response.StateCode)
 	r.Response.StateCode = h.Response.StateCode
 	r.Response.Error = h.Response.Error

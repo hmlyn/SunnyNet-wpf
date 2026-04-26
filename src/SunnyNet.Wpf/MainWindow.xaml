@@ -852,7 +852,13 @@
                                                     ToolTip="放大/还原请求区域">
                                                 <TextBlock x:Name="RequestZoomGlyph" Style="{StaticResource GlyphTextStyle}" Text="&#xE740;" />
                                             </Button>
-                                            <TextBlock VerticalAlignment="Center" Style="{StaticResource DetailSectionTitleTextStyle}" Text="请求内容" />
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource DetailSectionTitleTextStyle}" Text="请求内容" />
+                                                <Border Style="{StaticResource DetailBadgeBorderStyle}"
+                                                        Visibility="{Binding Detail.HasRequestDisplayBody, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                    <TextBlock Text="显示解密" />
+                                                </Border>
+                                            </StackPanel>
                                             <Border DockPanel.Dock="Right" Style="{StaticResource DetailBadgeBorderStyle}">
                                                 <TextBlock Text="{Binding Detail.RequestMethod}" />
                                             </Border>
@@ -1019,6 +1025,10 @@
                                             </StackPanel>
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                 <TextBlock Style="{StaticResource DetailSectionTitleTextStyle}" Text="响应内容" />
+                                                <Border Style="{StaticResource DetailBadgeBorderStyle}"
+                                                        Visibility="{Binding Detail.HasResponseDisplayBody, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                    <TextBlock Text="显示解密" />
+                                                </Border>
                                                 <Border Style="{StaticResource DetailBadgeBorderStyle}">
                                                     <TextBlock Text="{Binding Detail.ResponseStateCode}" />
                                                 </Border>
