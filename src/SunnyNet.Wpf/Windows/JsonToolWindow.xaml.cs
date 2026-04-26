@@ -1,5 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Collections.Specialized;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Unicode;
@@ -14,7 +15,7 @@ namespace SunnyNet.Wpf.Windows;
 public partial class JsonToolWindow : Window
 {
     private readonly ObservableCollection<JsonEditorNode> _rootNodes = new();
-    private readonly ObservableCollection<JsonEditorNode> _visibleNodes = new();
+    private readonly RangeObservableCollection<JsonEditorNode> _visibleNodes = new();
     private readonly Dictionary<JsonEditorNode, string> _editingValues = new();
     private readonly Dictionary<JsonEditorNode, string> _editingTypes = new();
     private bool _isRefreshingNodes;
@@ -186,8 +187,7 @@ public partial class JsonToolWindow : Window
             return;
         }
 
-        node.IsExpanded = !node.IsExpanded;
-        RefreshVisibleNodes();
+        ToggleVisibleNode(node);
     }
 
     private void JsonNodeListBox_SelectionChanged(object sender, SelectionChangedEventArgs selectionChangedEventArgs)
@@ -450,12 +450,14 @@ public partial class JsonToolWindow : Window
         _isRefreshingNodes = true;
         try
         {
-        NormalizeLevels();
-        _visibleNodes.Clear();
-        foreach (JsonEditorNode node in _rootNodes)
-        {
-            AddVisibleNode(node);
-        }
+            NormalizeLevels();
+            List<JsonEditorNode> visibleNodes = new();
+            foreach (JsonEditorNode node in _rootNodes)
+            {
+                AddVisibleNode(node, visibleNodes);
+            }
+
+            _visibleNodes.ReplaceAll(visibleNodes);
         }
         finally
         {
@@ -463,11 +465,62 @@ public partial class JsonToolWindow : Window
         }
     }
 
-    private void AddVisibleNode(JsonEditorNode node)
+    private void ToggleVisibleNode(JsonEditorNode node)
+    {
+        int index = _visibleNodes.IndexOf(node);
+        if (index < 0)
+        {
+            node.IsExpanded = !node.IsExpanded;
+            RefreshVisibleNodes();
+            return;
+        }
+
+        if (node.IsExpanded)
+        {
+            node.IsExpanded = false;
+            int removeCount = CountVisibleDescendants(index + 1, node.Level);
+            if (removeCount > 0)
+            {
+                _visibleNodes.RemoveRange(index + 1, removeCount);
+            }
+
+            return;
+        }
+
+        node.IsExpanded = true;
+        List<JsonEditorNode> descendants = new();
+        foreach (JsonEditorNode child in node.Children)
+        {
+            AddVisibleNode(child, descendants);
+        }
+
+        if (descendants.Count > 0)
+        {
+            _visibleNodes.InsertRange(index + 1, descendants);
+        }
+    }
+
+    private int CountVisibleDescendants(int startIndex, int parentLevel)
+    {
+        int count = 0;
+        for (int index = startIndex; index < _visibleNodes.Count; index++)
+        {
+            if (_visibleNodes[index].Level <= parentLevel)
+            {
+                break;
+            }
+
+            count++;
+        }
+
+        return count;
+    }
+
+    private static void AddVisibleNode(JsonEditorNode node, ICollection<JsonEditorNode> visibleNodes)
     {
         node.Indent = Math.Max(0, node.Level * 18);
         node.CanToggle = node.Children.Count > 0;
-        _visibleNodes.Add(node);
+        visibleNodes.Add(node);
         if (!node.IsExpanded)
         {
             return;
@@ -475,7 +528,7 @@ public partial class JsonToolWindow : Window
 
         foreach (JsonEditorNode child in node.Children)
         {
-            AddVisibleNode(child);
+            AddVisibleNode(child, visibleNodes);
         }
     }
 
@@ -739,7 +792,6 @@ public partial class JsonToolWindow : Window
         node.Parent = parent;
         node.Level = level;
         node.Indent = Math.Max(0, level * 18);
-        node.IsExpanded = level < 2;
 
         if (element.ValueKind == JsonValueKind.Object)
         {
@@ -759,7 +811,23 @@ public partial class JsonToolWindow : Window
         }
 
         node.CanToggle = node.Children.Count > 0;
+        node.IsExpanded = ShouldAutoExpandNode(level, node.Children.Count);
         return node;
+    }
+
+    private static bool ShouldAutoExpandNode(int level, int childCount)
+    {
+        if (childCount == 0)
+        {
+            return false;
+        }
+
+        if (level == 0)
+        {
+            return true;
+        }
+
+        return level == 1 && childCount <= 50;
     }
 
     private static void SetExpanded(JsonEditorNode node, bool expanded)
@@ -817,5 +885,102 @@ public partial class JsonToolWindow : Window
     {
         JsonParseStatusTextBlock.Text = $"{title}：{exception.Message}";
         ToolSummaryTextBlock.Text = title;
+    }
+}
+
+internal sealed class RangeObservableCollection<T> : ObservableCollection<T>
+{
+    private bool _suppressNotifications;
+
+    public void ReplaceAll(IEnumerable<T> items)
+    {
+        CheckReentrancy();
+        _suppressNotifications = true;
+        try
+        {
+            Items.Clear();
+            foreach (T item in items)
+            {
+                Items.Add(item);
+            }
+        }
+        finally
+        {
+            _suppressNotifications = false;
+        }
+
+        RaiseReset();
+    }
+
+    public void InsertRange(int index, IEnumerable<T> items)
+    {
+        List<T> itemList = items as List<T> ?? items.ToList();
+        if (itemList.Count == 0)
+        {
+            return;
+        }
+
+        CheckReentrancy();
+        _suppressNotifications = true;
+        try
+        {
+            for (int offset = 0; offset < itemList.Count; offset++)
+            {
+                Items.Insert(index + offset, itemList[offset]);
+            }
+        }
+        finally
+        {
+            _suppressNotifications = false;
+        }
+
+        RaiseReset();
+    }
+
+    public void RemoveRange(int index, int count)
+    {
+        if (count <= 0)
+        {
+            return;
+        }
+
+        CheckReentrancy();
+        _suppressNotifications = true;
+        try
+        {
+            for (int offset = 0; offset < count; offset++)
+            {
+                Items.RemoveAt(index);
+            }
+        }
+        finally
+        {
+            _suppressNotifications = false;
+        }
+
+        RaiseReset();
+    }
+
+    protected override void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
+    {
+        if (!_suppressNotifications)
+        {
+            base.OnCollectionChanged(e);
+        }
+    }
+
+    protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (!_suppressNotifications)
+        {
+            base.OnPropertyChanged(e);
+        }
+    }
+
+    private void RaiseReset()
+    {
+        OnPropertyChanged(new System.ComponentModel.PropertyChangedEventArgs(nameof(Count)));
+        OnPropertyChanged(new System.ComponentModel.PropertyChangedEventArgs("Item[]"));
+        OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
     }
 }

@@ -227,11 +227,16 @@
                                      DragOver="JsonNodeListBox_DragOver"
                                      DragLeave="JsonNodeListBox_DragLeave"
                                      Drop="JsonNodeListBox_Drop"
-                                     VirtualizingPanel.IsVirtualizing="False"
+                                     ScrollViewer.CanContentScroll="True"
+                                     VirtualizingPanel.CacheLength="1,1"
+                                     VirtualizingPanel.CacheLengthUnit="Page"
+                                     VirtualizingPanel.IsVirtualizing="True"
+                                     VirtualizingPanel.ScrollUnit="Pixel"
+                                     VirtualizingPanel.VirtualizationMode="Recycling"
                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                 <ListBox.ItemsPanel>
                                     <ItemsPanelTemplate>
-                                        <StackPanel />
+                                        <VirtualizingStackPanel />
                                     </ItemsPanelTemplate>
                                 </ListBox.ItemsPanel>
                                 <ListBox.ItemTemplate>
