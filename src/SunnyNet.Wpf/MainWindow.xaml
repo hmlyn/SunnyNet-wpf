@@ -728,6 +728,28 @@
                                         <Setter Property="VerticalAlignment" Value="Center" />
                                         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
                                     </Style>
+                                    <Style x:Key="SessionIconBadgeStyle" TargetType="{x:Type Border}">
+                                        <Setter Property="Width" Value="23" />
+                                        <Setter Property="Height" Value="18" />
+                                        <Setter Property="CornerRadius" Value="4" />
+                                        <Setter Property="BorderThickness" Value="1" />
+                                        <Setter Property="Background" Value="{Binding SessionIconBackground}" />
+                                        <Setter Property="BorderBrush" Value="{Binding StatusBrush}" />
+                                        <Setter Property="ToolTip" Value="{Binding SessionIconToolTip}" />
+                                        <Setter Property="VerticalAlignment" Value="Center" />
+                                    </Style>
+                                    <Style x:Key="SessionIconGlyphStyle" TargetType="{x:Type TextBlock}">
+                                        <Setter Property="HorizontalAlignment" Value="Center" />
+                                        <Setter Property="VerticalAlignment" Value="Center" />
+                                        <Setter Property="TextAlignment" Value="Center" />
+                                        <Setter Property="FontFamily" Value="Segoe UI Symbol, Segoe UI" />
+                                        <Setter Property="FontSize" Value="{Binding SessionIconFontSize}" />
+                                        <Setter Property="FontWeight" Value="Bold" />
+                                        <Setter Property="Foreground" Value="{Binding StatusBrush}" />
+                                        <Setter Property="LineHeight" Value="13" />
+                                        <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+                                        <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+                                    </Style>
                                     <Style x:Key="SessionMethodTextStyle" TargetType="{x:Type TextBlock}" BasedOn="{StaticResource MethodCellTextStyle}">
                                         <Setter Property="Margin" Value="0" />
                                         <Setter Property="HorizontalAlignment" Value="Left" />
@@ -778,12 +800,11 @@
                                                 <StackPanel Margin="16,0,0,0"
                                                             Orientation="Horizontal"
                                                             VerticalAlignment="Center">
-                                                    <Ellipse Width="7"
-                                                             Height="7"
-                                                             VerticalAlignment="Center"
-                                                             Fill="{Binding StatusBrush}"
-                                                             ToolTip="{Binding StatusIconToolTip}" />
-                                                    <TextBlock Margin="8,0,0,0"
+                                                    <Border Style="{StaticResource SessionIconBadgeStyle}">
+                                                        <TextBlock Style="{StaticResource SessionIconGlyphStyle}"
+                                                                   Text="{Binding SessionIconGlyph}" />
+                                                    </Border>
+                                                    <TextBlock Margin="7,0,0,0"
                                                                Style="{StaticResource SessionIndexTextStyle}"
                                                                Text="{Binding Index}" />
                                                 </StackPanel>

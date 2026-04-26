@@ -22,6 +22,13 @@ public sealed class CaptureEntry : ViewModelBase
     private static readonly Brush WarningRowBackgroundBrush = CreateFrozenBrush("#FFF8EA");
     private static readonly Brush DangerRowBackgroundBrush = CreateFrozenBrush("#FFF1F1");
     private static readonly Brush InfoRowBackgroundBrush = CreateFrozenBrush("#F4F8FF");
+    private static readonly Brush DefaultIconBackgroundBrush = CreateFrozenBrush("#F4F7FB");
+    private static readonly Brush SuccessIconBackgroundBrush = CreateFrozenBrush("#E8F6EE");
+    private static readonly Brush RedirectIconBackgroundBrush = CreateFrozenBrush("#EAF1FF");
+    private static readonly Brush WarningIconBackgroundBrush = CreateFrozenBrush("#FFF2D8");
+    private static readonly Brush DangerIconBackgroundBrush = CreateFrozenBrush("#FFE8E8");
+    private static readonly Brush InfoIconBackgroundBrush = CreateFrozenBrush("#EAF1FF");
+    private static readonly Brush InterceptIconBackgroundBrush = CreateFrozenBrush("#FFF0DF");
     private int _index;
     private int _theology;
     private string _method = "";
@@ -215,6 +222,31 @@ public sealed class CaptureEntry : ViewModelBase
     public string StatusIconToolTip => GetStatusIconToolTip();
 
     [JsonIgnore]
+    public string SessionIconGlyph => GetSessionIconVisual().Glyph;
+
+    [JsonIgnore]
+    public string SessionIconToolTip => GetSessionIconVisual().ToolTip;
+
+    [JsonIgnore]
+    public Brush SessionIconBackground => GetSessionIconBackground();
+
+    [JsonIgnore]
+    public double SessionIconFontSize
+    {
+        get
+        {
+            int length = SessionIconGlyph.Length;
+            return length switch
+            {
+                >= 4 => 7.4,
+                3 => 8.0,
+                2 => 9.3,
+                _ => 12.2
+            };
+        }
+    }
+
+    [JsonIgnore]
     public bool IsFavorite
     {
         get => _isFavorite;
@@ -332,6 +364,10 @@ public sealed class CaptureEntry : ViewModelBase
         OnPropertyChanged(nameof(RowBackground));
         OnPropertyChanged(nameof(StatusBrush));
         OnPropertyChanged(nameof(StatusIconToolTip));
+        OnPropertyChanged(nameof(SessionIconGlyph));
+        OnPropertyChanged(nameof(SessionIconToolTip));
+        OnPropertyChanged(nameof(SessionIconBackground));
+        OnPropertyChanged(nameof(SessionIconFontSize));
     }
 
     private Brush GetStatusBrush()
@@ -426,6 +462,52 @@ public sealed class CaptureEntry : ViewModelBase
         return DefaultRowBackgroundBrush;
     }
 
+    private Brush GetSessionIconBackground()
+    {
+        if (IsIntercepted)
+        {
+            return InterceptIconBackgroundBrush;
+        }
+
+        if (IsErrorState())
+        {
+            return DangerIconBackgroundBrush;
+        }
+
+        int statusCode = ExtractStatusCode(State);
+        if (statusCode >= 500)
+        {
+            return DangerIconBackgroundBrush;
+        }
+
+        if (statusCode >= 400)
+        {
+            return DangerIconBackgroundBrush;
+        }
+
+        if (statusCode >= 300)
+        {
+            return RedirectIconBackgroundBrush;
+        }
+
+        if (statusCode >= 200)
+        {
+            return SuccessIconBackgroundBrush;
+        }
+
+        if (Icon is "websocket_connect")
+        {
+            return InfoIconBackgroundBrush;
+        }
+
+        if (Icon is "websocket_close" || State.Contains("断开", StringComparison.OrdinalIgnoreCase))
+        {
+            return WarningIconBackgroundBrush;
+        }
+
+        return DefaultIconBackgroundBrush;
+    }
+
     private string GetStatusIconToolTip()
     {
         if (IsIntercepted)
@@ -440,6 +522,212 @@ public sealed class CaptureEntry : ViewModelBase
         }
 
         return string.IsNullOrWhiteSpace(State) ? "等待状态" : State;
+    }
+
+    private SessionIconVisual GetSessionIconVisual()
+    {
+        if (IsIntercepted)
+        {
+            return BreakMode == 2
+                ? new SessionIconVisual("↓", "响应断点：已拦截下行响应")
+                : new SessionIconVisual("↑", "请求断点：已拦截上行请求");
+        }
+
+        if (Icon.Equals("websocket_close", StringComparison.OrdinalIgnoreCase)
+            || State.Contains("断开", StringComparison.OrdinalIgnoreCase))
+        {
+            return new SessionIconVisual("×", BuildSessionIconToolTip("连接已断开"));
+        }
+
+        if (Icon.Equals("websocket_connect", StringComparison.OrdinalIgnoreCase)
+            || Method.Equals("WebSocket", StringComparison.OrdinalIgnoreCase)
+            || Method.Equals("Websocket", StringComparison.OrdinalIgnoreCase)
+            || ResponseType.Contains("WebSocket", StringComparison.OrdinalIgnoreCase)
+            || ResponseType.Contains("Websocket", StringComparison.OrdinalIgnoreCase))
+        {
+            return new SessionIconVisual("WS", BuildSessionIconToolTip("WebSocket 会话"));
+        }
+
+        int statusCode = ExtractStatusCode(State);
+        if (IsErrorState() || statusCode >= 500)
+        {
+            return new SessionIconVisual("!", BuildSessionIconToolTip("服务器错误"));
+        }
+
+        if (statusCode == 401 || statusCode == 407)
+        {
+            return new SessionIconVisual(statusCode.ToString(), BuildSessionIconToolTip("认证请求"));
+        }
+
+        if (statusCode >= 400)
+        {
+            return new SessionIconVisual("!", BuildSessionIconToolTip("请求错误"));
+        }
+
+        if (statusCode == 304)
+        {
+            return new SessionIconVisual("304", BuildSessionIconToolTip("缓存未修改"));
+        }
+
+        if (statusCode >= 300)
+        {
+            return new SessionIconVisual("↪", BuildSessionIconToolTip("重定向响应"));
+        }
+
+        SessionIconVisual? iconVisual = TryGetKnownSessionIcon(Icon);
+        if (iconVisual.HasValue)
+        {
+            return iconVisual.Value;
+        }
+
+        iconVisual = TryGetContentTypeSessionIcon(ResponseType);
+        if (iconVisual.HasValue)
+        {
+            return iconVisual.Value;
+        }
+
+        iconVisual = TryGetMethodSessionIcon(Method);
+        if (iconVisual.HasValue)
+        {
+            return iconVisual.Value;
+        }
+
+        if (statusCode >= 200)
+        {
+            return new SessionIconVisual("✓", BuildSessionIconToolTip("请求完成"));
+        }
+
+        if (Icon.Contains("上行", StringComparison.OrdinalIgnoreCase) || State.Contains("-", StringComparison.OrdinalIgnoreCase))
+        {
+            return new SessionIconVisual("↑", "请求已发送，等待响应");
+        }
+
+        return new SessionIconVisual("↔", string.IsNullOrWhiteSpace(State) ? "普通会话" : State);
+    }
+
+    private SessionIconVisual? TryGetKnownSessionIcon(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        string key = value.Trim();
+        if (key.Contains("上行", StringComparison.OrdinalIgnoreCase))
+        {
+            return new SessionIconVisual("↑", "请求已发送，等待响应");
+        }
+
+        return key.ToLowerInvariant() switch
+        {
+            "img" => new SessionIconVisual("▧", BuildSessionIconToolTip("图片响应")),
+            "js" => new SessionIconVisual("JS", BuildSessionIconToolTip("JavaScript 响应")),
+            "css" => new SessionIconVisual("CSS", BuildSessionIconToolTip("CSS 样式响应")),
+            "xml" => new SessionIconVisual("<>", BuildSessionIconToolTip("XML 响应")),
+            "json" => new SessionIconVisual("{}", BuildSessionIconToolTip("JSON 响应")),
+            "html" => new SessionIconVisual("H", BuildSessionIconToolTip("HTML 响应")),
+            "audio" => new SessionIconVisual("♪", BuildSessionIconToolTip("音频响应")),
+            "video" => new SessionIconVisual("▶", BuildSessionIconToolTip("视频响应")),
+            "font" => new SessionIconVisual("Aa", BuildSessionIconToolTip("字体资源")),
+            "flash" => new SessionIconVisual("F", BuildSessionIconToolTip("Flash 资源")),
+            "post" => new SessionIconVisual("P", BuildSessionIconToolTip("POST/PUT 请求")),
+            "302" => new SessionIconVisual("↪", BuildSessionIconToolTip("重定向响应")),
+            "401" => new SessionIconVisual("401", BuildSessionIconToolTip("认证请求")),
+            "stop" => new SessionIconVisual("!", BuildSessionIconToolTip("请求被拒绝或不存在")),
+            "error" => new SessionIconVisual("!", BuildSessionIconToolTip("请求失败")),
+            _ => null
+        };
+    }
+
+    private SessionIconVisual? TryGetContentTypeSessionIcon(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        string contentType = value.Trim().ToLowerInvariant();
+        if (contentType.Contains("image/"))
+        {
+            return new SessionIconVisual("▧", BuildSessionIconToolTip("图片响应"));
+        }
+
+        if (contentType.Contains("javascript") || contentType.Contains("ecmascript"))
+        {
+            return new SessionIconVisual("JS", BuildSessionIconToolTip("JavaScript 响应"));
+        }
+
+        if (contentType.Contains("css"))
+        {
+            return new SessionIconVisual("CSS", BuildSessionIconToolTip("CSS 样式响应"));
+        }
+
+        if (contentType.Contains("json"))
+        {
+            return new SessionIconVisual("{}", BuildSessionIconToolTip("JSON 响应"));
+        }
+
+        if (contentType.Contains("html"))
+        {
+            return new SessionIconVisual("H", BuildSessionIconToolTip("HTML 响应"));
+        }
+
+        if (contentType.Contains("xml"))
+        {
+            return new SessionIconVisual("<>", BuildSessionIconToolTip("XML 响应"));
+        }
+
+        if (contentType.Contains("audio/"))
+        {
+            return new SessionIconVisual("♪", BuildSessionIconToolTip("音频响应"));
+        }
+
+        if (contentType.Contains("video/"))
+        {
+            return new SessionIconVisual("▶", BuildSessionIconToolTip("视频响应"));
+        }
+
+        if (contentType.Contains("font") || contentType.Contains("woff") || contentType.Contains("ttf"))
+        {
+            return new SessionIconVisual("Aa", BuildSessionIconToolTip("字体资源"));
+        }
+
+        if (contentType.Contains("text/plain"))
+        {
+            return new SessionIconVisual("TXT", BuildSessionIconToolTip("纯文本响应"));
+        }
+
+        if (contentType.Contains("octet-stream"))
+        {
+            return new SessionIconVisual("BIN", BuildSessionIconToolTip("二进制响应"));
+        }
+
+        return null;
+    }
+
+    private SessionIconVisual? TryGetMethodSessionIcon(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return value.Trim().ToUpperInvariant() switch
+        {
+            "CONNECT" => new SessionIconVisual("T", "CONNECT 隧道"),
+            "HEAD" => new SessionIconVisual("H", "HEAD 请求"),
+            "POST" => new SessionIconVisual("P", "POST 请求"),
+            "PUT" => new SessionIconVisual("PU", "PUT 请求"),
+            "DELETE" => new SessionIconVisual("D", "DELETE 请求"),
+            "PATCH" => new SessionIconVisual("PA", "PATCH 请求"),
+            _ => null
+        };
+    }
+
+    private string BuildSessionIconToolTip(string text)
+    {
+        int statusCode = ExtractStatusCode(State);
+        return statusCode > 0 ? $"{text}（HTTP {statusCode}）" : text;
     }
 
     private bool IsErrorState()
@@ -503,6 +791,8 @@ public sealed class CaptureEntry : ViewModelBase
             return fallback;
         }
     }
+
+    private readonly record struct SessionIconVisual(string Glyph, string ToolTip);
 }
 
 public sealed class CaptureEntryColor
