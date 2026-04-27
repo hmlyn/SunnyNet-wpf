@@ -1,4 +1,8 @@
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using SunnyNet.Wpf.ViewModels;
 
 namespace SunnyNet.Wpf.Models;
@@ -125,6 +129,7 @@ public sealed class RequestBlockRuleItem : TrafficRuleItemBase
 
 public sealed class RequestRewriteRuleItem : TrafficRuleItemBase
 {
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = false };
     private string _direction = "请求";
     private string _target = "协议头";
     private string _operation = "设置";
@@ -132,6 +137,12 @@ public sealed class RequestRewriteRuleItem : TrafficRuleItemBase
     private string _value = "";
     private string _valueType = "String(UTF8)";
     private string _operationsJson = "[]";
+    private bool _syncingOperations;
+
+    public RequestRewriteRuleItem()
+    {
+        Operations.CollectionChanged += RewriteOperationsChanged;
+    }
 
     public string Direction
     {
@@ -172,12 +183,230 @@ public sealed class RequestRewriteRuleItem : TrafficRuleItemBase
     public string OperationsJson
     {
         get => _operationsJson;
-        set => SetRuleProperty(ref _operationsJson, string.IsNullOrWhiteSpace(value) ? "[]" : value);
+        set
+        {
+            if (SetRuleProperty(ref _operationsJson, string.IsNullOrWhiteSpace(value) ? "[]" : value))
+            {
+                LoadOperationsFromJson();
+            }
+        }
     }
 
-    public override string Summary => string.IsNullOrWhiteSpace(Key)
-        ? $"{Direction} · {Operation}{Target}"
-        : $"{Direction} · {Operation}{Target} · {Key}";
+    public ObservableCollection<RequestRewriteOperationItem> Operations { get; } = new();
+
+    public override string Summary
+    {
+        get
+        {
+            if (Operations.Count > 1)
+            {
+                return $"{Direction} · {Operations.Count} 个动作";
+            }
+
+            RequestRewriteOperationItem? operation = Operations.Count == 1 ? Operations[0] : null;
+            string target = operation?.Target ?? Target;
+            string action = operation?.Operation ?? Operation;
+            string key = operation?.Key ?? Key;
+            return string.IsNullOrWhiteSpace(key)
+                ? $"{Direction} · {action}{target}"
+                : $"{Direction} · {action}{target} · {key}";
+        }
+    }
+
+    public void EnsureOperations()
+    {
+        if (Operations.Count == 0)
+        {
+            LoadOperationsFromJson();
+        }
+
+        if (Operations.Count > 0)
+        {
+            SyncLegacyFieldsFromFirstOperation();
+            return;
+        }
+
+        Operations.Add(new RequestRewriteOperationItem
+        {
+            Target = Target,
+            Operation = Operation,
+            Key = Key,
+            Value = Value,
+            ValueType = ValueType
+        });
+        SyncOperationsJson();
+    }
+
+    public void SyncOperationsJson()
+    {
+        _operationsJson = JsonSerializer.Serialize(
+            Operations.Select(static item => new
+            {
+                item.Target,
+                item.Operation,
+                item.Key,
+                item.Value,
+                item.ValueType
+            }),
+            JsonOptions);
+        OnPropertyChanged(nameof(OperationsJson));
+        SyncLegacyFieldsFromFirstOperation();
+        OnPropertyChanged(nameof(Summary));
+    }
+
+    public void LoadOperationsFromJson()
+    {
+        _syncingOperations = true;
+        try
+        {
+            Operations.Clear();
+            if (!string.IsNullOrWhiteSpace(OperationsJson))
+            {
+                List<RequestRewriteOperationItem>? operations = JsonSerializer.Deserialize<List<RequestRewriteOperationItem>>(OperationsJson);
+                if (operations is not null)
+                {
+                    foreach (RequestRewriteOperationItem operation in operations.Where(static item => item is not null))
+                    {
+                        Operations.Add(operation);
+                    }
+                }
+            }
+        }
+        catch
+        {
+            Operations.Clear();
+        }
+        finally
+        {
+            _syncingOperations = false;
+        }
+
+        OnPropertyChanged(nameof(Summary));
+    }
+
+    private void SyncLegacyFieldsFromFirstOperation()
+    {
+        RequestRewriteOperationItem? operation = Operations.FirstOrDefault();
+        if (operation is null)
+        {
+            return;
+        }
+
+        SetLegacyField(ref _target, operation.Target, nameof(Target));
+        SetLegacyField(ref _operation, operation.Operation, nameof(Operation));
+        SetLegacyField(ref _key, operation.Key, nameof(Key));
+        SetLegacyField(ref _value, operation.Value, nameof(Value));
+        SetLegacyField(ref _valueType, operation.ValueType, nameof(ValueType));
+    }
+
+    private void SetLegacyField(ref string field, string value, string propertyName)
+    {
+        value ??= "";
+        if (field == value)
+        {
+            return;
+        }
+
+        field = value;
+        OnPropertyChanged(propertyName);
+    }
+
+    private void RewriteOperationsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.OldItems is not null)
+        {
+            foreach (RequestRewriteOperationItem item in e.OldItems.OfType<RequestRewriteOperationItem>())
+            {
+                item.PropertyChanged -= RewriteOperationPropertyChanged;
+            }
+        }
+
+        if (e.NewItems is not null)
+        {
+            foreach (RequestRewriteOperationItem item in e.NewItems.OfType<RequestRewriteOperationItem>())
+            {
+                item.PropertyChanged += RewriteOperationPropertyChanged;
+            }
+        }
+
+        if (!_syncingOperations)
+        {
+            State = "未保存";
+        }
+
+        OnPropertyChanged(nameof(Summary));
+    }
+
+    private void RewriteOperationPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (!_syncingOperations)
+        {
+            State = "未保存";
+        }
+
+        OnPropertyChanged(nameof(Summary));
+    }
+}
+
+public sealed class RequestRewriteOperationItem : ViewModelBase
+{
+    private string _target = "协议头";
+    private string _operation = "设置";
+    private string _key = "";
+    private string _value = "";
+    private string _valueType = "String(UTF8)";
+
+    public string Target
+    {
+        get => _target;
+        set
+        {
+            if (SetProperty(ref _target, string.IsNullOrWhiteSpace(value) ? "协议头" : value))
+            {
+                OnPropertyChanged(nameof(Summary));
+            }
+        }
+    }
+
+    public string Operation
+    {
+        get => _operation;
+        set
+        {
+            if (SetProperty(ref _operation, string.IsNullOrWhiteSpace(value) ? "设置" : value))
+            {
+                OnPropertyChanged(nameof(Summary));
+            }
+        }
+    }
+
+    public string Key
+    {
+        get => _key;
+        set
+        {
+            if (SetProperty(ref _key, value ?? ""))
+            {
+                OnPropertyChanged(nameof(Summary));
+            }
+        }
+    }
+
+    public string Value
+    {
+        get => _value;
+        set => SetProperty(ref _value, value ?? "");
+    }
+
+    public string ValueType
+    {
+        get => _valueType;
+        set => SetProperty(ref _valueType, string.IsNullOrWhiteSpace(value) ? "String(UTF8)" : value);
+    }
+
+    public string Summary => string.IsNullOrWhiteSpace(Key)
+        ? $"{Operation}{Target}"
+        : $"{Operation}{Target} · {Key}";
 }
 
 public sealed class RequestMappingRuleItem : TrafficRuleItemBase

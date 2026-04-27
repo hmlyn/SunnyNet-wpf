@@ -445,6 +445,7 @@ public partial class RulesCenterWindow : Window
 
     private static RequestRewriteRuleItem CloneRewriteRule(RequestRewriteRuleItem source)
     {
+        source.SyncOperationsJson();
         RequestRewriteRuleItem clone = new();
         ApplyRewriteRule(clone, source);
         clone.State = source.State;
@@ -461,6 +462,7 @@ public partial class RulesCenterWindow : Window
         target.Value = source.Value;
         target.ValueType = source.ValueType;
         target.OperationsJson = source.OperationsJson;
+        target.LoadOperationsFromJson();
     }
 
     private static RequestMappingRuleItem CloneMappingRule(RequestMappingRuleItem source)

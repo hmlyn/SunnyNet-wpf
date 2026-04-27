@@ -151,11 +151,7 @@
                     <DataGridTextColumn Header="匹配" Binding="{Binding UrlMatchType}" Width="82" />
                     <DataGridTextColumn Header="可选地址 (Url)" Binding="{Binding UrlPattern}" Width="300" />
                     <DataGridTextColumn Header="方向" Binding="{Binding Direction}" Width="82" />
-                    <DataGridTextColumn Header="目标" Binding="{Binding Target}" Width="92" />
-                    <DataGridTextColumn Header="操作" Binding="{Binding Operation}" Width="82" />
-                    <DataGridTextColumn Header="键" Binding="{Binding Key}" Width="140" />
-                    <DataGridTextColumn Header="值格式" Binding="{Binding ValueType}" Width="116" />
-                    <DataGridTextColumn Header="值" Binding="{Binding Value}" Width="280" />
+                    <DataGridTextColumn Header="动作链" Binding="{Binding Summary}" Width="260" />
                     <DataGridTextColumn Header="排序" Binding="{Binding Priority}" Width="80" />
                     <DataGridTextColumn Header="备注" Binding="{Binding Note}" Width="180" />
                     <DataGridTextColumn Header="状态" Binding="{Binding State}" Width="100" />

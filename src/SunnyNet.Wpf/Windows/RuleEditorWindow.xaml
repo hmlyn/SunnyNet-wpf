@@ -3,8 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         Title="规则设置"
-        Width="700"
-        Height="590"
+        Width="760"
+        Height="660"
         MinWidth="640"
         MinHeight="520"
         Background="#FFFFFF"
@@ -135,7 +135,7 @@
                     <RowDefinition Height="42" />
                     <RowDefinition Height="42" />
                     <RowDefinition Height="42" />
-                    <RowDefinition Height="84" />
+                    <RowDefinition Height="170" />
                     <RowDefinition Height="42" />
                     <RowDefinition Height="42" />
                     <RowDefinition Height="84" />
@@ -192,8 +192,6 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="118" />
                         <ColumnDefinition Width="200" />
-                        <ColumnDefinition Width="24" />
-                        <ColumnDefinition Width="88" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Style="{StaticResource EditorLabelTextStyle}" Text="方向" />
@@ -201,11 +199,11 @@
                               ItemsSource="{StaticResource RewriteDirectionItems}"
                               SelectedItem="{Binding Direction, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                               Style="{StaticResource EditorComboBoxStyle}" />
-                    <TextBlock Grid.Column="3" Style="{StaticResource EditorLabelTextStyle}" Text="目标" />
-                    <ComboBox Grid.Column="4"
-                              ItemsSource="{StaticResource RewriteTargetItems}"
-                              SelectedItem="{Binding Target, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                              Style="{StaticResource EditorComboBoxStyle}" />
+                    <TextBlock Grid.Column="2"
+                               Margin="12,0,0,0"
+                               VerticalAlignment="Center"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Text="动作按列表顺序依次执行" />
                 </Grid>
 
                 <Grid x:Name="BlockActionPanel"
@@ -252,6 +250,61 @@
                               ItemsSource="{StaticResource MappingValueTypeItems}"
                               SelectedItem="{Binding ValueType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                               Style="{StaticResource EditorComboBoxStyle}" />
+                </Grid>
+
+                <Grid x:Name="RewriteOperationsPanel"
+                      Grid.Row="7"
+                      Grid.ColumnSpan="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <DockPanel Margin="0,2,0,8">
+                        <TextBlock VerticalAlignment="Center"
+                                   Style="{StaticResource EditorLabelTextStyle}"
+                                   Text="动作链" />
+                        <StackPanel DockPanel.Dock="Right"
+                                    Orientation="Horizontal">
+                            <Button MinWidth="58" Margin="0,0,6,0" Padding="8,4" Click="AddRewriteOperation_Click" Content="新增" />
+                            <Button MinWidth="58" Margin="0,0,6,0" Padding="8,4" Click="RemoveRewriteOperation_Click" Content="删除" />
+                            <Button MinWidth="58" Margin="0,0,6,0" Padding="8,4" Click="MoveRewriteOperationUp_Click" Content="上移" />
+                            <Button MinWidth="58" Padding="8,4" Click="MoveRewriteOperationDown_Click" Content="下移" />
+                        </StackPanel>
+                    </DockPanel>
+                    <DataGrid x:Name="RewriteOperationsGrid"
+                              Grid.Row="1"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              CanUserResizeRows="False"
+                              HeadersVisibility="Column"
+                              GridLinesVisibility="Vertical"
+                              RowHeight="28"
+                              MinRowHeight="28"
+                              ItemsSource="{Binding Operations}"
+                              SelectionMode="Single"
+                              SelectionUnit="FullRow">
+                        <DataGrid.Columns>
+                            <DataGridComboBoxColumn Header="目标"
+                                                    ItemsSource="{StaticResource RewriteTargetItems}"
+                                                    SelectedItemBinding="{Binding Target, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                    Width="105" />
+                            <DataGridComboBoxColumn Header="操作"
+                                                    ItemsSource="{StaticResource RewriteOperationItems}"
+                                                    SelectedItemBinding="{Binding Operation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                    Width="82" />
+                            <DataGridTextColumn Header="键"
+                                                Binding="{Binding Key, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                Width="130" />
+                            <DataGridComboBoxColumn Header="值格式"
+                                                    ItemsSource="{StaticResource MappingValueTypeItems}"
+                                                    SelectedItemBinding="{Binding ValueType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                    Width="110" />
+                            <DataGridTextColumn Header="值"
+                                                Binding="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                Width="*" />
+                        </DataGrid.Columns>
+                    </DataGrid>
                 </Grid>
 
                 <Grid x:Name="BlockResponseTypePanel"

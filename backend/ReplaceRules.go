@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"compress/zlib"
 	"encoding/base64"
+	"encoding/json"
 	"github.com/andybalholm/brotli"
 	"github.com/qtgolang/SunnyNet/src/encoding/hex"
 	"github.com/qtgolang/SunnyNet/src/protobuf/JSON"
@@ -37,6 +38,14 @@ var decodeScriptCache = make(map[string]decodeScriptCacheEntry)
 type decodeScriptCacheEntry struct {
 	fn  func(string, string, string, []byte) []byte
 	err error
+}
+
+type requestRewriteOperation struct {
+	Target    string `json:"Target"`
+	Operation string `json:"Operation"`
+	Key       string `json:"Key"`
+	Value     string `json:"Value"`
+	ValueType string `json:"ValueType"`
 }
 
 func ReplaceRulesEvent(command string, args *JSON.SyJson) any {
@@ -331,8 +340,14 @@ func ApplyRequestRewrite(theology int, method string, u *url.URL, header http.He
 			continue
 		}
 
-		recordTrafficRuleHit(theology, "请求重写", rule.ConfigTrafficRuleBase, buildRewriteAction(rule), "请求", currentURL.String())
-		currentMethod, currentURL, currentBody = applyRequestRewriteRule(rule, currentMethod, currentURL, header, currentBody)
+		operations := getRewriteOperations(rule)
+		if len(operations) == 0 {
+			continue
+		}
+		recordTrafficRuleHit(theology, "请求重写", rule.ConfigTrafficRuleBase, buildRewriteAction(operations), "请求", currentURL.String())
+		for _, operation := range operations {
+			currentMethod, currentURL, currentBody = applyRequestRewriteOperation(operation, currentMethod, currentURL, header, currentBody)
+		}
 	}
 
 	return currentMethod, currentURL, currentBody
@@ -354,8 +369,14 @@ func ApplyResponseRewrite(theology int, method string, u *url.URL, response *htt
 			continue
 		}
 
-		recordTrafficRuleHit(theology, "请求重写", rule.ConfigTrafficRuleBase, buildRewriteAction(rule), "响应", u.String())
-		currentBody = applyResponseRewriteRule(rule, response, currentBody)
+		operations := getRewriteOperations(rule)
+		if len(operations) == 0 {
+			continue
+		}
+		recordTrafficRuleHit(theology, "请求重写", rule.ConfigTrafficRuleBase, buildRewriteAction(operations), "响应", u.String())
+		for _, operation := range operations {
+			currentBody = applyResponseRewriteOperation(operation, response, currentBody)
+		}
 	}
 
 	return currentBody
@@ -605,11 +626,11 @@ func rewriteDirectionMatches(direction string, request bool) bool {
 	}
 }
 
-func applyRequestRewriteRule(rule ConfigRequestRewriteRule, method string, u *url.URL, header http.Header, body []byte) (string, *url.URL, []byte) {
-	target := strings.TrimSpace(rule.Target)
-	operation := strings.TrimSpace(rule.Operation)
-	key := strings.TrimSpace(rule.Key)
-	value := strings.ReplaceAll(rule.Value, "\\\\", "\\")
+func applyRequestRewriteOperation(rewriteOperation requestRewriteOperation, method string, u *url.URL, header http.Header, body []byte) (string, *url.URL, []byte) {
+	target := strings.TrimSpace(rewriteOperation.Target)
+	operation := strings.TrimSpace(rewriteOperation.Operation)
+	key := strings.TrimSpace(rewriteOperation.Key)
+	value := strings.ReplaceAll(rewriteOperation.Value, "\\\\", "\\")
 	value = strings.ReplaceAll(value, "\\\"", "\"")
 
 	switch target {
@@ -655,7 +676,7 @@ func applyRequestRewriteRule(rule ConfigRequestRewriteRule, method string, u *ur
 			body = nil
 			break
 		}
-		if decoded, err := decodeMappingBody(value, rule.ValueType); err == nil {
+		if decoded, err := decodeMappingBody(value, rewriteOperation.ValueType); err == nil {
 			body = decoded
 		}
 	}
@@ -663,11 +684,11 @@ func applyRequestRewriteRule(rule ConfigRequestRewriteRule, method string, u *ur
 	return method, u, body
 }
 
-func applyResponseRewriteRule(rule ConfigRequestRewriteRule, response *http.Response, body []byte) []byte {
-	target := strings.TrimSpace(rule.Target)
-	operation := strings.TrimSpace(rule.Operation)
-	key := strings.TrimSpace(rule.Key)
-	value := strings.ReplaceAll(rule.Value, "\\\\", "\\")
+func applyResponseRewriteOperation(rewriteOperation requestRewriteOperation, response *http.Response, body []byte) []byte {
+	target := strings.TrimSpace(rewriteOperation.Target)
+	operation := strings.TrimSpace(rewriteOperation.Operation)
+	key := strings.TrimSpace(rewriteOperation.Key)
+	value := strings.ReplaceAll(rewriteOperation.Value, "\\\\", "\\")
 	value = strings.ReplaceAll(value, "\\\"", "\"")
 
 	switch target {
@@ -689,7 +710,7 @@ func applyResponseRewriteRule(rule ConfigRequestRewriteRule, response *http.Resp
 	case "Body", "响应体":
 		if isDeleteOperation(operation) {
 			body = nil
-		} else if decoded, err := decodeMappingBody(value, rule.ValueType); err == nil {
+		} else if decoded, err := decodeMappingBody(value, rewriteOperation.ValueType); err == nil {
 			body = decoded
 		}
 		if response.Header != nil {
@@ -700,6 +721,56 @@ func applyResponseRewriteRule(rule ConfigRequestRewriteRule, response *http.Resp
 	}
 
 	return body
+}
+
+func getRewriteOperations(rule ConfigRequestRewriteRule) []requestRewriteOperation {
+	operations := make([]requestRewriteOperation, 0)
+	operationsJSON := strings.TrimSpace(rule.OperationsJson)
+	if operationsJSON != "" && operationsJSON != "[]" {
+		_ = json.Unmarshal([]byte(operationsJSON), &operations)
+	}
+
+	filtered := make([]requestRewriteOperation, 0, len(operations))
+	for _, operation := range operations {
+		operation.Target = strings.TrimSpace(operation.Target)
+		operation.Operation = strings.TrimSpace(operation.Operation)
+		if operation.Target == "" {
+			continue
+		}
+		if operation.Operation == "" {
+			operation.Operation = "设置"
+		}
+		if strings.TrimSpace(operation.ValueType) == "" {
+			operation.ValueType = rule.ValueType
+		}
+		if strings.TrimSpace(operation.ValueType) == "" {
+			operation.ValueType = "String(UTF8)"
+		}
+		filtered = append(filtered, operation)
+	}
+	if len(filtered) > 0 {
+		return filtered
+	}
+
+	target := strings.TrimSpace(rule.Target)
+	if target == "" {
+		return nil
+	}
+	operation := strings.TrimSpace(rule.Operation)
+	if operation == "" {
+		operation = "设置"
+	}
+	valueType := strings.TrimSpace(rule.ValueType)
+	if valueType == "" {
+		valueType = "String(UTF8)"
+	}
+	return []requestRewriteOperation{{
+		Target:    target,
+		Operation: operation,
+		Key:       rule.Key,
+		Value:     rule.Value,
+		ValueType: valueType,
+	}}
 }
 
 func applyHeaderRewrite(header http.Header, operation string, key string, value string) {
@@ -717,19 +788,26 @@ func applyHeaderRewrite(header http.Header, operation string, key string, value 
 	header.Set(key, value)
 }
 
-func buildRewriteAction(rule ConfigRequestRewriteRule) string {
-	target := strings.TrimSpace(rule.Target)
-	operation := strings.TrimSpace(rule.Operation)
+func buildRewriteAction(operations []requestRewriteOperation) string {
+	if len(operations) > 1 {
+		return "动作链×" + strconv.Itoa(len(operations))
+	}
+	if len(operations) == 0 {
+		return "命中"
+	}
+	rewriteOperation := operations[0]
+	target := strings.TrimSpace(rewriteOperation.Target)
+	operation := strings.TrimSpace(rewriteOperation.Operation)
 	if target == "" {
 		target = "内容"
 	}
 	if operation == "" {
 		operation = "设置"
 	}
-	if strings.TrimSpace(rule.Key) == "" {
+	if strings.TrimSpace(rewriteOperation.Key) == "" {
 		return operation + target
 	}
-	return operation + target + ":" + strings.TrimSpace(rule.Key)
+	return operation + target + ":" + strings.TrimSpace(rewriteOperation.Key)
 }
 
 func directionText(request bool) string {

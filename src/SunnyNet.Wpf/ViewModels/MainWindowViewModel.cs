@@ -3095,6 +3095,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
     private string SyncRuleCenterRulesText()
     {
+        foreach (RequestRewriteRuleItem item in RequestRewriteRules)
+        {
+            item.SyncOperationsJson();
+        }
+
         Settings.RuleCenterRules = JsonSerializer.Serialize(
             new
             {
