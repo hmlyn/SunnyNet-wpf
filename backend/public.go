@@ -643,6 +643,13 @@ func event(command string, args *JSON.SyJson) any {
 		Insert.Unlock()
 		h := HashMap.GetRequestWeb(Theology)
 		return h
+	case "HTTP正文范围读取":
+		Theology := getInt(args.GetData("Theology"))
+		direction := args.GetData("Direction")
+		kind := args.GetData("Kind")
+		offset, _ := strconv.ParseInt(args.GetData("Offset"), 10, 64)
+		count := getInt(args.GetData("Count"))
+		return HashMap.GetHTTPBodyRange(Theology, direction, kind, offset, count)
 	case "socket请求获取":
 		Theology := getInt(args.GetData("Theology"))
 		Index := getInt(args.GetData("Index")) - 1
@@ -1027,7 +1034,7 @@ func event(command string, args *JSON.SyJson) any {
 						value = strings.TrimSpace(strings.Replace(array1[i], name+":", "", 1))
 						header[name] = []string{value}
 					}
-					h.Body = []byte(strings.Join(array[1:], "\r\n\r\n"))
+					HashMap.SetRequestBody(h, []byte(strings.Join(array[1:], "\r\n\r\n")))
 					if h.Conn.Request.Body != nil {
 						_ = h.Conn.Request.Body.Close()
 					}
@@ -1126,7 +1133,7 @@ func event(command string, args *JSON.SyJson) any {
 						}
 					}
 					{
-						h.Body = []byte(PostData)
+						HashMap.SetRequestBody(h, []byte(PostData))
 						if h.Conn.Request.Body != nil {
 							_ = h.Conn.Request.Body.Close()
 						}
@@ -1140,7 +1147,7 @@ func event(command string, args *JSON.SyJson) any {
 					Data = Utf8ToGBK(Data)
 				}
 				{
-					h.Body = Data
+					HashMap.SetRequestBody(h, Data)
 					if h.Conn.Request.Body != nil {
 						_ = h.Conn.Request.Body.Close()
 					}
@@ -1154,16 +1161,7 @@ func event(command string, args *JSON.SyJson) any {
 				return false
 			}
 			defer func() {
-				CallJs("更新响应", &UpdateCurrentResponse{
-					Theology:       Theology,
-					Header:         h.Response.Header,
-					Body:           h.Response.Body,
-					DisplayBody:    h.Response.DisplayBody,
-					HasDisplayBody: h.Response.HasDisplayBody,
-					StateText:      http.StatusText(h.Response.StateCode),
-					StateCode:      h.Response.StateCode,
-					Break:          true,
-				})
+				CallJs("更新响应", newUpdateCurrentResponse(Theology, h, http.StatusText(h.Response.StateCode), h.Response.StateCode, true, false))
 			}()
 			switch Tabs {
 			case "Raw", "Hex":
@@ -1205,7 +1203,7 @@ func event(command string, args *JSON.SyJson) any {
 							}
 						}
 					}
-					h.Response.Body = DataBody
+					HashMap.SetResponseBody(h, DataBody)
 					if h.Response.Conn.Response.Body != nil {
 						_ = h.Response.Conn.Response.Body.Close()
 					}
@@ -1245,7 +1243,7 @@ func event(command string, args *JSON.SyJson) any {
 				}
 				//修改URL中的参数
 				{
-					h.Response.Body = Data
+					HashMap.SetResponseBody(h, Data)
 					if h.Response.Conn.Response.Body != nil {
 						_ = h.Response.Conn.Response.Body.Close()
 					}
@@ -1358,6 +1356,22 @@ func event(command string, args *JSON.SyJson) any {
 		_ = GlobalConfig.saveToFile()
 		_TmpLock.Unlock()
 		return app.App.SetMustTcpRegexp(code) == nil
+	case "保存规则中心配置":
+		data := strings.ReplaceAll(args.GetData("Data"), "\\\\", "\\")
+		bs, err := base64.StdEncoding.DecodeString(data)
+		if err != nil {
+			return false
+		}
+		var ruleCenter ConfigRuleCenter
+		if err = json.Unmarshal(bs, &ruleCenter); err != nil {
+			return false
+		}
+		_TmpLock.Lock()
+		GlobalConfig.RuleCenter = ruleCenter
+		GlobalConfig.loadDefaultValue()
+		_ = GlobalConfig.saveToFile()
+		_TmpLock.Unlock()
+		return true
 	case "创建证书":
 		domain := args.GetData("domain")
 		country := args.GetData("country")

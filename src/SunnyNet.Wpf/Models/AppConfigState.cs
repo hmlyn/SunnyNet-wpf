@@ -20,6 +20,7 @@ public sealed class AppConfigState : ViewModelBase
     private string _hostsRules = "";
     private string _replaceRules = "";
     private string _interceptRules = "";
+    private string _ruleCenterRules = "";
     private string _goos = "windows";
     private bool _isDarkTheme;
 
@@ -117,6 +118,12 @@ public sealed class AppConfigState : ViewModelBase
     {
         get => _interceptRules;
         set => SetProperty(ref _interceptRules, value ?? "");
+    }
+
+    public string RuleCenterRules
+    {
+        get => _ruleCenterRules;
+        set => SetProperty(ref _ruleCenterRules, value ?? "");
     }
 
     public string GOOS

@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using SunnyNet.Wpf.Models;
 
 namespace SunnyNet.Wpf.Controls;
 
@@ -14,6 +15,9 @@ public partial class HexViewControl : UserControl
 
     public static readonly DependencyProperty HeaderLengthProperty =
         DependencyProperty.Register(nameof(HeaderLength), typeof(int), typeof(HexViewControl), new PropertyMetadata(0, OnHexDataChanged));
+
+    public static readonly DependencyProperty VirtualSourceProperty =
+        DependencyProperty.Register(nameof(VirtualSource), typeof(HexVirtualDataSource), typeof(HexViewControl), new PropertyMetadata(null, OnVirtualSourceChanged));
 
     public static readonly DependencyProperty EmptyTextProperty =
         DependencyProperty.Register(nameof(EmptyText), typeof(string), typeof(HexViewControl), new PropertyMetadata("无十六进制数据", OnEmptyTextChanged));
@@ -31,6 +35,8 @@ public partial class HexViewControl : UserControl
     private const double AsciiPaddingLeft = 16;
     private const int MinBytesPerLine = 8;
     private const int MaxBytesPerLine = 32;
+    private const int VirtualPageSize = 64 * 1024;
+    private const int CopyReadLimit = 16 * 1024 * 1024;
 
     private static readonly Brush OffsetBrush = CreateBrush(0x6B, 0x7C, 0x93);
     private static readonly Brush OffsetSelectedBrush = CreateBrush(0x1E, 0x63, 0xD6);
@@ -59,6 +65,9 @@ public partial class HexViewControl : UserControl
     private SelectionRegion _activeRegion;
     private SelectionRegion _preferredRegion = SelectionRegion.Hex;
     private string? _copyFeedbackText;
+    private int _virtualVersion;
+    private readonly Dictionary<int, byte[]> _virtualPages = new();
+    private readonly HashSet<int> _loadingVirtualPages = new();
     private readonly System.Windows.Threading.DispatcherTimer _copyFeedbackTimer;
 
     public HexViewControl()
@@ -97,6 +106,12 @@ public partial class HexViewControl : UserControl
         set => SetValue(HeaderLengthProperty, value);
     }
 
+    public HexVirtualDataSource? VirtualSource
+    {
+        get => (HexVirtualDataSource?)GetValue(VirtualSourceProperty);
+        set => SetValue(VirtualSourceProperty, value);
+    }
+
     public string EmptyText
     {
         get => (string)GetValue(EmptyTextProperty);
@@ -111,7 +126,9 @@ public partial class HexViewControl : UserControl
 
     internal byte[] RenderBytes => Bytes ?? Array.Empty<byte>();
 
-    internal int RenderHeaderLength => HeaderLength;
+    internal int RenderLength => ActiveVirtualSource?.TotalLength ?? RenderBytes.Length;
+
+    internal int RenderHeaderLength => ActiveVirtualSource?.HeaderLength ?? HeaderLength;
 
     internal int BytesPerLine => _bytesPerLine;
 
@@ -131,10 +148,22 @@ public partial class HexViewControl : UserControl
 
     internal ScrollViewer ScrollHost => BodyScrollViewer;
 
+    private HexVirtualDataSource? ActiveVirtualSource => VirtualSource?.TotalLength > 0 ? VirtualSource : null;
+
     private static void OnHexDataChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs args)
     {
         if (dependencyObject is HexViewControl control)
         {
+            control.CoerceSelection();
+            control.RefreshLayout();
+        }
+    }
+
+    private static void OnVirtualSourceChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs args)
+    {
+        if (dependencyObject is HexViewControl control)
+        {
+            control.ResetVirtualCache();
             control.CoerceSelection();
             control.RefreshLayout();
         }
@@ -155,6 +184,7 @@ public partial class HexViewControl : UserControl
 
     private void BodyScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs scrollChangedEventArgs)
     {
+        EnsureVisibleVirtualRangeLoaded();
         RenderSurface.InvalidateVisual();
     }
 
@@ -165,9 +195,9 @@ public partial class HexViewControl : UserControl
             return;
         }
 
-        byte[] bytes = RenderBytes;
+        int length = RenderLength;
         EmptyTextBlock.Text = EmptyText;
-        EmptyPanel.Visibility = bytes.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        EmptyPanel.Visibility = length == 0 ? Visibility.Visible : Visibility.Collapsed;
 
         _charWidth = MeasureCharacterWidth();
         _hexByteWidth = Math.Ceiling(_charWidth * 3);
@@ -175,12 +205,13 @@ public partial class HexViewControl : UserControl
         _hexColumnWidth = Math.Max(420, Math.Ceiling(_bytesPerLine * _hexByteWidth) + HexPaddingLeft + 18);
         _asciiColumnWidth = Math.Max(220, Math.Ceiling(_bytesPerLine * _charWidth) + AsciiPaddingLeft + 18);
 
-        int lineCount = GetLineCount(bytes.Length);
+        int lineCount = GetLineCount(length);
         RenderSurface.Width = Math.Max(BodyScrollViewer.ViewportWidth, OffsetWidth + DividerWidth + _hexColumnWidth + DividerWidth + _asciiColumnWidth);
         RenderSurface.Height = Math.Max(BodyScrollViewer.ViewportHeight, TopPadding + BottomPadding + lineCount * LineHeight);
-        SummaryTextBlock.Text = BuildSummaryText(bytes.Length);
+        SummaryTextBlock.Text = BuildSummaryText(length);
         SelectionInfoBorder.Visibility = HasSelection ? Visibility.Visible : Visibility.Collapsed;
         SelectionInfoTextBlock.Text = BuildSelectionInfoText();
+        EnsureVisibleVirtualRangeLoaded();
         RenderSurface.InvalidateVisual();
     }
 
@@ -205,7 +236,7 @@ public partial class HexViewControl : UserControl
 
     internal void DrawHex(DrawingContext context)
     {
-        byte[] bytes = RenderBytes;
+        int length = RenderLength;
         double width = Math.Max(RenderSurface.ActualWidth, RenderSurface.Width);
         double height = Math.Max(RenderSurface.ActualHeight, RenderSurface.Height);
         context.DrawRectangle(Brushes.Transparent, null, new Rect(0, 0, width, height));
@@ -213,20 +244,21 @@ public partial class HexViewControl : UserControl
         context.DrawRectangle(DividerBrush, null, new Rect(OffsetWidth, 0, DividerWidth, height));
         context.DrawRectangle(DividerBrush, null, new Rect(GetAsciiStartX() - DividerWidth, 0, DividerWidth, height));
 
-        if (bytes.Length == 0)
+        if (length == 0)
         {
             return;
         }
 
-        int lineCount = GetLineCount(bytes.Length);
+        int lineCount = GetLineCount(length);
         int firstLine = Math.Clamp((int)Math.Floor((BodyScrollViewer.VerticalOffset - TopPadding) / LineHeight), 0, Math.Max(0, lineCount - 1));
         int lastLine = Math.Clamp((int)Math.Ceiling((BodyScrollViewer.VerticalOffset + BodyScrollViewer.ViewportHeight - TopPadding) / LineHeight), firstLine, Math.Max(0, lineCount - 1));
+        EnsureVirtualRangeLoaded(firstLine * _bytesPerLine, Math.Min(length - firstLine * _bytesPerLine, (lastLine - firstLine + 1) * _bytesPerLine));
         double pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
 
         for (int lineIndex = firstLine; lineIndex <= lastLine; lineIndex++)
         {
             int offset = lineIndex * _bytesPerLine;
-            int count = Math.Min(_bytesPerLine, bytes.Length - offset);
+            int count = Math.Min(_bytesPerLine, length - offset);
             double y = TopPadding + lineIndex * LineHeight;
             bool lineSelected = IsLineSelected(offset, count);
             bool lineHasAnchor = IsAnchorLine(offset, count);
@@ -252,7 +284,7 @@ public partial class HexViewControl : UserControl
             {
                 int index = offset + column;
                 bool selected = IsByteSelected(index);
-                bool header = index < HeaderLength;
+                bool header = index < RenderHeaderLength;
                 double hexX = GetHexStartX() + column * _hexByteWidth;
                 double asciiX = GetAsciiStartX() + AsciiPaddingLeft + column * _charWidth;
                 if (selected)
@@ -263,16 +295,23 @@ public partial class HexViewControl : UserControl
 
                 Brush hexBrush = selected ? SelectedForegroundBrush : header ? HexHeaderBrush : HexBodyBrush;
                 Brush asciiBrush = selected ? SelectedForegroundBrush : header ? TextHeaderBrush : TextBodyBrush;
-                DrawText(context, bytes[index].ToString("X2"), hexX, y + 3, hexBrush, pixelsPerDip, FontWeights.Normal);
-                DrawText(context, ToVisibleChar(bytes[index]).ToString(), asciiX, y + 3, asciiBrush, pixelsPerDip, FontWeights.Normal);
+                if (TryGetRenderByte(index, out byte value))
+                {
+                    DrawText(context, value.ToString("X2"), hexX, y + 3, hexBrush, pixelsPerDip, FontWeights.Normal);
+                    DrawText(context, ToVisibleChar(value).ToString(), asciiX, y + 3, asciiBrush, pixelsPerDip, FontWeights.Normal);
+                }
+                else
+                {
+                    DrawText(context, "??", hexX, y + 3, OffsetBrush, pixelsPerDip, FontWeights.Normal);
+                    DrawText(context, "·", asciiX, y + 3, OffsetBrush, pixelsPerDip, FontWeights.Normal);
+                }
             }
         }
     }
 
     private void RenderSurface_MouseLeftButtonDown(object sender, MouseButtonEventArgs mouseButtonEventArgs)
     {
-        byte[] bytes = RenderBytes;
-        if (bytes.Length == 0)
+        if (RenderLength == 0)
         {
             return;
         }
@@ -367,22 +406,22 @@ public partial class HexViewControl : UserControl
 
     private int GetByteIndex(Point point, SelectionRegion region)
     {
-        byte[] bytes = RenderBytes;
-        if (bytes.Length == 0)
+        int length = RenderLength;
+        if (length == 0)
         {
             return 0;
         }
 
-        int lineCount = GetLineCount(bytes.Length);
+        int lineCount = GetLineCount(length);
         int line = Math.Clamp((int)Math.Floor((point.Y - TopPadding) / LineHeight), 0, Math.Max(lineCount - 1, 0));
         int lineStart = line * _bytesPerLine;
-        int count = Math.Min(_bytesPerLine, bytes.Length - lineStart);
+        int count = Math.Min(_bytesPerLine, length - lineStart);
         double xStart = region == SelectionRegion.Hex
             ? GetHexStartX()
             : GetAsciiStartX() + AsciiPaddingLeft;
         double xStep = region == SelectionRegion.Hex ? _hexByteWidth : _charWidth;
         int column = Math.Clamp((int)Math.Floor((point.X - xStart + xStep * 0.35) / Math.Max(xStep, 1)), 0, Math.Max(count - 1, 0));
-        return Math.Clamp(lineStart + column, 0, bytes.Length - 1);
+        return Math.Clamp(lineStart + column, 0, length - 1);
     }
 
     private void HexViewControl_PreviewKeyDown(object sender, KeyEventArgs keyEventArgs)
@@ -430,8 +469,8 @@ public partial class HexViewControl : UserControl
 
     private bool TryHandleNavigationKey(KeyEventArgs keyEventArgs)
     {
-        byte[] bytes = RenderBytes;
-        if (bytes.Length == 0)
+        int length = RenderLength;
+        if (length == 0)
         {
             return false;
         }
@@ -444,19 +483,19 @@ public partial class HexViewControl : UserControl
                 target = Math.Max(0, current - 1);
                 break;
             case Key.Right:
-                target = Math.Min(bytes.Length - 1, current + 1);
+                target = Math.Min(length - 1, current + 1);
                 break;
             case Key.Up:
                 target = Math.Max(0, current - _bytesPerLine);
                 break;
             case Key.Down:
-                target = Math.Min(bytes.Length - 1, current + _bytesPerLine);
+                target = Math.Min(length - 1, current + _bytesPerLine);
                 break;
             case Key.Home:
                 target = (current / _bytesPerLine) * _bytesPerLine;
                 break;
             case Key.End:
-                target = Math.Min(bytes.Length - 1, (current / _bytesPerLine) * _bytesPerLine + _bytesPerLine - 1);
+                target = Math.Min(length - 1, (current / _bytesPerLine) * _bytesPerLine + _bytesPerLine - 1);
                 break;
             default:
                 return false;
@@ -468,13 +507,13 @@ public partial class HexViewControl : UserControl
 
     private void ApplyKeyboardSelection(int target, bool extendSelection)
     {
-        byte[] bytes = RenderBytes;
-        if (bytes.Length == 0)
+        int length = RenderLength;
+        if (length == 0)
         {
             return;
         }
 
-        int clampedTarget = Math.Clamp(target, 0, bytes.Length - 1);
+        int clampedTarget = Math.Clamp(target, 0, length - 1);
         if (extendSelection)
         {
             int anchor = _selectionAnchor ?? _selectionStart ?? clampedTarget;
@@ -564,51 +603,54 @@ public partial class HexViewControl : UserControl
         CopyBodyBase64MenuItem.Header = enabled ? $"复制 Body Base64 ({bodyLength:N0} Bytes)" : "复制 Body Base64";
     }
 
-    private void CopyAllHex_Click(object sender, RoutedEventArgs routedEventArgs)
+    private async void CopyAllHex_Click(object sender, RoutedEventArgs routedEventArgs)
     {
-        byte[] bytes = RenderBytes;
-        if (bytes.Length == 0)
+        int length = RenderLength;
+        if (length == 0)
         {
             return;
         }
 
-        if (CopyText(BuildHexLines(bytes, 0, bytes.Length, includeOffset: false, includeAscii: false)))
+        byte[] bytes = await ReadBytesForCopyAsync(0, length);
+        if (bytes.Length > 0 && CopyText(BuildHexLines(bytes, 0, bytes.Length, includeOffset: false, includeAscii: false)))
         {
-            ShowCopyFeedback($"已复制全部 HEX · {bytes.Length:N0} Bytes");
+            ShowCopyFeedback($"已复制全部 HEX · {length:N0} Bytes");
         }
     }
 
-    private void CopyAllText_Click(object sender, RoutedEventArgs routedEventArgs)
+    private async void CopyAllText_Click(object sender, RoutedEventArgs routedEventArgs)
     {
-        byte[] bytes = RenderBytes;
-        if (bytes.Length == 0)
+        int length = RenderLength;
+        if (length == 0)
         {
             return;
         }
 
-        if (CopyText(ToVisibleText(bytes)))
+        byte[] bytes = await ReadBytesForCopyAsync(0, length);
+        if (bytes.Length > 0 && CopyText(ToVisibleText(bytes)))
         {
-            ShowCopyFeedback($"已复制全部文本 · {bytes.Length:N0} Bytes");
+            ShowCopyFeedback($"已复制全部文本 · {length:N0} Bytes");
         }
     }
 
-    private void CopyAllLines_Click(object sender, RoutedEventArgs routedEventArgs)
+    private async void CopyAllLines_Click(object sender, RoutedEventArgs routedEventArgs)
     {
-        byte[] bytes = RenderBytes;
-        if (bytes.Length == 0)
+        int length = RenderLength;
+        if (length == 0)
         {
             return;
         }
 
-        if (CopyText(BuildHexLines(bytes, 0, bytes.Length, includeOffset: true, includeAscii: true)))
+        byte[] bytes = await ReadBytesForCopyAsync(0, length);
+        if (bytes.Length > 0 && CopyText(BuildHexLines(bytes, 0, bytes.Length, includeOffset: true, includeAscii: true)))
         {
-            ShowCopyFeedback($"已复制全部内容 · {bytes.Length:N0} Bytes");
+            ShowCopyFeedback($"已复制全部内容 · {length:N0} Bytes");
         }
     }
 
-    private void CopyBodyText_Click(object sender, RoutedEventArgs routedEventArgs)
+    private async void CopyBodyText_Click(object sender, RoutedEventArgs routedEventArgs)
     {
-        byte[] body = GetBodyBytes();
+        byte[] body = await ReadBodyBytesForCopyAsync();
         if (body.Length == 0)
         {
             return;
@@ -620,9 +662,9 @@ public partial class HexViewControl : UserControl
         }
     }
 
-    private void CopyBodyHex_Click(object sender, RoutedEventArgs routedEventArgs)
+    private async void CopyBodyHex_Click(object sender, RoutedEventArgs routedEventArgs)
     {
-        byte[] body = GetBodyBytes();
+        byte[] body = await ReadBodyBytesForCopyAsync();
         if (body.Length == 0)
         {
             return;
@@ -634,9 +676,9 @@ public partial class HexViewControl : UserControl
         }
     }
 
-    private void CopyBodyBase64_Click(object sender, RoutedEventArgs routedEventArgs)
+    private async void CopyBodyBase64_Click(object sender, RoutedEventArgs routedEventArgs)
     {
-        byte[] body = GetBodyBytes();
+        byte[] body = await ReadBodyBytesForCopyAsync();
         if (body.Length == 0)
         {
             return;
@@ -648,7 +690,7 @@ public partial class HexViewControl : UserControl
         }
     }
 
-    private void CopySelectedHex_Click(object sender, RoutedEventArgs routedEventArgs)
+    private async void CopySelectedHex_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         (int start, int count) = GetSelectionRange();
         if (count <= 0)
@@ -656,15 +698,17 @@ public partial class HexViewControl : UserControl
             return;
         }
 
-        if (CopyText(BuildHexLines(RenderBytes, start, count, includeOffset: false, includeAscii: false)))
+        byte[] selection = await ReadBytesForCopyAsync(start, count);
+        if (selection.Length > 0 && CopyText(BuildHexLines(selection, 0, selection.Length, includeOffset: false, includeAscii: false, displayOffset: start)))
         {
             ShowCopyFeedback($"已复制选中 HEX · {count:N0} Bytes");
         }
     }
 
-    private void CopySelectedText_Click(object sender, RoutedEventArgs routedEventArgs)
+    private async void CopySelectedText_Click(object sender, RoutedEventArgs routedEventArgs)
     {
-        byte[] selection = GetSelectedBytes();
+        (int start, int count) = GetSelectionRange();
+        byte[] selection = await ReadBytesForCopyAsync(start, count);
         if (selection.Length == 0)
         {
             return;
@@ -676,7 +720,7 @@ public partial class HexViewControl : UserControl
         }
     }
 
-    private void CopySelectedLines_Click(object sender, RoutedEventArgs routedEventArgs)
+    private async void CopySelectedLines_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         (int start, int count) = GetSelectionRange();
         if (count <= 0)
@@ -684,7 +728,8 @@ public partial class HexViewControl : UserControl
             return;
         }
 
-        if (CopyText(BuildHexLines(RenderBytes, start, count, includeOffset: true, includeAscii: true)))
+        byte[] selection = await ReadBytesForCopyAsync(start, count);
+        if (selection.Length > 0 && CopyText(BuildHexLines(selection, 0, selection.Length, includeOffset: true, includeAscii: true, displayOffset: start)))
         {
             ShowCopyFeedback($"已复制选中全部 · {count:N0} Bytes");
         }
@@ -711,22 +756,22 @@ public partial class HexViewControl : UserControl
 
     private void SelectAll()
     {
-        byte[] bytes = RenderBytes;
-        if (bytes.Length == 0)
+        int length = RenderLength;
+        if (length == 0)
         {
             return;
         }
 
         _selectionAnchor = 0;
         _selectionStart = 0;
-        _selectionEnd = bytes.Length - 1;
+        _selectionEnd = length - 1;
         RefreshLayout();
     }
 
     private void CoerceSelection()
     {
-        byte[] bytes = RenderBytes;
-        if (bytes.Length == 0)
+        int length = RenderLength;
+        if (length == 0)
         {
             _selectionAnchor = null;
             _selectionStart = null;
@@ -736,17 +781,17 @@ public partial class HexViewControl : UserControl
 
         if (_selectionAnchor is int anchor)
         {
-            _selectionAnchor = Math.Clamp(anchor, 0, bytes.Length - 1);
+            _selectionAnchor = Math.Clamp(anchor, 0, length - 1);
         }
 
         if (_selectionStart is int start)
         {
-            _selectionStart = Math.Clamp(start, 0, bytes.Length - 1);
+            _selectionStart = Math.Clamp(start, 0, length - 1);
         }
 
         if (_selectionEnd is int end)
         {
-            _selectionEnd = Math.Clamp(end, 0, bytes.Length - 1);
+            _selectionEnd = Math.Clamp(end, 0, length - 1);
         }
     }
 
@@ -771,6 +816,134 @@ public partial class HexViewControl : UserControl
     {
         int current = GetCurrentEdgeIndex();
         return current >= offset && current < offset + count;
+    }
+
+    private void ResetVirtualCache()
+    {
+        _virtualVersion++;
+        _virtualPages.Clear();
+        _loadingVirtualPages.Clear();
+    }
+
+    private bool TryGetRenderByte(int index, out byte value)
+    {
+        HexVirtualDataSource? source = ActiveVirtualSource;
+        if (source is null)
+        {
+            byte[] bytes = RenderBytes;
+            if (index >= 0 && index < bytes.Length)
+            {
+                value = bytes[index];
+                return true;
+            }
+
+            value = 0;
+            return false;
+        }
+
+        int pageIndex = index / VirtualPageSize;
+        int pageOffset = pageIndex * VirtualPageSize;
+        if (_virtualPages.TryGetValue(pageIndex, out byte[]? page))
+        {
+            int relative = index - pageOffset;
+            if (relative >= 0 && relative < page.Length)
+            {
+                value = page[relative];
+                return true;
+            }
+        }
+
+        EnsureVirtualPageLoaded(source, pageIndex);
+        value = 0;
+        return false;
+    }
+
+    private void EnsureVisibleVirtualRangeLoaded()
+    {
+        if (ActiveVirtualSource is null || BodyScrollViewer is null || _bytesPerLine <= 0)
+        {
+            return;
+        }
+
+        int length = RenderLength;
+        if (length <= 0)
+        {
+            return;
+        }
+
+        int firstLine = Math.Clamp((int)Math.Floor((BodyScrollViewer.VerticalOffset - TopPadding) / LineHeight), 0, Math.Max(0, GetLineCount(length) - 1));
+        int visibleLines = Math.Max(1, (int)Math.Ceiling(BodyScrollViewer.ViewportHeight / LineHeight) + 4);
+        EnsureVirtualRangeLoaded(firstLine * _bytesPerLine, Math.Min(length - firstLine * _bytesPerLine, visibleLines * _bytesPerLine));
+    }
+
+    private void EnsureVirtualRangeLoaded(int start, int count)
+    {
+        HexVirtualDataSource? source = ActiveVirtualSource;
+        if (source is null || count <= 0 || start < 0)
+        {
+            return;
+        }
+
+        int end = Math.Min(source.TotalLength, start + count);
+        int firstPage = start / VirtualPageSize;
+        int lastPage = Math.Max(firstPage, (end - 1) / VirtualPageSize);
+        for (int pageIndex = firstPage; pageIndex <= lastPage; pageIndex++)
+        {
+            EnsureVirtualPageLoaded(source, pageIndex);
+        }
+    }
+
+    private void EnsureVirtualPageLoaded(HexVirtualDataSource source, int pageIndex)
+    {
+        if (_virtualPages.ContainsKey(pageIndex) || _loadingVirtualPages.Contains(pageIndex))
+        {
+            return;
+        }
+
+        int offset = pageIndex * VirtualPageSize;
+        if (offset >= source.TotalLength)
+        {
+            return;
+        }
+
+        int count = Math.Min(VirtualPageSize, source.TotalLength - offset);
+        int version = _virtualVersion;
+        _loadingVirtualPages.Add(pageIndex);
+        _ = LoadVirtualPageAsync(source, pageIndex, offset, count, version);
+    }
+
+    private async Task LoadVirtualPageAsync(HexVirtualDataSource source, int pageIndex, int offset, int count, int version)
+    {
+        byte[] data;
+        try
+        {
+            data = await source.ReadRangeAsync(offset, count, CancellationToken.None);
+        }
+        catch
+        {
+            data = Array.Empty<byte>();
+        }
+
+        if (!Dispatcher.CheckAccess())
+        {
+            await Dispatcher.InvokeAsync(() => ApplyVirtualPage(source, pageIndex, data, version));
+            return;
+        }
+
+        ApplyVirtualPage(source, pageIndex, data, version);
+    }
+
+    private void ApplyVirtualPage(HexVirtualDataSource source, int pageIndex, byte[] data, int version)
+    {
+        _loadingVirtualPages.Remove(pageIndex);
+        if (version != _virtualVersion || !ReferenceEquals(source, ActiveVirtualSource))
+        {
+            return;
+        }
+
+        _virtualPages[pageIndex] = data;
+        SummaryTextBlock.Text = BuildSummaryText(RenderLength);
+        RenderSurface.InvalidateVisual();
     }
 
     private int GetKeyboardCurrentIndex()
@@ -830,17 +1003,47 @@ public partial class HexViewControl : UserControl
         return result;
     }
 
+    private async Task<byte[]> ReadBytesForCopyAsync(int start, int count)
+    {
+        if (count <= 0 || start < 0)
+        {
+            return Array.Empty<byte>();
+        }
+
+        if (count > CopyReadLimit)
+        {
+            ShowCopyFeedback($"数据过大，请缩小选区后复制 · {count:N0} Bytes");
+            return Array.Empty<byte>();
+        }
+
+        HexVirtualDataSource? source = ActiveVirtualSource;
+        if (source is not null)
+        {
+            ShowCopyFeedback("正在读取选区...");
+            return await source.ReadRangeAsync(start, count, CancellationToken.None);
+        }
+
+        byte[] bytes = RenderBytes;
+        if (start >= bytes.Length)
+        {
+            return Array.Empty<byte>();
+        }
+
+        int safeCount = Math.Min(count, bytes.Length - start);
+        byte[] result = new byte[safeCount];
+        Buffer.BlockCopy(bytes, start, result, 0, safeCount);
+        return result;
+    }
+
     private int GetBodyStart()
     {
-        byte[] bytes = RenderBytes;
-        return Math.Clamp(HeaderLength, 0, bytes.Length);
+        return Math.Clamp(RenderHeaderLength, 0, RenderLength);
     }
 
     private int GetBodyLength()
     {
-        byte[] bytes = RenderBytes;
         int bodyStart = GetBodyStart();
-        return Math.Max(0, bytes.Length - bodyStart);
+        return Math.Max(0, RenderLength - bodyStart);
     }
 
     private byte[] GetBodyBytes()
@@ -858,11 +1061,20 @@ public partial class HexViewControl : UserControl
         return result;
     }
 
+    private Task<byte[]> ReadBodyBytesForCopyAsync()
+    {
+        int bodyStart = GetBodyStart();
+        int bodyLength = GetBodyLength();
+        return ReadBytesForCopyAsync(bodyStart, bodyLength);
+    }
+
     private string BuildSummaryText(int length)
     {
         string text = length == 0
             ? "HEX 数据"
-            : $"{length:N0} Bytes · 每行 {_bytesPerLine} Bytes · 自绘虚拟渲染";
+            : ActiveVirtualSource is null
+                ? $"{length:N0} Bytes · 每行 {_bytesPerLine} Bytes · 自绘虚拟渲染"
+                : $"{length:N0} Bytes · 每行 {_bytesPerLine} Bytes · 分页加载";
         if (HasSelection)
         {
             text += $" · 已选中 {GetSelectionLength():N0} Bytes";
@@ -887,12 +1099,12 @@ public partial class HexViewControl : UserControl
 
     private string GetSelectionScopeText(int start, int end)
     {
-        if (end < HeaderLength)
+        if (end < RenderHeaderLength)
         {
             return "范围：请求头";
         }
 
-        if (start >= HeaderLength)
+        if (start >= RenderHeaderLength)
         {
             return "范围：正文";
         }
@@ -900,7 +1112,7 @@ public partial class HexViewControl : UserControl
         return "范围：头体混合";
     }
 
-    private string BuildHexLines(byte[] bytes, int start, int count, bool includeOffset, bool includeAscii)
+    private string BuildHexLines(byte[] bytes, int start, int count, bool includeOffset, bool includeAscii, int displayOffset = 0)
     {
         if (bytes.Length == 0 || count <= 0)
         {
@@ -916,7 +1128,7 @@ public partial class HexViewControl : UserControl
             ReadOnlySpan<byte> line = bytes.AsSpan(offset, lineCount);
             if (includeOffset)
             {
-                builder.Append(offset.ToString("X8")).Append("  ");
+                builder.Append((displayOffset + offset).ToString("X8")).Append("  ");
             }
 
             builder.Append(FormatHex(line));

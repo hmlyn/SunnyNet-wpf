@@ -514,6 +514,43 @@ public partial class MainWindow : Window
         new RequestBuilderWindow(_viewModel) { Owner = this }.Show();
     }
 
+    private void RulesMenuButton_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        if (RulesMenuButton.ContextMenu is null)
+        {
+            return;
+        }
+
+        RulesMenuButton.ContextMenu.PlacementTarget = RulesMenuButton;
+        RulesMenuButton.ContextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+        RulesMenuButton.ContextMenu.IsOpen = true;
+    }
+
+    private void RequestBlockRules_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        OpenRulesCenter("请求屏蔽");
+    }
+
+    private void RequestRewriteRules_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        OpenRulesCenter("请求重写");
+    }
+
+    private void RequestMappingRules_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        OpenRulesCenter("请求映射");
+    }
+
+    private void RequestDecodeRules_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        OpenRulesCenter("请求解密");
+    }
+
+    private void OpenRulesCenter(string page)
+    {
+        new RulesCenterWindow(_viewModel, page) { Owner = this }.Show();
+    }
+
     private void CertificateGuide_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         new CertificateGuideWindow(_viewModel) { Owner = this }.Show();

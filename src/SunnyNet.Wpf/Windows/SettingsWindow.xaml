@@ -514,12 +514,6 @@
                             <TextBlock Margin="10,0,0,0" Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}" Text="HOSTS 设置" />
                         </StackPanel>
                     </ListBoxItem>
-                    <ListBoxItem x:Name="ReplaceSectionItem" Tag="Replace">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}" Text="&#xE8AB;" />
-                            <TextBlock Margin="10,0,0,0" Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}" Text="替换规则" />
-                        </StackPanel>
-                    </ListBoxItem>
                     <ListBoxItem x:Name="InterceptSectionItem" Tag="Intercept">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}" Text="&#xE814;" />

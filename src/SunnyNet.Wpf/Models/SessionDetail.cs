@@ -49,6 +49,8 @@ public sealed class SessionDetail : ViewModelBase
     private string _requestSearchText = "";
     private string _responseSearchText = "";
     private bool _detailSearchIgnoreCase = true;
+    private HexVirtualDataSource? _requestHexSource;
+    private HexVirtualDataSource? _responseHexSource;
     private SocketEntry? _selectedSocketEntry;
 
     public bool HasSelection
@@ -156,6 +158,12 @@ public sealed class SessionDetail : ViewModelBase
         set => SetProperty(ref _requestHexHeaderLength, value);
     }
 
+    public HexVirtualDataSource? RequestHexSource
+    {
+        get => _requestHexSource;
+        set => SetProperty(ref _requestHexSource, value);
+    }
+
     public byte[] RequestImageBytes
     {
         get => _requestImageBytes;
@@ -253,6 +261,12 @@ public sealed class SessionDetail : ViewModelBase
     {
         get => _responseHexHeaderLength;
         set => SetProperty(ref _responseHexHeaderLength, value);
+    }
+
+    public HexVirtualDataSource? ResponseHexSource
+    {
+        get => _responseHexSource;
+        set => SetProperty(ref _responseHexSource, value);
     }
 
     public byte[] ResponseImageBytes
@@ -431,5 +445,7 @@ public sealed class SessionDetail : ViewModelBase
         ResponseHeaderRows.Clear();
         ResponseCookieRows.Clear();
         ResponseHexRows.Clear();
+        RequestHexSource = null;
+        ResponseHexSource = null;
     }
 }

@@ -29,7 +29,6 @@ public partial class SettingsWindow : Window
             "MustTcp" => MustTcpSectionItem,
             "Proxy" => ProxySectionItem,
             "Hosts" => HostsSectionItem,
-            "Replace" => ReplaceSectionItem,
             "Intercept" => InterceptSectionItem,
             "Script" => ScriptSectionItem,
             "Process" => ProcessSectionItem,
@@ -59,7 +58,7 @@ public partial class SettingsWindow : Window
         MustTcpSectionPanel.Visibility = ToVisibility(sectionKey == "MustTcp");
         ProxySectionPanel.Visibility = ToVisibility(sectionKey == "Proxy");
         HostsSectionPanel.Visibility = ToVisibility(sectionKey == "Hosts");
-        ReplaceSectionPanel.Visibility = ToVisibility(sectionKey == "Replace");
+        ReplaceSectionPanel.Visibility = Visibility.Collapsed;
         InterceptSectionPanel.Visibility = ToVisibility(sectionKey == "Intercept");
         ScriptSectionPanel.Visibility = ToVisibility(sectionKey == "Script");
         ProcessSectionPanel.Visibility = ToVisibility(sectionKey == "Process");
@@ -72,7 +71,6 @@ public partial class SettingsWindow : Window
             "MustTcp" => ("强制走 TCP", "通过规则控制指定流量强制转为 TCP。"),
             "Proxy" => ("上游网关", "设置上游代理地址以及命中规则。"),
             "Hosts" => ("HOSTS 设置", "维护域名映射规则，命中后直接重定向。"),
-            "Replace" => ("替换规则", "按规则替换请求或响应中的指定内容。"),
             "Intercept" => ("拦截规则", "命中条件后自动进入上行或下行断点编辑。"),
             "Script" => ("脚本编辑", "格式化、恢复默认并保存 Go 核心脚本。"),
             "Process" => ("进程拦截", "加载驱动、指定进程名或按PID精准捕获。"),
@@ -103,7 +101,6 @@ public partial class SettingsWindow : Window
             "强制走TCP" or "强制走 TCP" => "MustTcp",
             "上游网关" => "Proxy",
             "HOSTS设置" or "HOSTS 设置" => "Hosts",
-            "替换规则" => "Replace",
             "拦截规则" => "Intercept",
             "脚本编辑" => "Script",
             "进程拦截" => "Process",

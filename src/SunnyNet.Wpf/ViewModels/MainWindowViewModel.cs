@@ -15,6 +15,8 @@ namespace SunnyNet.Wpf.ViewModels;
 public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 {
     private const int LargePayloadThresholdBytes = 512 * 1024;
+    private const int DetailFullBodyLoadLimitBytes = 8 * 1024 * 1024;
+    private const int DetailTextChunkBytes = 512 * 1024;
     private static readonly string[] ResourceTypeTokens =
     {
         "javascript",
@@ -140,6 +142,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     public ObservableCollection<HostsRuleItem> HostsRuleItems { get; } = new();
     public ObservableCollection<ReplaceRuleItem> ReplaceRuleItems { get; } = new();
     public ObservableCollection<InterceptRuleItem> InterceptRuleItems { get; } = new();
+    public ObservableCollection<RequestBlockRuleItem> RequestBlockRules { get; } = new();
+    public ObservableCollection<RequestRewriteRuleItem> RequestRewriteRules { get; } = new();
+    public ObservableCollection<RequestMappingRuleItem> RequestMappingRules { get; } = new();
+    public ObservableCollection<RequestDecodeRuleItem> RequestDecodeRules { get; } = new();
     public ObservableCollection<RequestCertificateRuleItem> RequestCertificateItems { get; } = new();
     public ObservableCollection<ProcessCaptureNameItem> ProcessCaptureNames { get; } = new();
     public ObservableCollection<RunningProcessItem> RunningProcesses { get; } = new();
@@ -978,6 +984,40 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
         StatusRight = ok ? "拦截规则已保存" : "拦截规则保存失败";
         NotificationRequested?.Invoke(ok ? "提示" : "错误", ok ? "拦截规则已保存。" : "拦截规则保存失败，请检查规则。");
+    }
+
+    public async Task ApplyRuleCenterConfigAsync()
+    {
+        string json = SyncRuleCenterRulesText();
+        JsonElement? result = await _backend.InvokeAsync("保存规则中心配置", new
+        {
+            Data = EncodeTextBase64(json)
+        });
+
+        bool ok = result is { ValueKind: JsonValueKind.True };
+        string state = ok ? "已保存" : "保存失败";
+        foreach (RequestBlockRuleItem item in RequestBlockRules)
+        {
+            item.State = state;
+        }
+
+        foreach (RequestRewriteRuleItem item in RequestRewriteRules)
+        {
+            item.State = state;
+        }
+
+        foreach (RequestMappingRuleItem item in RequestMappingRules)
+        {
+            item.State = item.LegacyReplaceRule ? "兼容旧规则" : state;
+        }
+
+        foreach (RequestDecodeRuleItem item in RequestDecodeRules)
+        {
+            item.State = state;
+        }
+
+        StatusRight = ok ? "规则中心配置已保存" : "规则中心配置保存失败";
+        NotificationRequested?.Invoke(ok ? "提示" : "错误", ok ? "规则中心配置已保存。" : "规则中心配置保存失败。");
     }
 
     public async Task RestoreDefaultScriptAsync()
@@ -2031,6 +2071,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             ReplaceRows(Detail.ResponseHexRows, ToHexRows(DecodePayloadBytes(GetProperty(args, "Body"))));
             Detail.ResponseHexBytes = DecodePayloadBytes(GetProperty(args, "Body"));
             Detail.ResponseHexHeaderLength = 0;
+            Detail.ResponseHexSource = null;
             Detail.ResponseImageBytes = Array.Empty<byte>();
             Detail.ResponseImageType = "";
             return;
@@ -2045,27 +2086,41 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         JsonElement responseHeader = GetProperty(args, "Header");
         Detail.ResponseHeaders = FormatHeaders(responseHeader);
         byte[] responseBytes = DecodePayloadBytes(GetProperty(args, "Body"));
+        int responseBodySize = GetInt(args, "BodySize", responseBytes.Length);
+        bool responseBodyTruncated = GetBool(args, "BodyTruncated");
         bool hasResponseDisplayBody = GetBool(args, "HasDisplayBody");
         byte[] responseDisplayBytes = hasResponseDisplayBody
             ? DecodePayloadBytes(GetProperty(args, "DisplayBody"))
             : responseBytes;
+        int responseDisplayBodySize = hasResponseDisplayBody ? GetInt(args, "DisplayBodySize", responseDisplayBytes.Length) : responseBodySize;
+        bool responseDisplayTruncated = hasResponseDisplayBody ? GetBool(args, "DisplayBodyTruncated") : responseBodyTruncated;
         Detail.HasResponseDisplayBody = hasResponseDisplayBody;
-        Detail.ResponseBody = BytesToPreviewText(responseDisplayBytes);
+        Detail.ResponseBody = WithPreviewNotice(BytesToPreviewText(responseDisplayBytes), responseDisplayTruncated, responseDisplayBytes.Length, responseDisplayBodySize);
         Detail.ResponseText = Detail.ResponseBody;
         Detail.ResponseHex = responseBytes.Length > LargePayloadThresholdBytes ? "" : ToHex(responseBytes);
-        string responseOriginalBody = BytesToPreviewText(responseBytes);
+        string responseOriginalBody = WithPreviewNotice(BytesToPreviewText(responseBytes), responseBodyTruncated, responseBytes.Length, responseBodySize);
         Detail.ResponseRaw = $"HTTP {GetInt(args, "StateCode")} {GetString(args, "StateText")}\r\n{Detail.ResponseHeaders}\r\n\r\n{Detail.ResponseBody}".Trim();
         Detail.ResponseOriginalRaw = $"HTTP {GetInt(args, "StateCode")} {GetString(args, "StateText")}\r\n{Detail.ResponseHeaders}\r\n\r\n{responseOriginalBody}".Trim();
-        Detail.ResponseJson = BuildJsonViewText(responseDisplayBytes, Detail.ResponseBody);
+        Detail.ResponseJson = responseDisplayTruncated ? Detail.ResponseBody : BuildJsonViewText(responseDisplayBytes, Detail.ResponseBody);
         Detail.ResponseHtml = Detail.ResponseBody;
         Detail.ResponseCookies = ExtractCookies(responseHeader);
         Detail.ResponseStateText = GetString(args, "StateText");
         Detail.ResponseStateCode = GetInt(args, "StateCode");
         string responseContentType = GetHeaderValue(responseHeader, "Content-Type");
-        Detail.ResponseImageBytes = responseDisplayBytes.Length > LargePayloadThresholdBytes ? Array.Empty<byte>() : TryGetImageBytes(responseContentType, responseDisplayBytes);
+        Detail.ResponseImageBytes = responseDisplayTruncated || responseDisplayBytes.Length > LargePayloadThresholdBytes ? Array.Empty<byte>() : TryGetImageBytes(responseContentType, responseDisplayBytes);
         Detail.ResponseImageType = ExtractImageType(responseContentType);
         (byte[] responseRawBytes, int responseHeaderLength) = BuildHttpBytes($"HTTP {GetInt(args, "StateCode")} {GetString(args, "StateText")}", Detail.ResponseHeaders, responseBytes);
         ApplyResponseRows(responseHeader, responseRawBytes, responseHeaderLength);
+        Detail.ResponseHexSource = responseBodyTruncated
+            ? CreateHttpHexSource(SelectedSession!, "Response", $"HTTP {GetInt(args, "StateCode")} {GetString(args, "StateText")}", Detail.ResponseHeaders, responseBodySize)
+            : null;
+        if (SelectedSession is not null && (responseBodyTruncated || responseDisplayTruncated))
+        {
+            CaptureEntry selected = SelectedSession;
+            int loadVersion = _selectedSessionLoadVersion;
+            JsonElement responseSnapshot = args.Clone();
+            _ = LoadFullResponseBodyFromUpdateAsync(selected, loadVersion, responseSnapshot);
+        }
     }
 
     private void ApplySocketUpdate(JsonElement args)
@@ -2113,9 +2168,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         Settings.HostsRules = ToIndentedJson(GetProperty(args, "HostsRules"));
         Settings.ReplaceRules = ToIndentedJson(GetProperty(args, "ReplaceRules"));
         Settings.InterceptRules = ToIndentedJson(GetProperty(args, "InterceptRules"));
+        Settings.RuleCenterRules = ToIndentedJson(GetProperty(args, "RuleCenter"));
         ApplyHostsRulesConfig(GetProperty(args, "HostsRules"));
         ApplyReplaceRulesConfig(GetProperty(args, "ReplaceRules"));
         ApplyInterceptRulesConfig(GetProperty(args, "InterceptRules"));
+        ApplyRuleCenterConfig(GetProperty(args, "RuleCenter"));
         ApplyRequestCertificateConfig(GetProperty(args, "RequestCertManager"));
     }
 
@@ -2185,6 +2242,133 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
         ReplaceRows(InterceptRuleItems, items);
         SyncInterceptRulesText();
+    }
+
+    private void ApplyRuleCenterConfig(JsonElement element)
+    {
+        List<RequestBlockRuleItem> blockRules = new();
+        List<RequestRewriteRuleItem> rewriteRules = new();
+        List<RequestMappingRuleItem> mappingRules = new();
+        List<RequestDecodeRuleItem> decodeRules = new();
+
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (JsonElement item in EnumerateArrayProperty(element, "BlockRules"))
+            {
+                RequestBlockRuleItem rule = new()
+                {
+                    Action = GetString(item, "Action", "返回空响应"),
+                    StatusCode = GetInt(item, "StatusCode", 403),
+                    ResponseValueType = GetString(item, "ResponseValueType", "String(UTF8)"),
+                    ResponseContent = GetString(item, "ResponseContent")
+                };
+                ApplyCommonTrafficRuleFields(rule, item);
+                blockRules.Add(rule);
+            }
+
+            foreach (JsonElement item in EnumerateArrayProperty(element, "RewriteRules"))
+            {
+                RequestRewriteRuleItem rule = new()
+                {
+                    Direction = GetString(item, "Direction", "请求"),
+                    Target = GetString(item, "Target", "协议头"),
+                    Operation = GetString(item, "Operation", "设置"),
+                    Key = GetString(item, "Key"),
+                    Value = GetString(item, "Value"),
+                    ValueType = GetString(item, "ValueType", "String(UTF8)"),
+                    OperationsJson = GetString(item, "OperationsJson", ToIndentedJson(GetProperty(item, "Operations")))
+                };
+                ApplyCommonTrafficRuleFields(rule, item);
+                rewriteRules.Add(rule);
+            }
+
+            foreach (JsonElement item in EnumerateArrayProperty(element, "MappingRules"))
+            {
+                RequestMappingRuleItem rule = new()
+                {
+                    MappingType = GetString(item, "MappingType", "本地文件"),
+                    SourceContent = GetString(item, "SourceContent"),
+                    TargetContent = GetString(item, "TargetContent"),
+                    ValueType = GetString(item, "ValueType", "String(UTF8)"),
+                    LegacyReplaceRule = GetBool(item, "LegacyReplaceRule")
+                };
+                ApplyCommonTrafficRuleFields(rule, item);
+                rule.State = rule.LegacyReplaceRule ? "兼容旧规则" : "已保存";
+                mappingRules.Add(rule);
+            }
+
+            foreach (JsonElement item in EnumerateArrayProperty(element, "DecodeRules"))
+            {
+                RequestDecodeRuleItem rule = new()
+                {
+                    Direction = GetString(item, "Direction", "响应"),
+                    DecoderType = GetString(item, "DecoderType", "自动解压"),
+                    ScriptCode = DecodePayloadElement(GetProperty(item, "ScriptCode"))
+                };
+                ApplyCommonTrafficRuleFields(rule, item);
+                decodeRules.Add(rule);
+            }
+        }
+
+        if (mappingRules.Count == 0 && ReplaceRuleItems.Count > 0)
+        {
+            mappingRules.AddRange(BuildLegacyMappingRules());
+        }
+
+        ReplaceRows(RequestBlockRules, blockRules);
+        ReplaceRows(RequestRewriteRules, rewriteRules);
+        ReplaceRows(RequestMappingRules, mappingRules);
+        ReplaceRows(RequestDecodeRules, decodeRules);
+        SyncRuleCenterRulesText();
+    }
+
+    private IEnumerable<RequestMappingRuleItem> BuildLegacyMappingRules()
+    {
+        foreach (ReplaceRuleItem item in ReplaceRuleItems)
+        {
+            RequestMappingRuleItem rule = new()
+            {
+                Hash = EnsureRuleHash(item.Hash),
+                Enabled = true,
+                Name = string.IsNullOrWhiteSpace(item.SourceContent) ? "旧替换规则" : $"旧替换：{item.SourceContent}",
+                Method = "ANY",
+                UrlMatchType = "包含",
+                UrlPattern = item.SourceContent,
+                Priority = 100,
+                MappingType = item.UsesResponseFile ? "本地文件" : "旧替换规则",
+                SourceContent = item.SourceContent,
+                TargetContent = item.ReplacementContent,
+                ValueType = item.RuleType,
+                LegacyReplaceRule = true,
+                Note = "由旧 ReplaceRules 兼容生成，当前仍由旧替换规则逻辑执行。",
+                State = "兼容旧规则"
+            };
+            yield return rule;
+        }
+    }
+
+    private static void ApplyCommonTrafficRuleFields(TrafficRuleItemBase rule, JsonElement item)
+    {
+        rule.Hash = GetString(item, "Hash", Guid.NewGuid().ToString("N"));
+        JsonElement enable = GetProperty(item, "Enable");
+        rule.Enabled = enable.ValueKind == JsonValueKind.Undefined
+            ? GetProperty(item, "Enabled").ValueKind == JsonValueKind.Undefined || GetBool(item, "Enabled")
+            : GetBool(item, "Enable");
+        rule.Name = GetString(item, "Name", "新规则");
+        rule.Method = GetString(item, "Method", "ANY");
+        rule.UrlMatchType = GetString(item, "UrlMatchType", "通配");
+        rule.UrlPattern = GetString(item, "UrlPattern");
+        rule.Priority = GetInt(item, "Priority", 100);
+        rule.Note = GetString(item, "Note");
+        rule.State = "已保存";
+    }
+
+    private static IEnumerable<JsonElement> EnumerateArrayProperty(JsonElement element, string propertyName)
+    {
+        JsonElement property = GetProperty(element, propertyName);
+        return property.ValueKind == JsonValueKind.Array
+            ? property.EnumerateArray().ToArray()
+            : Array.Empty<JsonElement>();
     }
 
     private void ApplyRequestCertificateConfig(JsonElement element)
@@ -2436,6 +2620,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         Detail.RequestHexRows.Clear();
         Detail.RequestHexBytes = Array.Empty<byte>();
         Detail.RequestHexHeaderLength = 0;
+        Detail.RequestHexSource = null;
         Detail.RequestImageBytes = Array.Empty<byte>();
         Detail.RequestImageType = "";
         Detail.ResponseHeaderRows.Clear();
@@ -2443,6 +2628,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         Detail.ResponseHexRows.Clear();
         Detail.ResponseHexBytes = Array.Empty<byte>();
         Detail.ResponseHexHeaderLength = 0;
+        Detail.ResponseHexSource = null;
         Detail.ResponseImageBytes = Array.Empty<byte>();
         Detail.ResponseImageType = "";
 
@@ -2456,6 +2642,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
             ApplySessionDetail(selected, result.Value);
             ApplyDetailTextSearch(selected);
+            _ = LoadFullHttpBodiesAsync(selected, loadVersion, result.Value);
             _ = LoadRequestMultipartImageAsync(selected);
             if (selected.BreakMode is 1 or 2)
             {
@@ -2829,6 +3016,79 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             JsonOptions);
     }
 
+    private string SyncRuleCenterRulesText()
+    {
+        Settings.RuleCenterRules = JsonSerializer.Serialize(
+            new
+            {
+                BlockRules = RequestBlockRules.Select(static item => new
+                {
+                    item.Hash,
+                    Enable = item.Enabled,
+                    item.Name,
+                    item.Method,
+                    item.UrlMatchType,
+                    item.UrlPattern,
+                    item.Priority,
+                    item.Note,
+                    item.Action,
+                    item.StatusCode,
+                    item.ResponseValueType,
+                    item.ResponseContent
+                }),
+                RewriteRules = RequestRewriteRules.Select(static item => new
+                {
+                    item.Hash,
+                    Enable = item.Enabled,
+                    item.Name,
+                    item.Method,
+                    item.UrlMatchType,
+                    item.UrlPattern,
+                    item.Priority,
+                    item.Note,
+                    item.Direction,
+                    item.Target,
+                    item.Operation,
+                    item.Key,
+                    item.Value,
+                    item.ValueType,
+                    item.OperationsJson
+                }),
+                MappingRules = RequestMappingRules.Select(static item => new
+                {
+                    item.Hash,
+                    Enable = item.Enabled,
+                    item.Name,
+                    item.Method,
+                    item.UrlMatchType,
+                    item.UrlPattern,
+                    item.Priority,
+                    item.Note,
+                    item.MappingType,
+                    item.SourceContent,
+                    item.TargetContent,
+                    item.ValueType,
+                    item.LegacyReplaceRule
+                }),
+                DecodeRules = RequestDecodeRules.Select(static item => new
+                {
+                    item.Hash,
+                    Enable = item.Enabled,
+                    item.Name,
+                    item.Method,
+                    item.UrlMatchType,
+                    item.UrlPattern,
+                    item.Priority,
+                    item.Note,
+                    item.Direction,
+                    item.DecoderType,
+                    ScriptCode = EncodeTextBase64(item.ScriptCode)
+                })
+            },
+            JsonOptions);
+        return Settings.RuleCenterRules;
+    }
+
     private void UpdateRunningProcessCaptureState()
     {
         foreach (RunningProcessItem item in RunningProcesses)
@@ -2899,6 +3159,257 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         }
     }
 
+    private async Task LoadFullHttpBodiesAsync(CaptureEntry selected, int loadVersion, JsonElement data)
+    {
+        int requestBodySize = GetInt(data, "BodySize");
+        bool requestBodyTruncated = GetBool(data, "BodyTruncated");
+        bool hasRequestDisplayBody = GetBool(data, "HasDisplayBody");
+        int requestDisplayBodySize = GetInt(data, "DisplayBodySize");
+        bool requestDisplayBodyTruncated = GetBool(data, "DisplayBodyTruncated");
+
+        if (requestBodyTruncated || requestDisplayBodyTruncated)
+        {
+            string kind = hasRequestDisplayBody ? "Display" : "Raw";
+            int total = hasRequestDisplayBody ? requestDisplayBodySize : requestBodySize;
+            await LoadRequestTextProgressivelyAsync(selected, loadVersion, data, kind, total);
+        }
+
+        JsonElement response = GetProperty(data, "Response");
+        if (response.ValueKind != JsonValueKind.Object)
+        {
+            return;
+        }
+
+        int responseBodySize = GetInt(response, "BodySize");
+        bool responseBodyTruncated = GetBool(response, "BodyTruncated");
+        bool hasResponseDisplayBody = GetBool(response, "HasDisplayBody");
+        int responseDisplayBodySize = GetInt(response, "DisplayBodySize");
+        bool responseDisplayBodyTruncated = GetBool(response, "DisplayBodyTruncated");
+
+        if (!responseBodyTruncated && !responseDisplayBodyTruncated)
+        {
+            return;
+        }
+
+        string responseKind = hasResponseDisplayBody ? "Display" : "Raw";
+        int responseTotal = hasResponseDisplayBody ? responseDisplayBodySize : responseBodySize;
+        await LoadResponseTextProgressivelyAsync(selected, loadVersion, response, responseKind, responseTotal);
+    }
+
+    private async Task<byte[]> LoadHttpBodyRangeAsync(int theology, string direction, string kind, int total)
+    {
+        if (total <= 0 || total > DetailFullBodyLoadLimitBytes)
+        {
+            return Array.Empty<byte>();
+        }
+
+        return await LoadHttpBodyChunkAsync(theology, direction, kind, 0, total);
+    }
+
+    private async Task<byte[]> LoadHttpBodyChunkAsync(int theology, string direction, string kind, int offset, int count)
+    {
+        if (count <= 0 || offset < 0)
+        {
+            return Array.Empty<byte>();
+        }
+
+        JsonElement? result = await _backend.InvokeAsync("HTTP正文范围读取", new
+        {
+            Theology = theology,
+            Direction = direction,
+            Kind = kind,
+            Offset = offset,
+            Count = count
+        });
+        if (result is null || !GetBool(result.Value, "Ok"))
+        {
+            return Array.Empty<byte>();
+        }
+
+        return DecodePayloadBytes(GetProperty(result.Value, "Body"));
+    }
+
+    private async Task LoadFullResponseBodyFromUpdateAsync(CaptureEntry selected, int loadVersion, JsonElement response)
+    {
+        int responseBodySize = GetInt(response, "BodySize");
+        bool responseBodyTruncated = GetBool(response, "BodyTruncated");
+        bool hasResponseDisplayBody = GetBool(response, "HasDisplayBody");
+        int responseDisplayBodySize = hasResponseDisplayBody ? GetInt(response, "DisplayBodySize") : responseBodySize;
+        bool responseDisplayBodyTruncated = hasResponseDisplayBody ? GetBool(response, "DisplayBodyTruncated") : responseBodyTruncated;
+
+        string responseKind = hasResponseDisplayBody ? "Display" : "Raw";
+        int responseTotal = hasResponseDisplayBody ? responseDisplayBodySize : responseBodySize;
+        await LoadResponseTextProgressivelyAsync(selected, loadVersion, response, responseKind, responseTotal);
+    }
+
+    private async Task LoadRequestTextProgressivelyAsync(CaptureEntry selected, int loadVersion, JsonElement data, string kind, int total)
+    {
+        if (total <= 0 || total > DetailFullBodyLoadLimitBytes)
+        {
+            return;
+        }
+
+        string method = GetString(data, "Method", selected.Method);
+        string url = GetString(data, "URL", selected.Url);
+        string proto = GetString(data, "Proto", "HTTP/1.1");
+        string headers = FormatHeaders(GetProperty(data, "Header"));
+        await LoadHttpTextProgressivelyAsync(selected, loadVersion, "Request", kind, total, (text, loaded, complete) =>
+        {
+            if (!IsCurrentDetailLoad(selected, loadVersion))
+            {
+                return;
+            }
+
+            string body = WithStreamingNotice(text, loaded, total, complete);
+            Detail.RequestBody = body;
+            Detail.RequestRaw = $"{method} {url} {proto}\r\n{headers}\r\n\r\n{body}".Trim();
+            if (string.Equals(kind, "Raw", StringComparison.OrdinalIgnoreCase))
+            {
+                Detail.RequestOriginalRaw = Detail.RequestRaw;
+            }
+
+            Detail.RequestJson = complete && loaded <= LargePayloadThresholdBytes
+                ? BuildJsonViewText(Encoding.UTF8.GetBytes(text), text)
+                : body;
+            ApplyDetailTextSearch(selected);
+        });
+    }
+
+    private async Task LoadResponseTextProgressivelyAsync(CaptureEntry selected, int loadVersion, JsonElement response, string kind, int total)
+    {
+        if (total <= 0 || total > DetailFullBodyLoadLimitBytes)
+        {
+            return;
+        }
+
+        string headers = FormatHeaders(GetProperty(response, "Header"));
+        string statusLine = $"HTTP {GetInt(response, "StateCode", Detail.ResponseStateCode)} {GetString(response, "StateText", Detail.ResponseStateText)}";
+        await LoadHttpTextProgressivelyAsync(selected, loadVersion, "Response", kind, total, (text, loaded, complete) =>
+        {
+            if (!IsCurrentDetailLoad(selected, loadVersion))
+            {
+                return;
+            }
+
+            string body = WithStreamingNotice(text, loaded, total, complete);
+            Detail.ResponseBody = body;
+            Detail.ResponseText = body;
+            Detail.ResponseRaw = $"{statusLine}\r\n{headers}\r\n\r\n{body}".Trim();
+            if (string.Equals(kind, "Raw", StringComparison.OrdinalIgnoreCase))
+            {
+                Detail.ResponseOriginalRaw = Detail.ResponseRaw;
+            }
+
+            Detail.ResponseJson = complete && loaded <= LargePayloadThresholdBytes
+                ? BuildJsonViewText(Encoding.UTF8.GetBytes(text), text)
+                : body;
+            Detail.ResponseHtml = body;
+            ApplyDetailTextSearch(selected);
+        });
+    }
+
+    private async Task LoadHttpTextProgressivelyAsync(
+        CaptureEntry selected,
+        int loadVersion,
+        string direction,
+        string kind,
+        int total,
+        Action<string, int, bool> applyProgress)
+    {
+        if (total <= 0 || total > DetailFullBodyLoadLimitBytes)
+        {
+            return;
+        }
+
+        Decoder decoder = Encoding.UTF8.GetDecoder();
+        StringBuilder builder = new(Math.Min(total, DetailFullBodyLoadLimitBytes));
+        int offset = 0;
+        while (offset < total)
+        {
+            if (!IsCurrentDetailLoad(selected, loadVersion))
+            {
+                return;
+            }
+
+            int count = Math.Min(DetailTextChunkBytes, total - offset);
+            byte[] chunk = await LoadHttpBodyChunkAsync(selected.Theology, direction, kind, offset, count);
+            if (chunk.Length == 0)
+            {
+                return;
+            }
+
+            if (offset == 0 && LooksBinary(chunk))
+            {
+                return;
+            }
+
+            offset += chunk.Length;
+            bool complete = offset >= total;
+            int charCount = decoder.GetCharCount(chunk, 0, chunk.Length, complete);
+            if (charCount > 0)
+            {
+                char[] chars = new char[charCount];
+                decoder.GetChars(chunk, 0, chunk.Length, chars, 0, complete);
+                builder.Append(chars);
+            }
+
+            applyProgress(builder.ToString(), offset, complete);
+            await Dispatcher.Yield(DispatcherPriority.Background);
+        }
+    }
+
+    private bool IsCurrentDetailLoad(CaptureEntry selected, int loadVersion)
+    {
+        return loadVersion == _selectedSessionLoadVersion && SelectedSession?.Theology == selected.Theology;
+    }
+
+    private void ApplyFullRequestBody(CaptureEntry selected, JsonElement data, byte[] requestBodyBytes, byte[] requestDisplayBytes)
+    {
+        string method = GetString(data, "Method", selected.Method);
+        string url = GetString(data, "URL", selected.Url);
+        string proto = GetString(data, "Proto", "HTTP/1.1");
+        JsonElement requestHeader = GetProperty(data, "Header");
+        string requestHeadersText = FormatHeaders(requestHeader);
+        string requestBody = BytesToPreviewText(requestDisplayBytes);
+        Detail.RequestBody = requestBody;
+        Detail.RequestRaw = $"{method} {url} {proto}\r\n{requestHeadersText}\r\n\r\n{requestBody}".Trim();
+        Detail.RequestOriginalRaw = $"{method} {url} {proto}\r\n{requestHeadersText}\r\n\r\n{BytesToPreviewText(requestBodyBytes)}".Trim();
+        Detail.RequestHex = requestBodyBytes.Length > LargePayloadThresholdBytes ? "" : ToHex(requestBodyBytes);
+        Detail.RequestHexSource = null;
+        Detail.RequestJson = BuildJsonViewText(requestDisplayBytes, requestBody);
+        string requestContentType = GetHeaderValue(requestHeader, "Content-Type");
+        Detail.RequestImageBytes = TryGetImageBytes(requestContentType, requestDisplayBytes);
+        Detail.RequestImageType = ExtractImageType(requestContentType);
+        (byte[] requestRawBytes, int requestHeaderLength) = BuildHttpBytes($"{method} {url} {proto}", requestHeadersText, requestBodyBytes);
+        ApplyRequestRows(url, requestHeader, requestRawBytes, requestHeaderLength);
+        Detail.RequestHexSource = null;
+        ApplyDetailTextSearch(selected);
+    }
+
+    private void ApplyFullResponseBody(JsonElement response, byte[] responseBodyBytes, byte[] responseDisplayBytes)
+    {
+        JsonElement responseHeader = GetProperty(response, "Header");
+        string responseHeadersText = FormatHeaders(responseHeader);
+        string responseBody = BytesToPreviewText(responseDisplayBytes);
+        Detail.ResponseBody = responseBody;
+        Detail.ResponseText = responseBody;
+        Detail.ResponseRaw = $"HTTP {Detail.ResponseStateCode} {Detail.ResponseStateText}\r\n{responseHeadersText}\r\n\r\n{responseBody}".Trim();
+        Detail.ResponseOriginalRaw = $"HTTP {Detail.ResponseStateCode} {Detail.ResponseStateText}\r\n{responseHeadersText}\r\n\r\n{BytesToPreviewText(responseBodyBytes)}".Trim();
+        Detail.ResponseHex = responseBodyBytes.Length > LargePayloadThresholdBytes ? "" : ToHex(responseBodyBytes);
+        Detail.ResponseHexSource = null;
+        Detail.ResponseJson = BuildJsonViewText(responseDisplayBytes, responseBody);
+        Detail.ResponseHtml = responseBody;
+        string responseContentType = GetHeaderValue(responseHeader, "Content-Type");
+        Detail.ResponseImageBytes = TryGetImageBytes(responseContentType, responseDisplayBytes);
+        Detail.ResponseImageType = ExtractImageType(responseContentType);
+        (byte[] responseRawBytes, int responseHeaderLength) = BuildHttpBytes($"HTTP {Detail.ResponseStateCode} {Detail.ResponseStateText}", responseHeadersText, responseBodyBytes);
+        ApplyResponseRows(responseHeader, responseRawBytes, responseHeaderLength);
+        if (SelectedSession is not null)
+        {
+            ApplyDetailTextSearch(SelectedSession);
+        }
+    }
+
     private void ApplyRequestRows(string url, JsonElement header, byte[] rawBytes, int headerLength)
     {
         ReplaceRows(Detail.RequestHeaderRows, ToHeaderRows(header));
@@ -2935,10 +3446,14 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         JsonElement socketData = GetProperty(data, "SocketData");
         JsonElement requestHeader = GetProperty(data, "Header");
         byte[] requestBodyBytes = DecodePayloadBytes(GetProperty(data, "Body"));
+        int requestBodySize = GetInt(data, "BodySize", requestBodyBytes.Length);
+        bool requestBodyTruncated = GetBool(data, "BodyTruncated");
         bool hasRequestDisplayBody = GetBool(data, "HasDisplayBody");
         byte[] requestDisplayBytes = hasRequestDisplayBody
             ? DecodePayloadBytes(GetProperty(data, "DisplayBody"))
             : requestBodyBytes;
+        int requestDisplayBodySize = hasRequestDisplayBody ? GetInt(data, "DisplayBodySize", requestDisplayBytes.Length) : requestBodySize;
+        bool requestDisplayTruncated = hasRequestDisplayBody ? GetBool(data, "DisplayBodyTruncated") : requestBodyTruncated;
         string requestContentType = GetHeaderValue(requestHeader, "Content-Type");
         Detail.RequestMethod = method;
         Detail.RequestUrl = url;
@@ -2947,45 +3462,55 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         Detail.HasRequestDisplayBody = hasRequestDisplayBody;
         string requestHeadersText = FormatHeaders(requestHeader);
         Detail.RequestHeaders = $"{method} {url} {proto}\r\n{requestHeadersText}".Trim();
-        Detail.RequestBody = BytesToPreviewText(requestDisplayBytes);
+        Detail.RequestBody = WithPreviewNotice(BytesToPreviewText(requestDisplayBytes), requestDisplayTruncated, requestDisplayBytes.Length, requestDisplayBodySize);
         Detail.RequestRaw = $"{method} {url} {proto}\r\n{requestHeadersText}\r\n\r\n{Detail.RequestBody}".Trim();
-        Detail.RequestOriginalRaw = $"{method} {url} {proto}\r\n{requestHeadersText}\r\n\r\n{BytesToPreviewText(requestBodyBytes)}".Trim();
+        Detail.RequestOriginalRaw = $"{method} {url} {proto}\r\n{requestHeadersText}\r\n\r\n{WithPreviewNotice(BytesToPreviewText(requestBodyBytes), requestBodyTruncated, requestBodyBytes.Length, requestBodySize)}".Trim();
         Detail.RequestQuery = selected.Query;
         Detail.RequestHex = ToHex(requestBodyBytes);
         Detail.RequestCookies = ExtractCookies(requestHeader);
-        Detail.RequestJson = BuildJsonViewText(requestDisplayBytes, Detail.RequestBody);
-        Detail.RequestImageBytes = requestDisplayBytes.Length > LargePayloadThresholdBytes ? Array.Empty<byte>() : TryGetImageBytes(requestContentType, requestDisplayBytes);
+        Detail.RequestJson = requestDisplayTruncated ? Detail.RequestBody : BuildJsonViewText(requestDisplayBytes, Detail.RequestBody);
+        Detail.RequestImageBytes = requestDisplayTruncated || requestDisplayBytes.Length > LargePayloadThresholdBytes ? Array.Empty<byte>() : TryGetImageBytes(requestContentType, requestDisplayBytes);
         Detail.RequestImageType = ExtractImageType(requestContentType);
         (byte[] requestRawBytes, int requestHeaderLength) = BuildHttpBytes($"{method} {url} {proto}", requestHeadersText, requestBodyBytes);
         ApplyRequestRows(url, requestHeader, requestRawBytes, requestHeaderLength);
+        Detail.RequestHexSource = requestBodyTruncated
+            ? CreateHttpHexSource(selected, "Request", $"{method} {url} {proto}", requestHeadersText, requestBodySize)
+            : null;
 
         JsonElement response = GetProperty(data, "Response");
         if (response.ValueKind == JsonValueKind.Object)
         {
             JsonElement responseHeader = GetProperty(response, "Header");
             byte[] responseBodyBytes = DecodePayloadBytes(GetProperty(response, "Body"));
+            int responseBodySize = GetInt(response, "BodySize", responseBodyBytes.Length);
+            bool responseBodyTruncated = GetBool(response, "BodyTruncated");
             bool hasResponseDisplayBody = GetBool(response, "HasDisplayBody");
             byte[] responseDisplayBytes = hasResponseDisplayBody
                 ? DecodePayloadBytes(GetProperty(response, "DisplayBody"))
                 : responseBodyBytes;
+            int responseDisplayBodySize = hasResponseDisplayBody ? GetInt(response, "DisplayBodySize", responseDisplayBytes.Length) : responseBodySize;
+            bool responseDisplayTruncated = hasResponseDisplayBody ? GetBool(response, "DisplayBodyTruncated") : responseBodyTruncated;
             string responseContentType = GetHeaderValue(responseHeader, "Content-Type");
             Detail.ResponseStateCode = GetInt(response, "StateCode");
             Detail.ResponseStateText = GetString(response, "StateText");
             Detail.HasResponseDisplayBody = hasResponseDisplayBody;
             string responseHeadersText = FormatHeaders(responseHeader);
             Detail.ResponseHeaders = $"HTTP {Detail.ResponseStateCode} {Detail.ResponseStateText}\r\n{responseHeadersText}".Trim();
-            Detail.ResponseBody = BytesToPreviewText(responseDisplayBytes);
+            Detail.ResponseBody = WithPreviewNotice(BytesToPreviewText(responseDisplayBytes), responseDisplayTruncated, responseDisplayBytes.Length, responseDisplayBodySize);
             Detail.ResponseRaw = $"HTTP {Detail.ResponseStateCode} {Detail.ResponseStateText}\r\n{responseHeadersText}\r\n\r\n{Detail.ResponseBody}".Trim();
-            Detail.ResponseOriginalRaw = $"HTTP {Detail.ResponseStateCode} {Detail.ResponseStateText}\r\n{responseHeadersText}\r\n\r\n{BytesToPreviewText(responseBodyBytes)}".Trim();
+            Detail.ResponseOriginalRaw = $"HTTP {Detail.ResponseStateCode} {Detail.ResponseStateText}\r\n{responseHeadersText}\r\n\r\n{WithPreviewNotice(BytesToPreviewText(responseBodyBytes), responseBodyTruncated, responseBodyBytes.Length, responseBodySize)}".Trim();
             Detail.ResponseText = Detail.ResponseBody;
             Detail.ResponseHex = responseBodyBytes.Length > LargePayloadThresholdBytes ? "" : ToHex(responseBodyBytes);
             Detail.ResponseCookies = ExtractCookies(responseHeader);
-            Detail.ResponseJson = BuildJsonViewText(responseDisplayBytes, Detail.ResponseBody);
+            Detail.ResponseJson = responseDisplayTruncated ? Detail.ResponseBody : BuildJsonViewText(responseDisplayBytes, Detail.ResponseBody);
             Detail.ResponseHtml = Detail.ResponseBody;
-            Detail.ResponseImageBytes = responseDisplayBytes.Length > LargePayloadThresholdBytes ? Array.Empty<byte>() : TryGetImageBytes(responseContentType, responseDisplayBytes);
+            Detail.ResponseImageBytes = responseDisplayTruncated || responseDisplayBytes.Length > LargePayloadThresholdBytes ? Array.Empty<byte>() : TryGetImageBytes(responseContentType, responseDisplayBytes);
             Detail.ResponseImageType = ExtractImageType(responseContentType);
             (byte[] responseRawBytes, int responseHeaderLength) = BuildHttpBytes($"HTTP {Detail.ResponseStateCode} {Detail.ResponseStateText}", responseHeadersText, responseBodyBytes);
             ApplyResponseRows(responseHeader, responseRawBytes, responseHeaderLength);
+            Detail.ResponseHexSource = responseBodyTruncated
+                ? CreateHttpHexSource(selected, "Response", $"HTTP {Detail.ResponseStateCode} {Detail.ResponseStateText}", responseHeadersText, responseBodySize)
+                : null;
         }
         else
         {
@@ -2998,6 +3523,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             Detail.ResponseImageType = "";
             Detail.HasResponseDisplayBody = false;
             Detail.ResponseOriginalRaw = "";
+            Detail.ResponseHexSource = null;
         }
 
         Detail.SocketEntries.Clear();
@@ -3269,6 +3795,34 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         return BytesToDisplayText(bytes);
     }
 
+    private static string WithPreviewNotice(string text, bool truncated, int previewLength, int totalLength)
+    {
+        if (!truncated)
+        {
+            return text;
+        }
+
+        string notice = totalLength <= DetailFullBodyLoadLimitBytes
+            ? $"已预览前 {previewLength:N0} Bytes，正在后台加载完整内容..."
+            : $"已预览前 {previewLength:N0} Bytes，完整内容 {totalLength:N0} Bytes，请切换 HEX 分页视图或使用复制功能。";
+        return string.IsNullOrEmpty(text)
+            ? notice
+            : $"{text}\r\n\r\n{notice}";
+    }
+
+    private static string WithStreamingNotice(string text, int loadedLength, int totalLength, bool complete)
+    {
+        if (complete)
+        {
+            return text;
+        }
+
+        string notice = $"正在分块加载正文... {loadedLength:N0}/{totalLength:N0} Bytes";
+        return string.IsNullOrEmpty(text)
+            ? notice
+            : $"{text}\r\n\r\n{notice}";
+    }
+
     private static string BuildJsonViewText(byte[] bytes, string displayText)
     {
         return bytes.Length > LargePayloadThresholdBytes
@@ -3522,10 +4076,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
     private static (byte[] Bytes, int HeaderLength) BuildHttpBytes(string startLine, string headers, byte[] bodyBytes)
     {
-        string prefix = string.IsNullOrWhiteSpace(headers)
-            ? $"{startLine}\r\n\r\n"
-            : $"{startLine}\r\n{headers}\r\n\r\n";
-        byte[] headerBytes = Encoding.UTF8.GetBytes(prefix);
+        byte[] headerBytes = BuildHttpHeaderBytes(startLine, headers);
         if (bodyBytes.Length == 0)
         {
             return (headerBytes, headerBytes.Length);
@@ -3535,6 +4086,26 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         Buffer.BlockCopy(headerBytes, 0, combined, 0, headerBytes.Length);
         Buffer.BlockCopy(bodyBytes, 0, combined, headerBytes.Length, bodyBytes.Length);
         return (combined, headerBytes.Length);
+    }
+
+    private HexVirtualDataSource CreateHttpHexSource(CaptureEntry selected, string direction, string startLine, string headers, int bodySize)
+    {
+        byte[] headerBytes = BuildHttpHeaderBytes(startLine, headers);
+        return new HexVirtualDataSource
+        {
+            HeaderBytes = headerBytes,
+            HeaderLength = headerBytes.Length,
+            TotalLength = headerBytes.Length + Math.Max(0, bodySize),
+            ReadBodyRangeAsync = (offset, count, _) => LoadHttpBodyChunkAsync(selected.Theology, direction, "Raw", offset, count)
+        };
+    }
+
+    private static byte[] BuildHttpHeaderBytes(string startLine, string headers)
+    {
+        string prefix = string.IsNullOrWhiteSpace(headers)
+            ? $"{startLine}\r\n\r\n"
+            : $"{startLine}\r\n{headers}\r\n\r\n";
+        return Encoding.UTF8.GetBytes(prefix);
     }
 
     private static List<HexViewRow> ToHexRows(byte[] bytes, int headerLength = 0)

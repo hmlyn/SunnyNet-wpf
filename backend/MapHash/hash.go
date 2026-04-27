@@ -3,6 +3,7 @@ package MapHash
 import (
 	"bufio"
 	"bytes"
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -24,9 +25,12 @@ import (
 )
 
 type Map struct {
-	Request      map[int]*Request
-	lock         sync.Mutex
-	UpdateLength map[int]*ResponseLength
+	Request            map[int]*Request
+	lock               sync.Mutex
+	UpdateLength       map[int]*ResponseLength
+	BodyStore          *BodyStore
+	httpActionLock     sync.Mutex
+	pendingHTTPActions []pendingHTTPAction
 }
 
 type WaitGroup struct {
@@ -62,14 +66,18 @@ type Request struct {
 	Proto          string      `json:"Proto"`
 	Header         http.Header `json:"Header"`
 	Body           []byte      `json:"Body"`
+	BodyRef        BodyRef     `json:"-"`
 	Display        bool        `json:"Display"` //是否需要显示到列表
 	DisplayBody    []byte      `json:"-"`
+	DisplayBodyRef BodyRef     `json:"-"`
 	HasDisplayBody bool        `json:"-"`
 	Response       struct {
 		Conn           *SunnyNet.HttpConn `json:"-"`
 		Header         http.Header        `json:"Header"`
 		Body           []byte             `json:"Body"`
+		BodyRef        BodyRef            `json:"-"`
 		DisplayBody    []byte             `json:"-"`
+		DisplayBodyRef BodyRef            `json:"-"`
 		HasDisplayBody bool               `json:"-"`
 		StateCode      int                `json:"StateCode"`
 		Error          bool               `json:"Error"`
@@ -99,21 +107,33 @@ type Request struct {
 	} `json:"color"` //显示图标
 }
 type RequestWeb struct {
-	Method         string
-	URL            string
-	Proto          string //HTTP/1.1
-	Header         http.Header
-	Body           []byte
-	DisplayBody    []byte
-	HasDisplayBody bool
-	Response       struct {
-		Header         http.Header
-		Body           []byte
-		DisplayBody    []byte
-		HasDisplayBody bool
-		StateCode      int
-		StateText      string
-		Error          bool
+	Method                 string
+	URL                    string
+	Proto                  string //HTTP/1.1
+	Header                 http.Header
+	Body                   []byte
+	BodySize               int
+	BodyPreviewSize        int
+	BodyTruncated          bool
+	DisplayBody            []byte
+	DisplayBodySize        int
+	DisplayBodyPreviewSize int
+	DisplayBodyTruncated   bool
+	HasDisplayBody         bool
+	Response               struct {
+		Header                 http.Header
+		Body                   []byte
+		BodySize               int
+		BodyPreviewSize        int
+		BodyTruncated          bool
+		DisplayBody            []byte
+		DisplayBodySize        int
+		DisplayBodyPreviewSize int
+		DisplayBodyTruncated   bool
+		HasDisplayBody         bool
+		StateCode              int
+		StateText              string
+		Error                  bool
 	}
 	SocketData []*UpdateSocketList
 	Options    struct {
@@ -126,6 +146,18 @@ type ResponseLength struct {
 	Send int
 	Rec  int
 }
+
+const httpDetailBodyPreviewLimit = 256 * 1024
+
+type pendingHTTPAction struct {
+	Method    string
+	URL       string
+	BodyHash  [32]byte
+	BodyLen   int
+	Mode      int
+	ExpiresAt time.Time
+}
+
 type UpdateResponseLength struct {
 	Send     int
 	Rec      int
@@ -156,6 +188,95 @@ func (m *Map) SetRequest(TheologyID int, h *Request) {
 	defer m.lock.Unlock()
 	m.Request[TheologyID] = h
 }
+func (m *Map) TrackBody(body []byte) BodyRef {
+	if m == nil || m.BodyStore == nil {
+		return BodyRef{Size: len(body)}
+	}
+	return m.BodyStore.Put(body)
+}
+func (m *Map) SetRequestBody(h *Request, body []byte) {
+	if h == nil {
+		return
+	}
+	old := h.BodyRef
+	h.Body = body
+	h.BodyRef = m.TrackBody(body)
+	if m != nil && m.BodyStore != nil {
+		m.BodyStore.Delete(old)
+	}
+}
+func (m *Map) SetResponseBody(h *Request, body []byte) {
+	if h == nil {
+		return
+	}
+	old := h.Response.BodyRef
+	h.Response.Body = body
+	h.Response.BodyRef = m.TrackBody(body)
+	if m != nil && m.BodyStore != nil {
+		m.BodyStore.Delete(old)
+	}
+}
+func (m *Map) RegisterHTTPReplayAction(method string, rawURL string, body []byte, mode int) {
+	if m == nil || mode <= 0 {
+		return
+	}
+	action := pendingHTTPAction{
+		Method:    strings.ToUpper(method),
+		URL:       rawURL,
+		BodyHash:  sha256.Sum256(body),
+		BodyLen:   len(body),
+		Mode:      mode,
+		ExpiresAt: time.Now().Add(30 * time.Second),
+	}
+	m.httpActionLock.Lock()
+	m.pendingHTTPActions = append(m.pendingHTTPActions, action)
+	m.compactHTTPActionsLocked(time.Now())
+	m.httpActionLock.Unlock()
+}
+func (m *Map) ConsumeHTTPReplayAction(method string, rawURL string, body []byte) int {
+	if m == nil {
+		return 0
+	}
+	now := time.Now()
+	bodyHash := sha256.Sum256(body)
+	method = strings.ToUpper(method)
+
+	m.httpActionLock.Lock()
+	defer m.httpActionLock.Unlock()
+	m.compactHTTPActionsLocked(now)
+
+	match := func(action pendingHTTPAction, strictURL bool) bool {
+		if action.Method != method || action.BodyLen != len(body) || action.BodyHash != bodyHash {
+			return false
+		}
+		return !strictURL || action.URL == rawURL
+	}
+	for i, action := range m.pendingHTTPActions {
+		if match(action, true) {
+			m.pendingHTTPActions = append(m.pendingHTTPActions[:i], m.pendingHTTPActions[i+1:]...)
+			return action.Mode
+		}
+	}
+	for i, action := range m.pendingHTTPActions {
+		if match(action, false) {
+			m.pendingHTTPActions = append(m.pendingHTTPActions[:i], m.pendingHTTPActions[i+1:]...)
+			return action.Mode
+		}
+	}
+	return 0
+}
+func (m *Map) compactHTTPActionsLocked(now time.Time) {
+	if len(m.pendingHTTPActions) == 0 {
+		return
+	}
+	dst := m.pendingHTTPActions[:0]
+	for _, action := range m.pendingHTTPActions {
+		if action.ExpiresAt.After(now) {
+			dst = append(dst, action)
+		}
+	}
+	m.pendingHTTPActions = dst
+}
 func (m *Map) SetRequestDisplayBody(TheologyID int, body []byte) bool {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -163,7 +284,12 @@ func (m *Map) SetRequestDisplayBody(TheologyID int, body []byte) bool {
 	if h == nil {
 		return false
 	}
+	old := h.DisplayBodyRef
 	h.DisplayBody = append(h.DisplayBody[:0], body...)
+	h.DisplayBodyRef = m.TrackBody(h.DisplayBody)
+	if m.BodyStore != nil {
+		m.BodyStore.Delete(old)
+	}
 	h.HasDisplayBody = true
 	return true
 }
@@ -174,7 +300,12 @@ func (m *Map) SetResponseDisplayBody(TheologyID int, body []byte) bool {
 	if h == nil {
 		return false
 	}
+	old := h.Response.DisplayBodyRef
 	h.Response.DisplayBody = append(h.Response.DisplayBody[:0], body...)
+	h.Response.DisplayBodyRef = m.TrackBody(h.Response.DisplayBody)
+	if m.BodyStore != nil {
+		m.BodyStore.Delete(old)
+	}
 	h.Response.HasDisplayBody = true
 	return true
 }
@@ -210,12 +341,31 @@ func (m *Map) GetRequestWeb(Theology int) *RequestWeb {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	h := m.Request[Theology]
-	r := &RequestWeb{Body: h.Body, URL: h.URL, Proto: h.Proto, Header: h.Header, Method: h.Method}
-	r.DisplayBody = h.DisplayBody
+	if h == nil {
+		return nil
+	}
+	requestBody, requestBodySize, requestBodyTruncated := BodyPreview(h.Body, h.BodyRef)
+	requestDisplayBody, requestDisplayBodySize, requestDisplayBodyTruncated := BodyPreview(h.DisplayBody, h.DisplayBodyRef)
+	responseBody, responseBodySize, responseBodyTruncated := BodyPreview(h.Response.Body, h.Response.BodyRef)
+	responseDisplayBody, responseDisplayBodySize, responseDisplayBodyTruncated := BodyPreview(h.Response.DisplayBody, h.Response.DisplayBodyRef)
+	r := &RequestWeb{Body: requestBody, URL: h.URL, Proto: h.Proto, Header: h.Header, Method: h.Method}
+	r.BodySize = requestBodySize
+	r.BodyPreviewSize = len(requestBody)
+	r.BodyTruncated = requestBodyTruncated
+	r.DisplayBody = requestDisplayBody
+	r.DisplayBodySize = requestDisplayBodySize
+	r.DisplayBodyPreviewSize = len(requestDisplayBody)
+	r.DisplayBodyTruncated = requestDisplayBodyTruncated
 	r.HasDisplayBody = h.HasDisplayBody
 	r.Response.Header = h.Response.Header
-	r.Response.Body = h.Response.Body
-	r.Response.DisplayBody = h.Response.DisplayBody
+	r.Response.Body = responseBody
+	r.Response.BodySize = responseBodySize
+	r.Response.BodyPreviewSize = len(responseBody)
+	r.Response.BodyTruncated = responseBodyTruncated
+	r.Response.DisplayBody = responseDisplayBody
+	r.Response.DisplayBodySize = responseDisplayBodySize
+	r.Response.DisplayBodyPreviewSize = len(responseDisplayBody)
+	r.Response.DisplayBodyTruncated = responseDisplayBodyTruncated
 	r.Response.HasDisplayBody = h.Response.HasDisplayBody
 	r.Response.StateText = http.StatusText(h.Response.StateCode)
 	r.Response.StateCode = h.Response.StateCode
@@ -229,6 +379,135 @@ func (m *Map) GetRequestWeb(Theology int) *RequestWeb {
 	r.Options.StopALL = h.Options.StopALL
 
 	return r
+}
+
+func BodyPreview(body []byte, ref BodyRef) ([]byte, int, bool) {
+	total := len(body)
+	if ref.Size > total {
+		total = ref.Size
+	}
+	if total <= httpDetailBodyPreviewLimit {
+		return public.CopyBytes(body), total, false
+	}
+	if len(body) > httpDetailBodyPreviewLimit {
+		return public.CopyBytes(body[:httpDetailBodyPreviewLimit]), total, true
+	}
+	return public.CopyBytes(body), total, true
+}
+
+type HTTPBodyRangeResult struct {
+	Ok        bool   `json:"Ok"`
+	Error     string `json:"Error"`
+	Theology  int    `json:"Theology"`
+	Direction string `json:"Direction"`
+	Kind      string `json:"Kind"`
+	Offset    int64  `json:"Offset"`
+	Count     int    `json:"Count"`
+	Total     int    `json:"Total"`
+	End       bool   `json:"End"`
+	Body      []byte `json:"Body"`
+}
+
+func (m *Map) GetHTTPBodyRange(theology int, direction, kind string, offset int64, count int) *HTTPBodyRangeResult {
+	result := &HTTPBodyRangeResult{
+		Ok:        false,
+		Theology:  theology,
+		Direction: direction,
+		Kind:      kind,
+		Offset:    offset,
+	}
+	if count < 1 {
+		result.Error = "count must be greater than 0"
+		return result
+	}
+	if offset < 0 {
+		result.Error = "offset must be greater than or equal to 0"
+		return result
+	}
+
+	body, ref, total, ok := m.selectHTTPBody(theology, direction, kind)
+	if !ok {
+		result.Error = "body not found"
+		return result
+	}
+	result.Total = total
+	if offset >= int64(total) {
+		result.Ok = true
+		result.End = true
+		result.Body = []byte{}
+		return result
+	}
+	if maxCount := total - int(offset); count > maxCount {
+		count = maxCount
+	}
+
+	var chunk []byte
+	if ref.Stored && m.BodyStore != nil {
+		if data, exists := m.BodyStore.ReadRange(ref, offset, count); exists {
+			chunk = data
+		}
+	}
+	if chunk == nil {
+		end := int(offset) + count
+		if int(offset) > len(body) {
+			chunk = []byte{}
+		} else {
+			if end > len(body) {
+				end = len(body)
+			}
+			chunk = public.CopyBytes(body[int(offset):end])
+		}
+	}
+
+	result.Ok = true
+	result.Count = len(chunk)
+	result.End = int(offset)+len(chunk) >= total
+	result.Body = chunk
+	return result
+}
+
+func (m *Map) selectHTTPBody(theology int, direction, kind string) ([]byte, BodyRef, int, bool) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	h := m.Request[theology]
+	if h == nil {
+		return nil, BodyRef{}, 0, false
+	}
+
+	direction = strings.ToLower(strings.TrimSpace(direction))
+	kind = strings.ToLower(strings.TrimSpace(kind))
+	if kind == "" {
+		kind = "raw"
+	}
+
+	var body []byte
+	var ref BodyRef
+	var has bool
+	if direction == "response" || direction == "响应" {
+		if kind == "display" && h.Response.HasDisplayBody {
+			body = h.Response.DisplayBody
+			ref = h.Response.DisplayBodyRef
+		} else {
+			body = h.Response.Body
+			ref = h.Response.BodyRef
+		}
+		has = h.Response.HasDisplayBody || len(h.Response.Body) > 0 || h.Response.BodyRef.Size > 0
+	} else {
+		if kind == "display" && h.HasDisplayBody {
+			body = h.DisplayBody
+			ref = h.DisplayBodyRef
+		} else {
+			body = h.Body
+			ref = h.BodyRef
+		}
+		has = h.HasDisplayBody || len(h.Body) > 0 || h.BodyRef.Size > 0
+	}
+
+	total := len(body)
+	if ref.Size > total {
+		total = ref.Size
+	}
+	return body, ref, total, has
 }
 func (m *Map) GetRequest(Theology int) *Request {
 	m.lock.Lock()
@@ -277,7 +556,7 @@ func (m *Map) SetSocketDataEmpty(Theology int) bool {
 	return h != nil
 }
 func NewHashMap() *Map {
-	return &Map{Request: make(map[int]*Request)}
+	return &Map{Request: make(map[int]*Request), UpdateLength: make(map[int]*ResponseLength), BodyStore: NewBodyStore()}
 }
 func (m *Map) Empty() {
 	m.lock.Lock()
@@ -292,6 +571,8 @@ func (m *Map) Empty() {
 					v.SendNum = 0
 					mz[k] = v
 				}
+			} else {
+				m.releaseBodies(v)
 			}
 			v.Wait.Done()
 		}
@@ -328,6 +609,7 @@ func (m *Map) Delete(TheologyArray []int) {
 					v.SendNum = 0
 				}
 			} else {
+				m.releaseBodies(v)
 				delete(m.Request, k)
 				delete(m.UpdateLength, k)
 			}
@@ -335,6 +617,16 @@ func (m *Map) Delete(TheologyArray []int) {
 		}
 
 	}
+}
+
+func (m *Map) releaseBodies(v *Request) {
+	if m == nil || m.BodyStore == nil || v == nil {
+		return
+	}
+	m.BodyStore.Delete(v.BodyRef)
+	m.BodyStore.Delete(v.DisplayBodyRef)
+	m.BodyStore.Delete(v.Response.BodyRef)
+	m.BodyStore.Delete(v.Response.DisplayBodyRef)
 }
 func (m *Map) Search(callSearch func(int, int, *Request)) {
 	m.lock.Lock()
@@ -423,26 +715,26 @@ func (m *Map) Resend(TheologyArray []int, mode int, Port int) {
 	for _, k := range TheologyArray {
 		v := m.Request[k]
 		if v != nil {
-			go resend(v, mode, Port)
+			go m.resend(v, mode, Port)
 		}
 	}
 }
 
-func resend(m *Request, mode, Port int) {
-	if m != nil {
+func (m *Map) resend(r *Request, mode, Port int) {
+	if r != nil {
 		/*
-			if m.Way == "Websocket" {
-				resendWS(m, mode, Port)
+			if r.Way == "Websocket" {
+				resendWS(r, mode, Port)
 			}
 		*/
-		if m.Way == "HTTP" {
-			resendHttp(m, mode, Port)
+		if r.Way == "HTTP" {
+			m.resendHttp(r, mode, Port)
 		}
 		/*
-			else if m.Way == "UDP" {
-				resendUDP(m, Port)
-			} else if strings.Contains(strings.ToUpper(m.Way), "TCP") {
-				resendTCP(m, strings.Contains(strings.ToUpper(m.Way), "TLS"), Port)
+			else if r.Way == "UDP" {
+				resendUDP(r, Port)
+			} else if strings.Contains(strings.ToUpper(r.Way), "TCP") {
+				resendTCP(r, strings.Contains(strings.ToUpper(r.Way), "TLS"), Port)
 			}
 		*/
 	}
@@ -557,22 +849,24 @@ func resendUDP(m *Request, LocalSunnyNetPort int) {
 func resendWS(m *Request, mode, Port int) {
 
 }
-func resendHttp(m *Request, mode, SunnyNetServerPort int) {
-	if m == nil {
+func (m *Map) resendHttp(r *Request, mode, SunnyNetServerPort int) {
+	if r == nil {
 		return
 	}
-	Body := io.NopCloser(bytes.NewBuffer(m.Body))
+	Body := io.NopCloser(bytes.NewBuffer(r.Body))
 	defer func() {
 		if Body != nil {
 			_ = Body.Close()
 		}
 	}()
-	h, e := http.NewRequest(m.Method, m.URL, Body)
+	h, e := http.NewRequest(r.Method, r.URL, Body)
 	if e != nil {
 		return
 	}
-	h.Header = m.Header.Clone()
-	h.Header.Set("SunnyNetMode", strconv.Itoa(mode))
+	h.Header = r.Header.Clone()
+	if mode > 0 {
+		m.RegisterHTTPReplayAction(r.Method, r.URL, r.Body, mode)
+	}
 	w := GoWinHttp.NewGoWinHttp()
 	w.SetProxyType(true)
 	w.SetProxyIP("127.0.0.1:" + strconv.Itoa(SunnyNetServerPort))

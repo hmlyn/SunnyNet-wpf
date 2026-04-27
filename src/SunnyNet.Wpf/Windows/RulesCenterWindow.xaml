@@ -1,0 +1,202 @@
+<Window x:Class="SunnyNet.Wpf.Windows.RulesCenterWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="规则中心"
+        Width="940"
+        Height="620"
+        MinWidth="760"
+        MinHeight="480"
+        Background="#FFFFFF"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        WindowStartupLocation="CenterOwner">
+    <Window.Resources>
+        <Style x:Key="RulesToolbarButtonStyle" TargetType="{x:Type Button}">
+            <Setter Property="MinWidth" Value="56" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="Padding" Value="12,4" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="3">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#F4F6F9" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#EAF1FF" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="#AEB7C5" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="RulesDataGridStyle" TargetType="{x:Type DataGrid}" BasedOn="{StaticResource {x:Type DataGrid}}">
+            <Setter Property="AutoGenerateColumns" Value="False" />
+            <Setter Property="CanUserAddRows" Value="False" />
+            <Setter Property="CanUserDeleteRows" Value="False" />
+            <Setter Property="CanUserResizeRows" Value="False" />
+            <Setter Property="HeadersVisibility" Value="Column" />
+            <Setter Property="GridLinesVisibility" Value="Vertical" />
+            <Setter Property="RowHeight" Value="28" />
+            <Setter Property="MinRowHeight" Value="28" />
+            <Setter Property="IsReadOnly" Value="True" />
+            <Setter Property="SelectionMode" Value="Single" />
+            <Setter Property="SelectionUnit" Value="FullRow" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Margin="14,10,12,8" LastChildFill="True">
+            <TextBlock x:Name="RuleStatusTextBlock"
+                       DockPanel.Dock="Right"
+                       Margin="12,0,0,0"
+                       VerticalAlignment="Center"
+                       FontSize="12"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       Text="0 条" />
+            <StackPanel Orientation="Horizontal">
+                <Button x:Name="AddRuleButton"
+                        Click="AddCurrentRule_Click"
+                        Content="添加"
+                        Style="{StaticResource RulesToolbarButtonStyle}" />
+                <Button x:Name="RemoveRuleButton"
+                        Click="RemoveSelectedRule_Click"
+                        Content="删除"
+                        Style="{StaticResource RulesToolbarButtonStyle}" />
+                <Button x:Name="EditRuleButton"
+                        Click="EditSelectedRule_Click"
+                        Content="编辑"
+                        Style="{StaticResource RulesToolbarButtonStyle}" />
+                <Button x:Name="ShareRuleButton"
+                        Content="分享"
+                        IsEnabled="False"
+                        Style="{StaticResource RulesToolbarButtonStyle}" />
+                <Button Click="Close_Click"
+                        Content="关闭"
+                        Style="{StaticResource RulesToolbarButtonStyle}" />
+            </StackPanel>
+        </DockPanel>
+
+        <Grid Grid.Row="1">
+            <DataGrid x:Name="BlockRulesGrid"
+                      ItemsSource="{Binding RequestBlockRules}"
+                      MouseDoubleClick="RulesGrid_MouseDoubleClick"
+                      Style="{StaticResource RulesDataGridStyle}"
+                      Visibility="Collapsed">
+                <DataGrid.Columns>
+                    <DataGridCheckBoxColumn Header="" Binding="{Binding Enabled}" Width="48" />
+                    <DataGridTextColumn Header="别名" Binding="{Binding Name}" Width="150" />
+                    <DataGridTextColumn Header="方法" Binding="{Binding Method}" Width="82" />
+                    <DataGridTextColumn Header="匹配" Binding="{Binding UrlMatchType}" Width="82" />
+                    <DataGridTextColumn Header="可选地址 (Url)" Binding="{Binding UrlPattern}" Width="340" />
+                    <DataGridTextColumn Header="动作" Binding="{Binding Action}" Width="130" />
+                    <DataGridTextColumn Header="状态码" Binding="{Binding StatusCode}" Width="82" />
+                    <DataGridTextColumn Header="响应格式" Binding="{Binding ResponseValueType}" Width="116" />
+                    <DataGridTextColumn Header="响应内容" Binding="{Binding ResponseContent}" Width="360" />
+                    <DataGridTextColumn Header="排序" Binding="{Binding Priority}" Width="80" />
+                    <DataGridTextColumn Header="备注" Binding="{Binding Note}" Width="180" />
+                    <DataGridTextColumn Header="状态" Binding="{Binding State}" Width="100" />
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <DataGrid x:Name="RewriteRulesGrid"
+                      ItemsSource="{Binding RequestRewriteRules}"
+                      MouseDoubleClick="RulesGrid_MouseDoubleClick"
+                      Style="{StaticResource RulesDataGridStyle}"
+                      Visibility="Collapsed">
+                <DataGrid.Columns>
+                    <DataGridCheckBoxColumn Header="" Binding="{Binding Enabled}" Width="48" />
+                    <DataGridTextColumn Header="别名" Binding="{Binding Name}" Width="150" />
+                    <DataGridTextColumn Header="方法" Binding="{Binding Method}" Width="82" />
+                    <DataGridTextColumn Header="匹配" Binding="{Binding UrlMatchType}" Width="82" />
+                    <DataGridTextColumn Header="可选地址 (Url)" Binding="{Binding UrlPattern}" Width="300" />
+                    <DataGridTextColumn Header="方向" Binding="{Binding Direction}" Width="82" />
+                    <DataGridTextColumn Header="目标" Binding="{Binding Target}" Width="92" />
+                    <DataGridTextColumn Header="操作" Binding="{Binding Operation}" Width="82" />
+                    <DataGridTextColumn Header="键" Binding="{Binding Key}" Width="140" />
+                    <DataGridTextColumn Header="值格式" Binding="{Binding ValueType}" Width="116" />
+                    <DataGridTextColumn Header="值" Binding="{Binding Value}" Width="280" />
+                    <DataGridTextColumn Header="排序" Binding="{Binding Priority}" Width="80" />
+                    <DataGridTextColumn Header="备注" Binding="{Binding Note}" Width="180" />
+                    <DataGridTextColumn Header="状态" Binding="{Binding State}" Width="100" />
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <DataGrid x:Name="MappingRulesGrid"
+                      ItemsSource="{Binding RequestMappingRules}"
+                      MouseDoubleClick="RulesGrid_MouseDoubleClick"
+                      Style="{StaticResource RulesDataGridStyle}"
+                      Visibility="Collapsed">
+                <DataGrid.Columns>
+                    <DataGridCheckBoxColumn Header="" Binding="{Binding Enabled}" Width="48" />
+                    <DataGridTextColumn Header="别名" Binding="{Binding Name}" Width="150" />
+                    <DataGridTextColumn Header="方法" Binding="{Binding Method}" Width="82" />
+                    <DataGridTextColumn Header="匹配" Binding="{Binding UrlMatchType}" Width="82" />
+                    <DataGridTextColumn Header="可选地址 (Url)" Binding="{Binding UrlPattern}" Width="340" />
+                    <DataGridTextColumn Header="映射类型" Binding="{Binding MappingType}" Width="116" />
+                    <DataGridTextColumn Header="值格式" Binding="{Binding ValueType}" Width="116" />
+                    <DataGridTextColumn Header="映射目标" Binding="{Binding TargetContent}" Width="430" />
+                    <DataGridTextColumn Header="排序" Binding="{Binding Priority}" Width="80" />
+                    <DataGridTextColumn Header="备注" Binding="{Binding Note}" Width="180" />
+                    <DataGridTextColumn Header="状态" Binding="{Binding State}" Width="100" />
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <DataGrid x:Name="DecodeRulesGrid"
+                      ItemsSource="{Binding RequestDecodeRules}"
+                      MouseDoubleClick="RulesGrid_MouseDoubleClick"
+                      Style="{StaticResource RulesDataGridStyle}"
+                      Visibility="Collapsed">
+                <DataGrid.Columns>
+                    <DataGridCheckBoxColumn Header="" Binding="{Binding Enabled}" Width="48" />
+                    <DataGridTextColumn Header="别名" Binding="{Binding Name}" Width="150" />
+                    <DataGridTextColumn Header="方法" Binding="{Binding Method}" Width="82" />
+                    <DataGridTextColumn Header="匹配" Binding="{Binding UrlMatchType}" Width="82" />
+                    <DataGridTextColumn Header="可选地址 (Url)" Binding="{Binding UrlPattern}" Width="340" />
+                    <DataGridTextColumn Header="方向" Binding="{Binding Direction}" Width="82" />
+                    <DataGridTextColumn Header="解码器" Binding="{Binding DecoderType}" Width="130" />
+                    <DataGridTextColumn Header="参数/脚本" Binding="{Binding ScriptCode}" Width="420" />
+                    <DataGridTextColumn Header="排序" Binding="{Binding Priority}" Width="80" />
+                    <DataGridTextColumn Header="备注" Binding="{Binding Note}" Width="180" />
+                    <DataGridTextColumn Header="状态" Binding="{Binding State}" Width="100" />
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <Border x:Name="PlaceholderListPanel"
+                    Background="#FFFFFF"
+                    Visibility="Collapsed">
+                <TextBlock x:Name="PlaceholderTextBlock"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           FontSize="13"
+                           Foreground="{StaticResource TextSecondaryBrush}"
+                           Text="该规则类型将在下一步接入。" />
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

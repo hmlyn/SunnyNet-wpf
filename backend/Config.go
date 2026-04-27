@@ -434,7 +434,7 @@ func RunHTTPRequestScriptCode(Conn *SunnyNet.HttpConn) (_Display bool) {
 	if Conn.Request.Body != nil {
 		Body, _ := io.ReadAll(Conn.Request.Body)
 		_ = Conn.Request.Body.Close()
-		h.Body = Body
+		HashMap.SetRequestBody(h, Body)
 		Conn.Request.Body = io.NopCloser(bytes.NewBuffer(Body))
 	}
 	h.Conn = Conn
@@ -461,9 +461,9 @@ func RunHTTPRequestScriptCode(Conn *SunnyNet.HttpConn) (_Display bool) {
 			Body, _ := io.ReadAll(Conn.Response.Body)
 			_ = Conn.Response.Body.Close()
 			Conn.Response.Body = io.NopCloser(bytes.NewBuffer(Body))
-			h.Response.Body = Body
+			HashMap.SetResponseBody(h, Body)
 		} else {
-			h.Response.Body = []byte{}
+			HashMap.SetResponseBody(h, []byte{})
 		}
 		h.Response.StateCode = Conn.Response.StatusCode
 		h.Response.Header = Conn.Response.Header
@@ -483,7 +483,7 @@ func RunHTTPRequestScriptCode(Conn *SunnyNet.HttpConn) (_Display bool) {
 		if Conn.Response == nil {
 			Conn.Response = new(http.Response)
 		}
-		h.Response.Body = _Body2
+		HashMap.SetResponseBody(h, _Body2)
 		if Conn.Response.Body != nil {
 			_ = Conn.Response.Body.Close()
 		}
@@ -521,7 +521,7 @@ func RunHTTPRequestScriptCode(Conn *SunnyNet.HttpConn) (_Display bool) {
 		Conn.Request.Header = _Header
 	}
 	if !bytes.Equal(_Body, h.Body) {
-		h.Body = _Body
+		HashMap.SetRequestBody(h, _Body)
 		if Conn.Request.Body != nil {
 			_ = Conn.Request.Body.Close()
 		}
@@ -585,7 +585,7 @@ func RunHTTPResponseScriptCode(Conn *SunnyNet.HttpConn) (_Return_ bool) {
 		return false
 	}
 	h1.Response.Header = _Header
-	h1.Response.Body = _Body
+	HashMap.SetResponseBody(h1, _Body)
 	h1.Response.StateCode = _StateCode
 	h1.Response.Conn = Conn
 	return _Break || MatchInterceptResponse(h1)
@@ -725,6 +725,53 @@ type ConfigInterceptRule struct {
 	Operator  string `json:"Operator"`
 	Value     string `json:"Value"`
 }
+type ConfigRuleCenter struct {
+	BlockRules   []ConfigRequestBlockRule   `json:"BlockRules"`
+	RewriteRules []ConfigRequestRewriteRule `json:"RewriteRules"`
+	MappingRules []ConfigRequestMappingRule `json:"MappingRules"`
+	DecodeRules  []ConfigRequestDecodeRule  `json:"DecodeRules"`
+}
+type ConfigTrafficRuleBase struct {
+	Hash         string `json:"Hash"`
+	Enable       bool   `json:"Enable"`
+	Name         string `json:"Name"`
+	Method       string `json:"Method"`
+	UrlMatchType string `json:"UrlMatchType"`
+	UrlPattern   string `json:"UrlPattern"`
+	Priority     int    `json:"Priority"`
+	Note         string `json:"Note"`
+}
+type ConfigRequestBlockRule struct {
+	ConfigTrafficRuleBase
+	Action            string `json:"Action"`
+	StatusCode        int    `json:"StatusCode"`
+	ResponseValueType string `json:"ResponseValueType"`
+	ResponseContent   string `json:"ResponseContent"`
+}
+type ConfigRequestRewriteRule struct {
+	ConfigTrafficRuleBase
+	Direction      string `json:"Direction"`
+	Target         string `json:"Target"`
+	Operation      string `json:"Operation"`
+	Key            string `json:"Key"`
+	Value          string `json:"Value"`
+	ValueType      string `json:"ValueType"`
+	OperationsJson string `json:"OperationsJson"`
+}
+type ConfigRequestMappingRule struct {
+	ConfigTrafficRuleBase
+	MappingType       string `json:"MappingType"`
+	SourceContent     string `json:"SourceContent"`
+	TargetContent     string `json:"TargetContent"`
+	ValueType         string `json:"ValueType"`
+	LegacyReplaceRule bool   `json:"LegacyReplaceRule"`
+}
+type ConfigRequestDecodeRule struct {
+	ConfigTrafficRuleBase
+	Direction   string `json:"Direction"`
+	DecoderType string `json:"DecoderType"`
+	ScriptCode  string `json:"ScriptCode"`
+}
 type ConfigRequestCertManager struct {
 	Rule     uint8  `json:"rule"`
 	FilePath string `json:"FilePath"`
@@ -760,6 +807,7 @@ type UserConfig struct {
 	ReplaceRules           []ConfigReplaceRules  `json:"ReplaceRules"`
 	HostsRules             []ConfigReplaceRules  `json:"HostsRules"`
 	InterceptRules         []ConfigInterceptRule `json:"InterceptRules"`
+	RuleCenter             ConfigRuleCenter      `json:"RuleCenter"`
 	DarkTheme              uint8                 `json:"DarkTheme"`
 	Filter                 string                `json:"Filter"`
 	KeysStrings            string                `json:"KeysStrings"`
@@ -806,6 +854,18 @@ func (c *UserConfig) loadDefaultValue() {
 	}
 	if c.InterceptRules == nil {
 		c.InterceptRules = make([]ConfigInterceptRule, 0)
+	}
+	if c.RuleCenter.BlockRules == nil {
+		c.RuleCenter.BlockRules = make([]ConfigRequestBlockRule, 0)
+	}
+	if c.RuleCenter.RewriteRules == nil {
+		c.RuleCenter.RewriteRules = make([]ConfigRequestRewriteRule, 0)
+	}
+	if c.RuleCenter.MappingRules == nil {
+		c.RuleCenter.MappingRules = make([]ConfigRequestMappingRule, 0)
+	}
+	if c.RuleCenter.DecodeRules == nil {
+		c.RuleCenter.DecodeRules = make([]ConfigRequestDecodeRule, 0)
 	}
 	if c.AuthenticationUserInfo == nil {
 		c.AuthenticationUserInfo = make(map[string]string)

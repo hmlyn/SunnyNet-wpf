@@ -301,6 +301,24 @@
                                     <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="请求构造器" />
                                 </StackPanel>
                             </Button>
+                            <Button x:Name="RulesMenuButton"
+                                    Margin="6,0,0,0"
+                                    Style="{StaticResource ToolbarButtonStyle}"
+                                    Click="RulesMenuButton_Click"
+                                    ToolTip="规则中心">
+                                <Button.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="请求屏蔽" Click="RequestBlockRules_Click" />
+                                        <MenuItem Header="请求重写" Click="RequestRewriteRules_Click" />
+                                        <MenuItem Header="请求映射" Click="RequestMappingRules_Click" />
+                                        <MenuItem Header="请求解密" Click="RequestDecodeRules_Click" />
+                                    </ContextMenu>
+                                </Button.ContextMenu>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE9D9;" />
+                                    <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="规则" />
+                                </StackPanel>
+                            </Button>
                             <Button Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}" Click="CertificateGuide_Click" ToolTip="证书安装教程">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE7C3;" />
@@ -1088,6 +1106,7 @@
                                             <TabItem Header="HEX视图">
                                                 <controls:HexViewControl Bytes="{Binding Detail.RequestHexBytes}"
                                                                          HeaderLength="{Binding Detail.RequestHexHeaderLength}"
+                                                                         VirtualSource="{Binding Detail.RequestHexSource}"
                                                                          EnableBodyCopyActions="True"
                                                                          EmptyText="无请求十六进制数据" />
                                             </TabItem>
@@ -1279,6 +1298,7 @@
                                             <TabItem Header="HEX视图">
                                                 <controls:HexViewControl Bytes="{Binding Detail.ResponseHexBytes}"
                                                                          HeaderLength="{Binding Detail.ResponseHexHeaderLength}"
+                                                                         VirtualSource="{Binding Detail.ResponseHexSource}"
                                                                          EmptyText="无响应十六进制数据" />
                                             </TabItem>
                                             <TabItem x:Name="ResponseWebSocketTab" Header="WebSocket调试">

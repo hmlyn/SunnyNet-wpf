@@ -72,16 +72,22 @@ type ListInfo struct {
 }
 
 type UpdateCurrentResponse struct {
-	Theology       int         `json:"Theology"` //唯一ID
-	Header         http.Header `json:"Header"`
-	Body           []byte      `json:"Body"`
-	DisplayBody    []byte      `json:"DisplayBody"`
-	HasDisplayBody bool        `json:"HasDisplayBody"`
-	StateText      string      `json:"StateText"`
-	StateCode      int         `json:"StateCode"`
-	Break          bool        `json:"断点状态"`
-	Error          bool        `json:"Error"`
-	WebSocket      bool        `json:"WebSocket"`
+	Theology               int         `json:"Theology"` //唯一ID
+	Header                 http.Header `json:"Header"`
+	Body                   []byte      `json:"Body"`
+	BodySize               int         `json:"BodySize"`
+	BodyPreviewSize        int         `json:"BodyPreviewSize"`
+	BodyTruncated          bool        `json:"BodyTruncated"`
+	DisplayBody            []byte      `json:"DisplayBody"`
+	DisplayBodySize        int         `json:"DisplayBodySize"`
+	DisplayBodyPreviewSize int         `json:"DisplayBodyPreviewSize"`
+	DisplayBodyTruncated   bool        `json:"DisplayBodyTruncated"`
+	HasDisplayBody         bool        `json:"HasDisplayBody"`
+	StateText              string      `json:"StateText"`
+	StateCode              int         `json:"StateCode"`
+	Break                  bool        `json:"断点状态"`
+	Error                  bool        `json:"Error"`
+	WebSocket              bool        `json:"WebSocket"`
 }
 type UpdateICO struct {
 	Theology int    `json:"Theology"` //唯一ID
@@ -92,6 +98,33 @@ func init() {
 	go InsertList()
 	go UpdateResponseLength()
 	GlobalConfig.LoadLocalFile()
+}
+
+func newUpdateCurrentResponse(theology int, h *MapHash.Request, stateText string, stateCode int, isBreak bool, isError bool) *UpdateCurrentResponse {
+	update := &UpdateCurrentResponse{
+		Theology:       theology,
+		StateText:      stateText,
+		StateCode:      stateCode,
+		Break:          isBreak,
+		Error:          isError,
+		HasDisplayBody: false,
+	}
+	if h == nil {
+		return update
+	}
+	update.Header = h.Response.Header
+	body, bodySize, bodyTruncated := MapHash.BodyPreview(h.Response.Body, h.Response.BodyRef)
+	displayBody, displayBodySize, displayBodyTruncated := MapHash.BodyPreview(h.Response.DisplayBody, h.Response.DisplayBodyRef)
+	update.Body = body
+	update.BodySize = bodySize
+	update.BodyPreviewSize = len(body)
+	update.BodyTruncated = bodyTruncated
+	update.DisplayBody = displayBody
+	update.DisplayBodySize = displayBodySize
+	update.DisplayBodyPreviewSize = len(displayBody)
+	update.DisplayBodyTruncated = displayBodyTruncated
+	update.HasDisplayBody = h.Response.HasDisplayBody
+	return update
 }
 
 var Insert sync.Mutex
@@ -243,43 +276,54 @@ func HttpCallback(Conn *SunnyNet.HttpConn) {
 	if Conn.Request.Header == nil {
 		return
 	}
-	SunnyNetMode := 0
 	{
 		if Conn.Type == public.HttpSendRequest {
-			SunnyNetMode, _ = strconv.Atoi(Conn.Request.Header.Get("SunnyNetMode"))
-			Conn.Request.Header.Del("SunnyNetMode")
 			HostsRulesUrl(Conn.Request.URL)
-			u, b := ReplaceURL(Conn.Request.URL)
-			if len(b) > 0 {
-				Conn.Response = new(http.Response)
-				Conn.Response.Body = io.NopCloser(bytes.NewBuffer(b))
-				Conn.Response.Header = make(http.Header)
-				Conn.Response.Header.Set("Server", "SunnyReplaceRules")
-				Conn.Response.Header.Set("Accept-Ranges", "bytes")
-				Conn.Response.Header.Set("Connection", "Close")
-				Conn.Response.Header.Set("Content-Length", strconv.Itoa(len(b)))
-				Conn.Response.ContentLength = int64(len(b))
-				Conn.Response.StatusCode = 200
+			if block, ok := ApplyRequestBlock(Conn.Request.Method, Conn.Request.URL); ok {
+				if block.Close {
+					Conn.Close()
+				} else {
+					Conn.Response = block.Response
+				}
 			} else {
-				Conn.Request.URL = u
-				ReplaceHeader(Conn.Request.Header)
-				{
-					if Conn.Request.Header != nil {
-						_TmpLock.Lock()
-						if DisableCache {
-							delete(Conn.Request.Header, "If-None-Match")
-							delete(Conn.Request.Header, "If-Modified-Since")
+				u, b := ReplaceURL(Conn.Request.Method, Conn.Request.URL)
+				if b != nil {
+					Conn.Response = new(http.Response)
+					Conn.Response.Body = io.NopCloser(bytes.NewBuffer(b))
+					Conn.Response.Header = make(http.Header)
+					Conn.Response.Header.Set("Server", "SunnyReplaceRules")
+					Conn.Response.Header.Set("Accept-Ranges", "bytes")
+					Conn.Response.Header.Set("Connection", "Close")
+					Conn.Response.Header.Set("Content-Length", strconv.Itoa(len(b)))
+					Conn.Response.ContentLength = int64(len(b))
+					Conn.Response.StatusCode = 200
+				} else {
+					Conn.Request.URL = u
+					ReplaceHeader(Conn.Request.Header)
+					{
+						if Conn.Request.Header != nil {
+							_TmpLock.Lock()
+							if DisableCache {
+								delete(Conn.Request.Header, "If-None-Match")
+								delete(Conn.Request.Header, "If-Modified-Since")
+							}
+							_TmpLock.Unlock()
 						}
-						_TmpLock.Unlock()
 					}
+					Body := make([]byte, 0)
+					if Conn.Request.Body != nil {
+						Body, _ = io.ReadAll(Conn.Request.Body)
+						_ = Conn.Request.Body.Close()
+					}
+					Body = ReplaceBody(Body)
+					method, rewrittenURL, rewrittenBody := ApplyRequestRewrite(Conn.Request.Method, Conn.Request.URL, Conn.Request.Header, Body)
+					Conn.Request.Method = method
+					Conn.Request.URL = rewrittenURL
+					Body = rewrittenBody
+					Conn.Request.ContentLength = int64(len(Body))
+					Conn.Request.Header.Set("Content-Length", strconv.Itoa(len(Body)))
+					Conn.Request.Body = io.NopCloser(bytes.NewBuffer(Body))
 				}
-				Body := make([]byte, 0)
-				if Conn.Request.Body != nil {
-					Body, _ = io.ReadAll(Conn.Request.Body)
-					_ = Conn.Request.Body.Close()
-				}
-				Body = ReplaceBody(Body)
-				Conn.Request.Body = io.NopCloser(bytes.NewBuffer(Body))
 			}
 
 		} else if Conn.Type == public.HttpResponseOK {
@@ -350,6 +394,11 @@ func HttpCallback(Conn *SunnyNet.HttpConn) {
 				_ = Conn.Response.Body.Close()
 			}
 			Body = ReplaceBody(Body)
+			Body = ApplyResponseRewrite(Conn.Request.Method, Conn.Request.URL, Conn.Response, Body)
+			Conn.Response.ContentLength = int64(len(Body))
+			if Conn.Response.Header != nil {
+				Conn.Response.Header.Set("Content-Length", strconv.Itoa(len(Body)))
+			}
 			Conn.Response.Body = io.NopCloser(bytes.NewBuffer(Body))
 		}
 		if !(GetWorkingState()) && Conn.Type == public.HttpSendRequest {
@@ -366,6 +415,11 @@ func HttpCallback(Conn *SunnyNet.HttpConn) {
 			h := HashMap.GetRequest(Conn.Theology)
 			if h == nil {
 				return
+			}
+			httpActionMode := HashMap.ConsumeHTTPReplayAction(h.Method, h.URL, h.Body)
+			ApplyHTTPDecodeRules(Conn.Theology, true, h.Method, Conn.Request.URL, h.Body)
+			if len(h.Response.Body) > 0 {
+				ApplyHTTPDecodeRules(Conn.Theology, false, h.Method, Conn.Request.URL, h.Response.Body)
 			}
 			h.SendTime = time.Now().Format("15:04:05.000")
 			if len(h.Response.Header) > 0 {
@@ -390,17 +444,7 @@ func HttpCallback(Conn *SunnyNet.HttpConn) {
 				isUpdateRequestInfo := currentlySelected == Conn.Theology
 				Insert.Unlock()
 				if isUpdateRequestInfo {
-					CallJs("更新响应", &UpdateCurrentResponse{
-						Theology:       Conn.Theology,
-						Header:         h.Response.Header,
-						Body:           h.Response.Body,
-						DisplayBody:    h.Response.DisplayBody,
-						HasDisplayBody: h.Response.HasDisplayBody,
-						StateText:      http.StatusText(h.Response.StateCode),
-						StateCode:      h.Response.StateCode,
-						Break:          false,
-						Error:          false,
-					})
+					CallJs("更新响应", newUpdateCurrentResponse(Conn.Theology, h, http.StatusText(h.Response.StateCode), h.Response.StateCode, false, false))
 				}
 				Insert.Lock()
 				ResponseType := ""
@@ -444,7 +488,7 @@ func HttpCallback(Conn *SunnyNet.HttpConn) {
 			}
 			Insert.Lock()
 			IsBreak := uint8(0)
-			if breakpoint == 1 || h.Break == 1 || SunnyNetMode == 1 {
+			if breakpoint == 1 || h.Break == 1 || httpActionMode == 1 {
 				IsBreak = 1
 			}
 			Insert.Unlock()
@@ -504,7 +548,7 @@ func HttpCallback(Conn *SunnyNet.HttpConn) {
 				}
 				AddInsertList(_tmp)
 			}
-			if SunnyNetMode == 2 {
+			if httpActionMode == 2 {
 				h.Break = 2
 			}
 		}
@@ -517,6 +561,7 @@ func HttpCallback(Conn *SunnyNet.HttpConn) {
 		if h == nil {
 			return
 		}
+		ApplyHTTPDecodeRules(Conn.Theology, false, Conn.Request.Method, Conn.Request.URL, h.Response.Body)
 		IsBreak := uint8(0)
 		if Break {
 			h.Break = 2
@@ -526,17 +571,7 @@ func HttpCallback(Conn *SunnyNet.HttpConn) {
 			IsBreak = 2
 		}
 		if isUpdateRequestInfo {
-			CallJs("更新响应", &UpdateCurrentResponse{
-				Theology:       Conn.Theology,
-				Header:         h.Response.Header,
-				Body:           h.Response.Body,
-				DisplayBody:    h.Response.DisplayBody,
-				HasDisplayBody: h.Response.HasDisplayBody,
-				StateText:      http.StatusText(h.Response.StateCode),
-				StateCode:      h.Response.StateCode,
-				Break:          IsBreak == 2,
-				Error:          false,
-			})
+			CallJs("更新响应", newUpdateCurrentResponse(Conn.Theology, h, http.StatusText(h.Response.StateCode), h.Response.StateCode, IsBreak == 2, false))
 		}
 		Insert.Lock()
 		ResponseType := ""
@@ -608,21 +643,12 @@ func HttpCallback(Conn *SunnyNet.HttpConn) {
 		h.RecTime = time.Now().Format("15:04:05.000")
 		h.Response.Error = true
 		h.Response.StateCode = -1
-		h.Response.Body = []byte(Conn.GetError())
+		HashMap.SetResponseBody(h, []byte(Conn.GetError()))
 		Insert.Lock()
 		isUpdateRequestInfo := currentlySelected == Conn.Theology
 		Insert.Unlock()
 		if isUpdateRequestInfo {
-			CallJs("更新响应", &UpdateCurrentResponse{
-				Theology:       Conn.Theology,
-				Body:           h.Response.Body,
-				DisplayBody:    h.Response.DisplayBody,
-				HasDisplayBody: h.Response.HasDisplayBody,
-				StateText:      "error",
-				StateCode:      h.Response.StateCode,
-				Break:          false,
-				Error:          true,
-			})
+			CallJs("更新响应", newUpdateCurrentResponse(Conn.Theology, h, "error", h.Response.StateCode, false, true))
 		}
 		Insert.Lock()
 		_tmp := &ListInfo{
