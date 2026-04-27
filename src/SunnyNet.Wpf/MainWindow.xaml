@@ -1088,6 +1088,7 @@
                                             <TabItem Header="HEX视图">
                                                 <controls:HexViewControl Bytes="{Binding Detail.RequestHexBytes}"
                                                                          HeaderLength="{Binding Detail.RequestHexHeaderLength}"
+                                                                         EnableBodyCopyActions="True"
                                                                          EmptyText="无请求十六进制数据" />
                                             </TabItem>
                                             <TabItem Header="Cookies">

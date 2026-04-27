@@ -18,6 +18,9 @@ public partial class HexViewControl : UserControl
     public static readonly DependencyProperty EmptyTextProperty =
         DependencyProperty.Register(nameof(EmptyText), typeof(string), typeof(HexViewControl), new PropertyMetadata("无十六进制数据", OnEmptyTextChanged));
 
+    public static readonly DependencyProperty EnableBodyCopyActionsProperty =
+        DependencyProperty.Register(nameof(EnableBodyCopyActions), typeof(bool), typeof(HexViewControl), new PropertyMetadata(false));
+
     private const double LineHeight = 22;
     private const double TopPadding = 10;
     private const double BottomPadding = 10;
@@ -98,6 +101,12 @@ public partial class HexViewControl : UserControl
     {
         get => (string)GetValue(EmptyTextProperty);
         set => SetValue(EmptyTextProperty, value);
+    }
+
+    public bool EnableBodyCopyActions
+    {
+        get => (bool)GetValue(EnableBodyCopyActionsProperty);
+        set => SetValue(EnableBodyCopyActionsProperty, value);
     }
 
     internal byte[] RenderBytes => Bytes ?? Array.Empty<byte>();
@@ -521,6 +530,7 @@ public partial class HexViewControl : UserControl
         CopySelectedTextMenuItem.IsEnabled = hasSelection;
         CopySelectedLinesMenuItem.IsEnabled = hasSelection;
         ClearSelectionMenuItem.IsEnabled = hasSelection;
+        UpdateBodyCopyMenuItems();
         if (hasSelection)
         {
             int count = GetSelectionLength();
@@ -534,6 +544,24 @@ public partial class HexViewControl : UserControl
             CopySelectedTextMenuItem.Header = "复制选中文本";
             CopySelectedLinesMenuItem.Header = "复制选中全部";
         }
+    }
+
+    private void UpdateBodyCopyMenuItems()
+    {
+        int bodyLength = GetBodyLength();
+        bool visible = EnableBodyCopyActions && bodyLength > 0;
+        bool enabled = visible;
+        Visibility visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        BodyCopySeparator.Visibility = visibility;
+        CopyBodyTextMenuItem.Visibility = visibility;
+        CopyBodyHexMenuItem.Visibility = visibility;
+        CopyBodyBase64MenuItem.Visibility = visibility;
+        CopyBodyTextMenuItem.IsEnabled = enabled;
+        CopyBodyHexMenuItem.IsEnabled = enabled;
+        CopyBodyBase64MenuItem.IsEnabled = enabled;
+        CopyBodyTextMenuItem.Header = enabled ? $"复制 Body 文本 ({bodyLength:N0} Bytes)" : "复制 Body 文本";
+        CopyBodyHexMenuItem.Header = enabled ? $"复制 Body HEX ({bodyLength:N0} Bytes)" : "复制 Body HEX";
+        CopyBodyBase64MenuItem.Header = enabled ? $"复制 Body Base64 ({bodyLength:N0} Bytes)" : "复制 Body Base64";
     }
 
     private void CopyAllHex_Click(object sender, RoutedEventArgs routedEventArgs)
@@ -575,6 +603,48 @@ public partial class HexViewControl : UserControl
         if (CopyText(BuildHexLines(bytes, 0, bytes.Length, includeOffset: true, includeAscii: true)))
         {
             ShowCopyFeedback($"已复制全部内容 · {bytes.Length:N0} Bytes");
+        }
+    }
+
+    private void CopyBodyText_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        byte[] body = GetBodyBytes();
+        if (body.Length == 0)
+        {
+            return;
+        }
+
+        if (CopyText(DecodeBodyText(body)))
+        {
+            ShowCopyFeedback($"已复制 Body 文本 · {body.Length:N0} Bytes");
+        }
+    }
+
+    private void CopyBodyHex_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        byte[] body = GetBodyBytes();
+        if (body.Length == 0)
+        {
+            return;
+        }
+
+        if (CopyText(BuildHexLines(body, 0, body.Length, includeOffset: false, includeAscii: false)))
+        {
+            ShowCopyFeedback($"已复制 Body HEX · {body.Length:N0} Bytes");
+        }
+    }
+
+    private void CopyBodyBase64_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        byte[] body = GetBodyBytes();
+        if (body.Length == 0)
+        {
+            return;
+        }
+
+        if (CopyText(Convert.ToBase64String(body)))
+        {
+            ShowCopyFeedback($"已复制 Body Base64 · {body.Length:N0} Bytes");
         }
     }
 
@@ -760,6 +830,34 @@ public partial class HexViewControl : UserControl
         return result;
     }
 
+    private int GetBodyStart()
+    {
+        byte[] bytes = RenderBytes;
+        return Math.Clamp(HeaderLength, 0, bytes.Length);
+    }
+
+    private int GetBodyLength()
+    {
+        byte[] bytes = RenderBytes;
+        int bodyStart = GetBodyStart();
+        return Math.Max(0, bytes.Length - bodyStart);
+    }
+
+    private byte[] GetBodyBytes()
+    {
+        byte[] bytes = RenderBytes;
+        int bodyStart = GetBodyStart();
+        int bodyLength = Math.Max(0, bytes.Length - bodyStart);
+        if (bodyLength <= 0)
+        {
+            return Array.Empty<byte>();
+        }
+
+        byte[] result = new byte[bodyLength];
+        Buffer.BlockCopy(bytes, bodyStart, result, 0, bodyLength);
+        return result;
+    }
+
     private string BuildSummaryText(int length)
     {
         string text = length == 0
@@ -835,7 +933,7 @@ public partial class HexViewControl : UserControl
 
     private bool CopyText(string text)
     {
-        if (string.IsNullOrWhiteSpace(text))
+        if (string.IsNullOrEmpty(text))
         {
             return false;
         }
@@ -941,6 +1039,16 @@ public partial class HexViewControl : UserControl
         }
 
         return builder.ToString();
+    }
+
+    private static string DecodeBodyText(byte[] bytes)
+    {
+        if (bytes.Length == 0)
+        {
+            return "";
+        }
+
+        return Encoding.UTF8.GetString(bytes);
     }
 
     private static char ToVisibleChar(byte value)

@@ -19,6 +19,10 @@
                 <MenuItem Header="复制全部 HEX" Click="CopyAllHex_Click" />
                 <MenuItem Header="复制全部文本" Click="CopyAllText_Click" />
                 <MenuItem Header="复制全部内容" Click="CopyAllLines_Click" />
+                <Separator x:Name="BodyCopySeparator" Visibility="Collapsed" />
+                <MenuItem x:Name="CopyBodyTextMenuItem" Header="复制 Body 文本" Visibility="Collapsed" Click="CopyBodyText_Click" />
+                <MenuItem x:Name="CopyBodyHexMenuItem" Header="复制 Body HEX" Visibility="Collapsed" Click="CopyBodyHex_Click" />
+                <MenuItem x:Name="CopyBodyBase64MenuItem" Header="复制 Body Base64" Visibility="Collapsed" Click="CopyBodyBase64_Click" />
                 <Separator />
                 <MenuItem x:Name="ClearSelectionMenuItem" Header="清除选中" Click="ClearSelection_Click" />
             </ContextMenu>
