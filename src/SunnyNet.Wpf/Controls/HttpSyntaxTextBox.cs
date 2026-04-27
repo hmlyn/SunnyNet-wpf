@@ -1,3 +1,6 @@
+using System.Diagnostics;
+using System.IO;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -55,11 +58,13 @@ public sealed class HttpSyntaxTextBox : RichTextBox
     private bool _progressiveInHeaders;
     private bool _progressiveLooksJson;
     private bool _searchAutoScrolled;
+    private bool _logicalSelectAll;
     private string _progressiveText = "";
     private int _progressiveIndex;
     private Paragraph? _paragraph;
     private Span? _progressStatusSpan;
     private ScrollViewer? _scrollViewer;
+    private ContextMenu? _defaultContextMenu;
 
     public HttpSyntaxTextBox()
     {
@@ -77,6 +82,11 @@ public sealed class HttpSyntaxTextBox : RichTextBox
         Unloaded += HttpSyntaxTextBox_Unloaded;
         IsVisibleChanged += HttpSyntaxTextBox_IsVisibleChanged;
         PreviewKeyDown += HttpSyntaxTextBox_PreviewKeyDown;
+        PreviewMouseLeftButtonDown += HttpSyntaxTextBox_PreviewMouseLeftButtonDown;
+        ContextMenuOpening += HttpSyntaxTextBox_ContextMenuOpening;
+        CommandBindings.Add(new CommandBinding(ApplicationCommands.Copy, CopyCommand_Executed, CopyCommand_CanExecute));
+        _defaultContextMenu = CreateDefaultContextMenu();
+        ContextMenu = _defaultContextMenu;
     }
 
     public string SourceText
@@ -108,6 +118,7 @@ public sealed class HttpSyntaxTextBox : RichTextBox
         if (dependencyObject is HttpSyntaxTextBox viewer)
         {
             viewer._activeSearchMatchIndex = 0;
+            viewer._logicalSelectAll = false;
             viewer.QueueRender();
         }
     }
@@ -176,6 +187,20 @@ public sealed class HttpSyntaxTextBox : RichTextBox
 
     private void HttpSyntaxTextBox_PreviewKeyDown(object sender, KeyEventArgs keyEventArgs)
     {
+        if (keyEventArgs.Key == Key.A && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+        {
+            MarkLogicalSelectAll();
+            keyEventArgs.Handled = true;
+            return;
+        }
+
+        if (keyEventArgs.Key == Key.C && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+        {
+            CopyCurrentSelection();
+            keyEventArgs.Handled = true;
+            return;
+        }
+
         if (keyEventArgs.Key != Key.Enter || string.IsNullOrEmpty(GetEffectiveSearchText()))
         {
             return;
@@ -184,11 +209,185 @@ public sealed class HttpSyntaxTextBox : RichTextBox
         keyEventArgs.Handled = MoveToNextMatch();
     }
 
+    private void HttpSyntaxTextBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs mouseButtonEventArgs)
+    {
+        _logicalSelectAll = false;
+    }
+
+    private void HttpSyntaxTextBox_ContextMenuOpening(object sender, ContextMenuEventArgs contextMenuEventArgs)
+    {
+        if (ContextMenu is null)
+        {
+            _defaultContextMenu ??= CreateDefaultContextMenu();
+            ContextMenu = _defaultContextMenu;
+        }
+
+        UpdateDefaultContextMenu();
+    }
+
+    private ContextMenu CreateDefaultContextMenu()
+    {
+        ContextMenu menu = new();
+        MenuItem copyMenuItem = new()
+        {
+            Header = "复制",
+            InputGestureText = "Ctrl+C",
+            Command = ApplicationCommands.Copy,
+            CommandTarget = this
+        };
+        MenuItem copyAllMenuItem = new()
+        {
+            Header = "复制全部",
+            InputGestureText = "Ctrl+A, Ctrl+C",
+            Tag = "CopyAll"
+        };
+        MenuItem openInNotepadMenuItem = new()
+        {
+            Header = "记事本打开",
+            Tag = "OpenInNotepad"
+        };
+        copyAllMenuItem.Click += CopyAllMenuItem_Click;
+        openInNotepadMenuItem.Click += OpenInNotepadMenuItem_Click;
+        menu.Items.Add(copyMenuItem);
+        menu.Items.Add(copyAllMenuItem);
+        menu.Items.Add(openInNotepadMenuItem);
+        menu.Opened += (_, _) => UpdateDefaultContextMenu();
+        return menu;
+    }
+
+    private void UpdateDefaultContextMenu()
+    {
+        if (ContextMenu is null || ContextMenu != _defaultContextMenu || ContextMenu.Items.Count == 0)
+        {
+            return;
+        }
+
+        bool hasText = !string.IsNullOrEmpty(SourceText);
+        bool hasSelection = _logicalSelectAll || !Selection.IsEmpty;
+        foreach (object item in ContextMenu.Items)
+        {
+            if (item is not MenuItem menuItem)
+            {
+                continue;
+            }
+
+            if (menuItem.Command == ApplicationCommands.Copy)
+            {
+                menuItem.IsEnabled = hasSelection;
+                menuItem.Header = _logicalSelectAll
+                    ? $"复制全部文本 ({(SourceText?.Length ?? 0):N0} 字符)"
+                    : "复制";
+            }
+            else if (Equals(menuItem.Tag, "CopyAll"))
+            {
+                menuItem.IsEnabled = hasText;
+                menuItem.Header = hasText
+                    ? $"复制全部 ({(SourceText?.Length ?? 0):N0} 字符)"
+                    : "复制全部";
+            }
+            else if (Equals(menuItem.Tag, "OpenInNotepad"))
+            {
+                menuItem.IsEnabled = hasText;
+            }
+        }
+    }
+
+    private void CopyCommand_CanExecute(object sender, CanExecuteRoutedEventArgs canExecuteRoutedEventArgs)
+    {
+        canExecuteRoutedEventArgs.CanExecute = _logicalSelectAll || !Selection.IsEmpty;
+        canExecuteRoutedEventArgs.Handled = true;
+    }
+
+    private void CopyCommand_Executed(object sender, ExecutedRoutedEventArgs executedRoutedEventArgs)
+    {
+        CopyCurrentSelection();
+        executedRoutedEventArgs.Handled = true;
+    }
+
+    private void CopyAllMenuItem_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        CopyText(SourceText ?? "");
+    }
+
+    private void OpenInNotepadMenuItem_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        OpenTextInNotepad(SourceText ?? "");
+    }
+
+    private void MarkLogicalSelectAll()
+    {
+        _logicalSelectAll = true;
+        try
+        {
+            Selection.Select(Document.ContentStart, Document.ContentStart);
+        }
+        catch
+        {
+        }
+    }
+
+    private void CopyCurrentSelection()
+    {
+        if (_logicalSelectAll)
+        {
+            CopyText(SourceText ?? "");
+            return;
+        }
+
+        if (!Selection.IsEmpty)
+        {
+            CopyText(Selection.Text);
+        }
+    }
+
+    private static void CopyText(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(text);
+        }
+        catch
+        {
+        }
+    }
+
+    private static void OpenTextInNotepad(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+
+        try
+        {
+            string directory = Path.Combine(Path.GetTempPath(), "SunnyNetWpf");
+            Directory.CreateDirectory(directory);
+            string filePath = Path.Combine(directory, $"sunnynet-view-{DateTime.Now:yyyyMMdd-HHmmss-fff}.txt");
+            File.WriteAllText(filePath, text, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+
+            ProcessStartInfo startInfo = new("notepad.exe")
+            {
+                UseShellExecute = false
+            };
+            startInfo.ArgumentList.Add(filePath);
+            Process.Start(startInfo);
+        }
+        catch
+        {
+        }
+    }
+
     private void QueueRender()
     {
         _renderVersion++;
         _isProgressiveRendering = false;
         _searchAutoScrolled = false;
+        _logicalSelectAll = false;
         if (!IsReadyToRender())
         {
             _renderPending = true;
