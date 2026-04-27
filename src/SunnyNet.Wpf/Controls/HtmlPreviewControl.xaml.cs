@@ -5,14 +5,19 @@ namespace SunnyNet.Wpf.Controls;
 
 public partial class HtmlPreviewControl : UserControl
 {
+    private const int MaxBrowserPreviewCharacters = 512 * 1024;
+
     public static readonly DependencyProperty HtmlTextProperty =
         DependencyProperty.Register(nameof(HtmlText), typeof(string), typeof(HtmlPreviewControl), new PropertyMetadata("", OnHtmlChanged));
 
     public HtmlPreviewControl()
     {
         InitializeComponent();
+        IsVisibleChanged += HtmlPreviewControl_IsVisibleChanged;
         Loaded += (_, _) => NavigateHtml();
     }
+
+    private bool _navigationPending;
 
     public string HtmlText
     {
@@ -24,12 +29,27 @@ public partial class HtmlPreviewControl : UserControl
     {
         if (dependencyObject is HtmlPreviewControl control)
         {
+            control._navigationPending = true;
             control.NavigateHtml();
+        }
+    }
+
+    private void HtmlPreviewControl_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs args)
+    {
+        if (IsVisible && _navigationPending)
+        {
+            NavigateHtml();
         }
     }
 
     private void PreviewButton_Click(object sender, RoutedEventArgs routedEventArgs)
     {
+        if (IsLargeHtml())
+        {
+            ApplyMode(false);
+            return;
+        }
+
         ApplyMode(true);
     }
 
@@ -69,18 +89,34 @@ public partial class HtmlPreviewControl : UserControl
 
     private void NavigateHtml()
     {
-        if (!IsLoaded)
+        if (!IsLoaded || !IsVisible)
         {
+            _navigationPending = true;
             return;
         }
 
+        _navigationPending = false;
+        bool largeHtml = IsLargeHtml();
+        PreviewButton.IsEnabled = !largeHtml;
         SummaryTextBlock.Text = string.IsNullOrWhiteSpace(HtmlText)
             ? "无 HTML 内容"
+            : largeHtml
+                ? $"HTML 文档 · {HtmlText.Length:N0} 字符 · 源码渐进加载"
             : $"HTML 文档 · {HtmlText.Length:N0} 字符";
+        if (largeHtml)
+        {
+            ApplyMode(false);
+            return;
+        }
 
         string html = string.IsNullOrWhiteSpace(HtmlText)
             ? "<html><body style=\"font-family:Segoe UI,Microsoft YaHei UI;color:#6B7C93;padding:24px\">暂无 HTML 内容</body></html>"
             : HtmlText;
         HtmlBrowser.NavigateToString(html);
+    }
+
+    private bool IsLargeHtml()
+    {
+        return (HtmlText?.Length ?? 0) > MaxBrowserPreviewCharacters;
     }
 }

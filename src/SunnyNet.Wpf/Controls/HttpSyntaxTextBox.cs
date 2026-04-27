@@ -3,12 +3,16 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace SunnyNet.Wpf.Controls;
 
 public sealed class HttpSyntaxTextBox : RichTextBox
 {
-    private const int MaxImmediateRenderCharacters = 48 * 1024;
+    private const int ProgressiveThresholdCharacters = 128 * 1024;
+    private const int InitialRenderCharacters = 64 * 1024;
+    private const int ProgressiveChunkCharacters = 64 * 1024;
+    private const int MaxChunkLineLookAhead = 8 * 1024;
     private const int MaxSearchTextLength = 256;
 
     public static readonly DependencyProperty SourceTextProperty =
@@ -45,6 +49,17 @@ public sealed class HttpSyntaxTextBox : RichTextBox
 
     private readonly List<Run> _searchMatchRuns = new();
     private int _activeSearchMatchIndex;
+    private int _renderVersion;
+    private bool _renderPending;
+    private bool _isProgressiveRendering;
+    private bool _progressiveInHeaders;
+    private bool _progressiveLooksJson;
+    private bool _searchAutoScrolled;
+    private string _progressiveText = "";
+    private int _progressiveIndex;
+    private Paragraph? _paragraph;
+    private Span? _progressStatusSpan;
+    private ScrollViewer? _scrollViewer;
 
     public HttpSyntaxTextBox()
     {
@@ -58,8 +73,10 @@ public sealed class HttpSyntaxTextBox : RichTextBox
         Padding = new Thickness(0);
         VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
         HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
+        Loaded += HttpSyntaxTextBox_Loaded;
+        Unloaded += HttpSyntaxTextBox_Unloaded;
+        IsVisibleChanged += HttpSyntaxTextBox_IsVisibleChanged;
         PreviewKeyDown += HttpSyntaxTextBox_PreviewKeyDown;
-        RenderDocument();
     }
 
     public string SourceText
@@ -91,7 +108,7 @@ public sealed class HttpSyntaxTextBox : RichTextBox
         if (dependencyObject is HttpSyntaxTextBox viewer)
         {
             viewer._activeSearchMatchIndex = 0;
-            viewer.RenderDocument();
+            viewer.QueueRender();
         }
     }
 
@@ -100,7 +117,35 @@ public sealed class HttpSyntaxTextBox : RichTextBox
         if (dependencyObject is HttpSyntaxTextBox viewer)
         {
             viewer._activeSearchMatchIndex = 0;
-            viewer.RenderDocument();
+            viewer.QueueRender();
+        }
+    }
+
+    private void HttpSyntaxTextBox_Loaded(object sender, RoutedEventArgs routedEventArgs)
+    {
+        AttachScrollViewer();
+        if (_renderPending)
+        {
+            QueueRender();
+        }
+    }
+
+    private void HttpSyntaxTextBox_Unloaded(object sender, RoutedEventArgs routedEventArgs)
+    {
+        _renderVersion++;
+        _isProgressiveRendering = false;
+        if (_scrollViewer is not null)
+        {
+            _scrollViewer.ScrollChanged -= ScrollViewer_ScrollChanged;
+            _scrollViewer = null;
+        }
+    }
+
+    private void HttpSyntaxTextBox_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs args)
+    {
+        if (IsReadyToRender() && _renderPending)
+        {
+            QueueRender();
         }
     }
 
@@ -139,9 +184,34 @@ public sealed class HttpSyntaxTextBox : RichTextBox
         keyEventArgs.Handled = MoveToNextMatch();
     }
 
-    private void RenderDocument()
+    private void QueueRender()
+    {
+        _renderVersion++;
+        _isProgressiveRendering = false;
+        _searchAutoScrolled = false;
+        if (!IsReadyToRender())
+        {
+            _renderPending = true;
+            return;
+        }
+
+        _renderPending = false;
+        RenderDocument(_renderVersion);
+    }
+
+    private bool IsReadyToRender()
+    {
+        return IsLoaded && IsVisible;
+    }
+
+    private void RenderDocument(int version)
     {
         _searchMatchRuns.Clear();
+        _paragraph = new Paragraph
+        {
+            Margin = new Thickness(0)
+        };
+
         FlowDocument document = new()
         {
             PagePadding = new Thickness(14, 12, 14, 12),
@@ -149,58 +219,161 @@ public sealed class HttpSyntaxTextBox : RichTextBox
             FontSize = FontSize,
             LineHeight = 18
         };
+        document.Blocks.Add(_paragraph);
+        Document = document;
 
-        Paragraph paragraph = new()
+        _progressiveText = NormalizeText(SourceText ?? "");
+        _progressiveIndex = 0;
+        _progressiveInHeaders = HighlightMode.Contains("Raw", StringComparison.OrdinalIgnoreCase);
+        _progressiveLooksJson = LooksJson(_progressiveText) || HighlightMode.Contains("Json", StringComparison.OrdinalIgnoreCase);
+
+        if (_progressiveText.Length == 0)
         {
-            Margin = new Thickness(0)
-        };
+            return;
+        }
 
-        string sourceText = SourceText ?? "";
-        string text = BuildDisplayText(sourceText)
-            .Replace("\r\n", "\n")
-            .Replace('\r', '\n');
-        string[] lines = text.Split('\n');
-        bool inHeaders = HighlightMode.Contains("Raw", StringComparison.OrdinalIgnoreCase);
-        bool looksJson = LooksJson(text) || HighlightMode.Contains("Json", StringComparison.OrdinalIgnoreCase);
+        bool progressive = _progressiveText.Length > ProgressiveThresholdCharacters;
+        int initialLength = progressive ? InitialRenderCharacters : _progressiveText.Length;
+        int firstEnd = FindChunkEnd(_progressiveText, 0, initialLength);
+        AppendTextRange(_paragraph, _progressiveText, 0, firstEnd, ref _progressiveInHeaders, _progressiveLooksJson);
+        _progressiveIndex = firstEnd;
 
-        for (int index = 0; index < lines.Length; index++)
+        if (!progressive || _progressiveIndex >= _progressiveText.Length)
         {
-            string line = lines[index];
-            if (index == 0 && HighlightMode.Contains("Request", StringComparison.OrdinalIgnoreCase))
+            ApplySearchMatchVisuals(scrollToActiveMatch: HasSearchText());
+            return;
+        }
+
+        _isProgressiveRendering = true;
+        AddProgressStatus();
+        ApplySearchMatchVisuals(scrollToActiveMatch: HasSearchText());
+        ScheduleProgressiveAppend(version);
+    }
+
+    private void ScheduleProgressiveAppend(int version)
+    {
+        Dispatcher.BeginInvoke(new Action(() => AppendProgressiveChunk(version)), DispatcherPriority.Background);
+    }
+
+    private void AppendProgressiveChunk(int version)
+    {
+        if (version != _renderVersion)
+        {
+            return;
+        }
+
+        if (!IsReadyToRender())
+        {
+            _renderPending = true;
+            _isProgressiveRendering = false;
+            return;
+        }
+
+        if (_paragraph is null || _progressiveIndex >= _progressiveText.Length)
+        {
+            _isProgressiveRendering = false;
+            RemoveProgressStatus();
+            return;
+        }
+
+        RemoveProgressStatus();
+        int chunkEnd = FindChunkEnd(_progressiveText, _progressiveIndex, ProgressiveChunkCharacters);
+        AppendTextRange(_paragraph, _progressiveText, _progressiveIndex, chunkEnd, ref _progressiveInHeaders, _progressiveLooksJson);
+        _progressiveIndex = chunkEnd;
+
+        if (_progressiveIndex < _progressiveText.Length)
+        {
+            AddProgressStatus();
+            ApplySearchMatchVisuals(scrollToActiveMatch: HasSearchText() && !_searchAutoScrolled);
+            ScheduleProgressiveAppend(version);
+            return;
+        }
+
+        _isProgressiveRendering = false;
+        ApplySearchMatchVisuals(scrollToActiveMatch: HasSearchText() && !_searchAutoScrolled);
+    }
+
+    private void AddProgressStatus()
+    {
+        if (_paragraph is null || !_isProgressiveRendering)
+        {
+            return;
+        }
+
+        _progressStatusSpan = new Span();
+        _progressStatusSpan.Inlines.Add(new LineBreak());
+        _progressStatusSpan.Inlines.Add(new LineBreak());
+        _progressStatusSpan.Inlines.Add(CreateRun(
+            $"…… 正在后台加载完整内容：{_progressiveIndex:N0}/{_progressiveText.Length:N0} 字符",
+            MutedBrush));
+        _paragraph.Inlines.Add(_progressStatusSpan);
+    }
+
+    private void RemoveProgressStatus()
+    {
+        if (_paragraph is not null && _progressStatusSpan is not null)
+        {
+            _paragraph.Inlines.Remove(_progressStatusSpan);
+        }
+
+        _progressStatusSpan = null;
+    }
+
+    private void AppendTextRange(Paragraph paragraph, string text, int start, int end, ref bool inHeaders, bool looksJson)
+    {
+        int cursor = start;
+        bool firstLine = start == 0;
+        while (cursor < end)
+        {
+            int lineEnd = text.IndexOf('\n', cursor);
+            if (lineEnd < 0 || lineEnd >= end)
             {
-                AppendRequestLine(paragraph, line);
+                lineEnd = end;
             }
-            else if (index == 0 && HighlightMode.Contains("Response", StringComparison.OrdinalIgnoreCase))
+
+            string line = text[cursor..lineEnd];
+            AppendStyledLine(paragraph, line, firstLine, ref inHeaders, looksJson);
+            firstLine = false;
+
+            if (lineEnd < end)
             {
-                AppendResponseLine(paragraph, line);
-            }
-            else if (inHeaders && string.IsNullOrWhiteSpace(line))
-            {
-                AppendRun(paragraph, "", TextBrush);
-                inHeaders = false;
-            }
-            else if (inHeaders && IsHeaderLine(line))
-            {
-                AppendHeaderLine(paragraph, line);
-            }
-            else if (looksJson)
-            {
-                AppendJsonLine(paragraph, line);
+                paragraph.Inlines.Add(new LineBreak());
+                cursor = lineEnd + 1;
             }
             else
             {
-                AppendRun(paragraph, line, TextBrush);
-            }
-
-            if (index < lines.Length - 1)
-            {
-                paragraph.Inlines.Add(new LineBreak());
+                cursor = end;
             }
         }
+    }
 
-        document.Blocks.Add(paragraph);
-        Document = document;
-        ApplySearchMatchVisuals(scrollToActiveMatch: HasSearchText());
+    private void AppendStyledLine(Paragraph paragraph, string line, bool firstLine, ref bool inHeaders, bool looksJson)
+    {
+        if (firstLine && HighlightMode.Contains("Request", StringComparison.OrdinalIgnoreCase))
+        {
+            AppendRequestLine(paragraph, line);
+        }
+        else if (firstLine && HighlightMode.Contains("Response", StringComparison.OrdinalIgnoreCase))
+        {
+            AppendResponseLine(paragraph, line);
+        }
+        else if (inHeaders && string.IsNullOrWhiteSpace(line))
+        {
+            AppendRun(paragraph, "", TextBrush);
+            inHeaders = false;
+        }
+        else if (inHeaders && IsHeaderLine(line))
+        {
+            AppendHeaderLine(paragraph, line);
+        }
+        else if (looksJson)
+        {
+            AppendJsonLine(paragraph, line);
+        }
+        else
+        {
+            AppendRun(paragraph, line, TextBrush);
+        }
     }
 
     private void AppendRequestLine(Paragraph paragraph, string line)
@@ -377,7 +550,8 @@ public sealed class HttpSyntaxTextBox : RichTextBox
         }
 
         Run activeRun = _searchMatchRuns[_activeSearchMatchIndex];
-        Dispatcher.BeginInvoke(new Action(() => activeRun.BringIntoView()), System.Windows.Threading.DispatcherPriority.Background);
+        _searchAutoScrolled = true;
+        Dispatcher.BeginInvoke(new Action(() => activeRun.BringIntoView()), DispatcherPriority.Background);
     }
 
     private bool HasSearchText()
@@ -385,40 +559,62 @@ public sealed class HttpSyntaxTextBox : RichTextBox
         return !string.IsNullOrEmpty(GetEffectiveSearchText());
     }
 
-    private string BuildDisplayText(string sourceText)
-    {
-        if (sourceText.Length <= MaxImmediateRenderCharacters)
-        {
-            return sourceText;
-        }
-
-        string searchText = GetEffectiveSearchText();
-        if (!string.IsNullOrEmpty(searchText))
-        {
-            StringComparison comparison = SearchIgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-            int matchIndex = sourceText.IndexOf(searchText, comparison);
-            if (matchIndex >= 0)
-            {
-                int start = Math.Max(0, matchIndex - MaxImmediateRenderCharacters / 2);
-                int length = Math.Min(MaxImmediateRenderCharacters, sourceText.Length - start);
-                string prefix = start > 0
-                    ? $"…… 已跳过前 {start:N0} 字符，以下为搜索命中附近预览。\r\n\r\n"
-                    : "";
-                string suffix = start + length < sourceText.Length
-                    ? $"\r\n\r\n…… 后续还有 {sourceText.Length - start - length:N0} 字符，完整内容请切换 HEX 视图或使用复制功能。"
-                    : "";
-
-                return prefix + sourceText.Substring(start, length) + suffix;
-            }
-        }
-
-        return sourceText[..MaxImmediateRenderCharacters] + $"\r\n\r\n…… 已预览前 {MaxImmediateRenderCharacters:N0} 字符，完整内容请切换 HEX 视图或使用复制功能。";
-    }
-
     private string GetEffectiveSearchText()
     {
         string text = SearchText ?? "";
         return text.Length > MaxSearchTextLength ? text[..MaxSearchTextLength] : text;
+    }
+
+    private static string NormalizeText(string text)
+    {
+        return text.Replace("\r\n", "\n").Replace('\r', '\n');
+    }
+
+    private static int FindChunkEnd(string text, int start, int preferredLength)
+    {
+        int preferredEnd = Math.Min(text.Length, start + preferredLength);
+        if (preferredEnd >= text.Length)
+        {
+            return text.Length;
+        }
+
+        int nextLineBreak = text.IndexOf('\n', preferredEnd);
+        if (nextLineBreak >= 0 && nextLineBreak - preferredEnd <= MaxChunkLineLookAhead)
+        {
+            return nextLineBreak + 1;
+        }
+
+        int searchLength = Math.Max(0, preferredEnd - start);
+        int previousLineBreak = searchLength > 0 ? text.LastIndexOf('\n', preferredEnd - 1, searchLength) : -1;
+        return previousLineBreak > start ? previousLineBreak + 1 : preferredEnd;
+    }
+
+    private void AttachScrollViewer()
+    {
+        if (_scrollViewer is not null)
+        {
+            return;
+        }
+
+        _scrollViewer = FindVisualChild<ScrollViewer>(this);
+        if (_scrollViewer is not null)
+        {
+            _scrollViewer.ScrollChanged += ScrollViewer_ScrollChanged;
+        }
+    }
+
+    private void ScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs scrollChangedEventArgs)
+    {
+        if (!_isProgressiveRendering || scrollChangedEventArgs.VerticalChange == 0)
+        {
+            return;
+        }
+
+        if (scrollChangedEventArgs.VerticalChange > 0 &&
+            scrollChangedEventArgs.VerticalOffset >= scrollChangedEventArgs.ExtentHeight - scrollChangedEventArgs.ViewportHeight - 2)
+        {
+            ScheduleProgressiveAppend(_renderVersion);
+        }
     }
 
     private static bool StartsWithKeyword(string line, int index, string keyword, out int end)
@@ -515,5 +711,24 @@ public sealed class HttpSyntaxTextBox : RichTextBox
         SolidColorBrush brush = new(Color.FromRgb(red, green, blue));
         brush.Freeze();
         return brush;
+    }
+
+    private static T? FindVisualChild<T>(DependencyObject element) where T : DependencyObject
+    {
+        for (int index = 0; index < VisualTreeHelper.GetChildrenCount(element); index++)
+        {
+            DependencyObject child = VisualTreeHelper.GetChild(element, index);
+            if (child is T target)
+            {
+                return target;
+            }
+
+            if (FindVisualChild<T>(child) is { } descendant)
+            {
+                return descendant;
+            }
+        }
+
+        return null;
     }
 }

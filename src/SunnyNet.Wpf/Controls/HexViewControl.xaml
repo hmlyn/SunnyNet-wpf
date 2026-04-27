@@ -1,6 +1,7 @@
 <UserControl x:Class="SunnyNet.Wpf.Controls.HexViewControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:SunnyNet.Wpf.Controls"
              SizeChanged="HexViewControl_SizeChanged"
              PreviewKeyDown="HexViewControl_PreviewKeyDown"
              Focusable="True">
@@ -62,43 +63,11 @@
                 <ScrollViewer x:Name="BodyScrollViewer"
                               HorizontalScrollBarVisibility="Auto"
                               VerticalScrollBarVisibility="Auto"
+                              ScrollChanged="BodyScrollViewer_ScrollChanged"
                               Focusable="False">
-                    <Grid x:Name="HexLayoutGrid"
-                          Background="{StaticResource SurfaceBrush}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition x:Name="OffsetColumn" Width="92" />
-                            <ColumnDefinition Width="1" />
-                            <ColumnDefinition x:Name="HexColumn" Width="420" />
-                            <ColumnDefinition Width="1" />
-                            <ColumnDefinition x:Name="AsciiColumn" Width="220" />
-                        </Grid.ColumnDefinitions>
-
-                        <Border Grid.Column="0" Background="#F6F8FC">
-                            <StackPanel x:Name="OffsetRowsPanel" Margin="0,10,0,10" />
-                        </Border>
-
-                        <Border Grid.Column="1" Background="{StaticResource DividerBrush}" />
-
-                        <Border Grid.Column="2"
-                                Background="{StaticResource SurfaceBrush}"
-                                MouseLeftButtonDown="HexRegion_MouseLeftButtonDown"
-                                MouseMove="HexRegion_MouseMove"
-                                MouseLeftButtonUp="HexRegion_MouseLeftButtonUp"
-                                LostMouseCapture="HexRegion_LostMouseCapture">
-                            <StackPanel x:Name="HexRowsPanel" Margin="0,10,0,10" />
-                        </Border>
-
-                        <Border Grid.Column="3" Background="{StaticResource DividerBrush}" />
-
-                        <Border Grid.Column="4"
-                                Background="{StaticResource SurfaceBrush}"
-                                MouseLeftButtonDown="AsciiRegion_MouseLeftButtonDown"
-                                MouseMove="AsciiRegion_MouseMove"
-                                MouseLeftButtonUp="AsciiRegion_MouseLeftButtonUp"
-                                LostMouseCapture="AsciiRegion_LostMouseCapture">
-                            <StackPanel x:Name="AsciiRowsPanel" Margin="0,10,0,10" />
-                        </Border>
-                    </Grid>
+                    <controls:HexRenderSurface x:Name="RenderSurface"
+                                               Background="{StaticResource SurfaceBrush}"
+                                               Focusable="False" />
                 </ScrollViewer>
 
                 <Border x:Name="EmptyPanel"

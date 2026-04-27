@@ -60,6 +60,10 @@
                       CanUserDeleteRows="False"
                       CanUserResizeRows="False"
                       CanUserResizeColumns="False"
+                      EnableRowVirtualization="True"
+                      EnableColumnVirtualization="True"
+                      VirtualizingPanel.IsVirtualizing="True"
+                      VirtualizingPanel.VirtualizationMode="Recycling"
                       CellStyle="{StaticResource NameValueCellStyle}"
                       ColumnHeaderStyle="{StaticResource NameValueColumnHeaderStyle}"
                       RowStyle="{StaticResource NameValueRowStyle}"
@@ -67,6 +71,7 @@
                       SelectionUnit="FullRow"
                       ScrollViewer.HorizontalScrollBarVisibility="Auto"
                       ScrollViewer.VerticalScrollBarVisibility="Auto"
+                      ScrollViewer.CanContentScroll="True"
                       PreviewMouseRightButtonDown="RowsGrid_PreviewMouseRightButtonDown"
                       MouseDoubleClick="RowsGrid_MouseDoubleClick">
                 <DataGrid.ContextMenu>

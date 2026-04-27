@@ -8,6 +8,11 @@ namespace SunnyNet.Wpf.Controls;
 
 public partial class JsonTreeViewControl : UserControl
 {
+    private const int AutoExpandChildLimit = 200;
+    private const int ChildBatchSize = 400;
+    private const int MaxExpandAllNodes = 2000;
+    private const int MaxPreviewValueLength = 220;
+
     public static readonly DependencyProperty JsonTextProperty =
         DependencyProperty.Register(nameof(JsonText), typeof(string), typeof(JsonTreeViewControl), new PropertyMetadata("", OnJsonChanged));
 
@@ -18,14 +23,47 @@ public partial class JsonTreeViewControl : UserControl
     private static readonly Brush NullBrush = CreateBrush(0x8C, 0x8C, 0x8C);
     private static readonly Brush SeparatorBrush = CreateBrush(0xC1, 0xCB, 0xD8);
     private static readonly Brush MutedBrush = CreateBrush(0x6B, 0x7C, 0x93);
+    private static readonly object LazyPlaceholder = new();
+    private JsonDocument? _document;
     private bool _isJson;
+    private bool _renderPending;
 
-    private sealed record JsonNodeInfo(string Key, string Value, string Path);
+    private sealed class JsonNodeInfo
+    {
+        public JsonNodeInfo(string key, JsonElement element, string path)
+        {
+            Key = key;
+            Element = element;
+            Path = path;
+        }
+
+        public string Key { get; }
+
+        public JsonElement Element { get; }
+
+        public string Path { get; }
+
+        public bool ChildrenInitialized { get; set; }
+
+        public bool AllChildrenLoaded { get; set; }
+
+        public int LoadedChildrenCount { get; set; }
+
+        public string Value => CopyValue(Element);
+
+        public bool CanHaveChildren => Element.ValueKind is JsonValueKind.Object or JsonValueKind.Array;
+    }
+
+    private sealed class JsonLoadMoreInfo
+    {
+    }
 
     public JsonTreeViewControl()
     {
         InitializeComponent();
-        RenderJson();
+        Loaded += JsonTreeViewControl_Loaded;
+        Unloaded += (_, _) => DisposeDocument();
+        IsVisibleChanged += JsonTreeViewControl_IsVisibleChanged;
     }
 
     public string JsonText
@@ -38,13 +76,44 @@ public partial class JsonTreeViewControl : UserControl
     {
         if (dependencyObject is JsonTreeViewControl control)
         {
-            control.RenderJson();
+            control.QueueRenderJson();
         }
+    }
+
+    private void JsonTreeViewControl_Loaded(object sender, RoutedEventArgs routedEventArgs)
+    {
+        QueueRenderJson();
+    }
+
+    private void JsonTreeViewControl_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs args)
+    {
+        if (IsReadyToRender() && _renderPending)
+        {
+            RenderJson();
+        }
+    }
+
+    private void QueueRenderJson()
+    {
+        if (!IsReadyToRender())
+        {
+            _renderPending = true;
+            return;
+        }
+
+        RenderJson();
+    }
+
+    private bool IsReadyToRender()
+    {
+        return IsLoaded && IsVisible;
     }
 
     private void RenderJson()
     {
+        _renderPending = false;
         JsonTree.Items.Clear();
+        DisposeDocument();
         if (string.IsNullOrWhiteSpace(JsonText))
         {
             _isJson = false;
@@ -55,14 +124,22 @@ public partial class JsonTreeViewControl : UserControl
 
         try
         {
-            using JsonDocument document = JsonDocument.Parse(JsonText);
-            JsonTree.Items.Add(CreateNode("root", document.RootElement, "$"));
+            _document = JsonDocument.Parse(JsonText);
+            TreeViewItem root = CreateNode("root", _document.RootElement, "$");
+            JsonTree.Items.Add(root);
             _isJson = true;
-            UpdateToolbarState(document.RootElement.ValueKind switch
+            int rootChildCount = GetDirectChildCount(_document.RootElement);
+            if (rootChildCount <= AutoExpandChildLimit)
             {
-                JsonValueKind.Object => $"对象 · {document.RootElement.EnumerateObject().Count()} 项",
-                JsonValueKind.Array => $"数组 · {document.RootElement.GetArrayLength()} 项",
-                _ => "JSON 值"
+                LoadChildren(root);
+                root.IsExpanded = true;
+            }
+
+            UpdateToolbarState(_document.RootElement.ValueKind switch
+            {
+                JsonValueKind.Object => $"对象 · {rootChildCount:N0} 项 · 懒加载",
+                JsonValueKind.Array => $"数组 · {rootChildCount:N0} 项 · 懒加载",
+                _ => "JSON 值 · 懒加载"
             });
             JsonTree.Visibility = Visibility.Visible;
             FallbackViewer.Visibility = Visibility.Collapsed;
@@ -93,9 +170,15 @@ public partial class JsonTreeViewControl : UserControl
 
     private void ExpandAll_Click(object sender, RoutedEventArgs routedEventArgs)
     {
+        int loadedCount = 0;
         foreach (TreeViewItem item in JsonTree.Items.OfType<TreeViewItem>())
         {
-            SetExpanded(item, true);
+            SetExpanded(item, true, ref loadedCount);
+            if (loadedCount >= MaxExpandAllNodes)
+            {
+                UpdateToolbarState($"已展开前 {MaxExpandAllNodes:N0} 个节点，数据较大请按需展开");
+                break;
+            }
         }
     }
 
@@ -147,6 +230,20 @@ public partial class JsonTreeViewControl : UserControl
         item.Focus();
     }
 
+    private void JsonTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> routedEventArgs)
+    {
+        if (routedEventArgs.NewValue is not TreeViewItem { Tag: JsonLoadMoreInfo } loadMoreItem)
+        {
+            return;
+        }
+
+        if (ItemsControl.ItemsControlFromItemContainer(loadMoreItem) is TreeViewItem parent)
+        {
+            LoadChildren(parent);
+            parent.IsExpanded = true;
+        }
+    }
+
     private void ApplyMode(bool treeMode, bool force = false)
     {
         bool useTree = _isJson && treeMode;
@@ -170,7 +267,17 @@ public partial class JsonTreeViewControl : UserControl
         TreeButton.IsEnabled = _isJson;
     }
 
-    private static void SetExpanded(TreeViewItem item, bool isExpanded)
+    private static void JsonNode_Expanded(object sender, RoutedEventArgs routedEventArgs)
+    {
+        if (!ReferenceEquals(sender, routedEventArgs.OriginalSource) || sender is not TreeViewItem item)
+        {
+            return;
+        }
+
+        LoadChildren(item);
+    }
+
+    private void SetExpanded(TreeViewItem item, bool isExpanded)
     {
         item.IsExpanded = isExpanded;
         foreach (TreeViewItem child in item.Items.OfType<TreeViewItem>())
@@ -179,35 +286,136 @@ public partial class JsonTreeViewControl : UserControl
         }
     }
 
+    private void SetExpanded(TreeViewItem item, bool isExpanded, ref int loadedCount)
+    {
+        if (loadedCount >= MaxExpandAllNodes)
+        {
+            return;
+        }
+
+        if (isExpanded)
+        {
+            LoadChildren(item);
+            loadedCount++;
+        }
+
+        item.IsExpanded = isExpanded;
+        foreach (TreeViewItem child in item.Items.OfType<TreeViewItem>())
+        {
+            SetExpanded(child, isExpanded, ref loadedCount);
+        }
+    }
+
     private static TreeViewItem CreateNode(string name, JsonElement element, string path)
     {
+        JsonNodeInfo info = new(name, element, path);
         TreeViewItem item = new()
         {
             Header = CreateHeader(name, element),
-            Tag = new JsonNodeInfo(name, CopyValue(element), path)
+            Tag = info
         };
+        item.Expanded += JsonNode_Expanded;
 
-        switch (element.ValueKind)
+        if (info.CanHaveChildren && GetDirectChildCount(element) > 0)
         {
-            case JsonValueKind.Object:
-                foreach (JsonProperty property in element.EnumerateObject())
-                {
-                    item.Items.Add(CreateNode(property.Name, property.Value, AppendObjectPath(path, property.Name)));
-                }
-                item.IsExpanded = true;
-                break;
-            case JsonValueKind.Array:
-                int index = 0;
-                foreach (JsonElement child in element.EnumerateArray())
-                {
-                    item.Items.Add(CreateNode($"[{index}]", child, $"{path}[{index}]"));
-                    index++;
-                }
-                item.IsExpanded = true;
-                break;
+            item.Items.Add(LazyPlaceholder);
         }
 
         return item;
+    }
+
+    private static void LoadChildren(TreeViewItem item)
+    {
+        if (item.Tag is not JsonNodeInfo info || !info.CanHaveChildren || info.AllChildrenLoaded)
+        {
+            return;
+        }
+
+        if (!info.ChildrenInitialized)
+        {
+            item.Items.Clear();
+            info.ChildrenInitialized = true;
+            info.LoadedChildrenCount = 0;
+        }
+        else
+        {
+            RemoveLoadMoreItem(item);
+        }
+
+        int start = info.LoadedChildrenCount;
+        int end = Math.Min(start + ChildBatchSize, GetDirectChildCount(info.Element));
+        switch (info.Element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                int propertyIndex = 0;
+                foreach (JsonProperty property in info.Element.EnumerateObject())
+                {
+                    if (propertyIndex >= start && propertyIndex < end)
+                    {
+                        item.Items.Add(CreateNode(property.Name, property.Value, AppendObjectPath(info.Path, property.Name)));
+                    }
+
+                    propertyIndex++;
+                    if (propertyIndex >= end)
+                    {
+                        break;
+                    }
+                }
+                break;
+            case JsonValueKind.Array:
+                int index = 0;
+                foreach (JsonElement child in info.Element.EnumerateArray())
+                {
+                    if (index >= start && index < end)
+                    {
+                        item.Items.Add(CreateNode($"[{index}]", child, $"{info.Path}[{index}]"));
+                    }
+
+                    index++;
+                    if (index >= end)
+                    {
+                        break;
+                    }
+                }
+                break;
+        }
+
+        info.LoadedChildrenCount = end;
+        info.AllChildrenLoaded = end >= GetDirectChildCount(info.Element);
+        if (!info.AllChildrenLoaded)
+        {
+            item.Items.Add(CreateLoadMoreItem(info));
+        }
+    }
+
+    private static void RemoveLoadMoreItem(TreeViewItem item)
+    {
+        for (int index = item.Items.Count - 1; index >= 0; index--)
+        {
+            if (item.Items[index] is TreeViewItem { Tag: JsonLoadMoreInfo })
+            {
+                item.Items.RemoveAt(index);
+            }
+        }
+    }
+
+    private static TreeViewItem CreateLoadMoreItem(JsonNodeInfo parent)
+    {
+        int total = GetDirectChildCount(parent.Element);
+        TextBlock textBlock = new()
+        {
+            Text = $"加载更多... {parent.LoadedChildrenCount:N0}/{total:N0}",
+            Foreground = MutedBrush,
+            FontFamily = new FontFamily("Microsoft YaHei UI"),
+            FontSize = 12,
+            Margin = new Thickness(4, 2, 0, 2)
+        };
+
+        return new TreeViewItem
+        {
+            Header = textBlock,
+            Tag = new JsonLoadMoreInfo()
+        };
     }
 
     private static StackPanel CreateHeader(string name, JsonElement element)
@@ -254,9 +462,9 @@ public partial class JsonTreeViewControl : UserControl
     {
         return element.ValueKind switch
         {
-            JsonValueKind.Object => $"{{ {element.EnumerateObject().Count()} fields }}",
-            JsonValueKind.Array => $"[ {element.GetArrayLength()} items ]",
-            JsonValueKind.String => $"\"{element.GetString()}\"",
+            JsonValueKind.Object => $"{{ {GetDirectChildCount(element):N0} fields }}",
+            JsonValueKind.Array => $"[ {GetDirectChildCount(element):N0} items ]",
+            JsonValueKind.String => $"\"{TrimPreview(element.GetString() ?? "")}\"",
             JsonValueKind.Number => element.GetRawText(),
             JsonValueKind.True => "true",
             JsonValueKind.False => "false",
@@ -308,6 +516,32 @@ public partial class JsonTreeViewControl : UserControl
             JsonValueKind.Null => "null",
             _ => element.GetRawText()
         };
+    }
+
+    private static int GetDirectChildCount(JsonElement element)
+    {
+        return element.ValueKind switch
+        {
+            JsonValueKind.Object => element.EnumerateObject().Count(),
+            JsonValueKind.Array => element.GetArrayLength(),
+            _ => 0
+        };
+    }
+
+    private static string TrimPreview(string text)
+    {
+        if (text.Length <= MaxPreviewValueLength)
+        {
+            return text;
+        }
+
+        return text[..MaxPreviewValueLength] + "…";
+    }
+
+    private void DisposeDocument()
+    {
+        _document?.Dispose();
+        _document = null;
     }
 
     private static string AppendObjectPath(string parentPath, string propertyName)

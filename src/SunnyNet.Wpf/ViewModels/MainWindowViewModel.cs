@@ -14,7 +14,6 @@ namespace SunnyNet.Wpf.ViewModels;
 
 public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 {
-    private const int LargePayloadPreviewBytes = 32 * 1024;
     private const int LargePayloadThresholdBytes = 512 * 1024;
     private static readonly string[] ResourceTypeTokens =
     {
@@ -2057,7 +2056,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         string responseOriginalBody = BytesToPreviewText(responseBytes);
         Detail.ResponseRaw = $"HTTP {GetInt(args, "StateCode")} {GetString(args, "StateText")}\r\n{Detail.ResponseHeaders}\r\n\r\n{Detail.ResponseBody}".Trim();
         Detail.ResponseOriginalRaw = $"HTTP {GetInt(args, "StateCode")} {GetString(args, "StateText")}\r\n{Detail.ResponseHeaders}\r\n\r\n{responseOriginalBody}".Trim();
-        Detail.ResponseJson = responseDisplayBytes.Length > LargePayloadThresholdBytes ? "响应内容较大，已跳过 JSON 自动格式化。" : TryFormatJson(Detail.ResponseBody);
+        Detail.ResponseJson = BuildJsonViewText(responseDisplayBytes, Detail.ResponseBody);
+        Detail.ResponseHtml = Detail.ResponseBody;
         Detail.ResponseCookies = ExtractCookies(responseHeader);
         Detail.ResponseStateText = GetString(args, "StateText");
         Detail.ResponseStateCode = GetInt(args, "StateCode");
@@ -2906,7 +2906,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         ReplaceRows(Detail.RequestCookieRows, ToRequestCookieRows(header));
         ReplaceRows(Detail.RequestBodyRows, ToBodyRows(Detail.RequestBody));
         Detail.HasRequestBodyRows = Detail.RequestBodyRows.Count > 0;
-        ReplaceRows(Detail.RequestHexRows, ToHexRows(rawBytes, headerLength));
+        ReplaceRows(Detail.RequestHexRows, rawBytes.Length > LargePayloadThresholdBytes ? Array.Empty<HexViewRow>() : ToHexRows(rawBytes, headerLength));
         Detail.RequestHexBytes = rawBytes;
         Detail.RequestHexHeaderLength = headerLength;
     }
@@ -2916,10 +2916,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         ReplaceRows(Detail.ResponseHeaderRows, ToHeaderRows(header));
         ReplaceRows(Detail.ResponseCookieRows, ToResponseCookieRows(header));
         bool largePayload = rawBytes.Length > LargePayloadThresholdBytes;
-        byte[] hexBytes = largePayload ? rawBytes.Take(LargePayloadPreviewBytes).ToArray() : rawBytes;
         ReplaceRows(Detail.ResponseHexRows, largePayload ? Array.Empty<HexViewRow>() : ToHexRows(rawBytes, headerLength));
-        Detail.ResponseHexBytes = hexBytes;
-        Detail.ResponseHexHeaderLength = Math.Min(headerLength, hexBytes.Length);
+        Detail.ResponseHexBytes = rawBytes;
+        Detail.ResponseHexHeaderLength = headerLength;
     }
 
     private void ApplySessionDetail(CaptureEntry selected, JsonElement data)
@@ -2954,7 +2953,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         Detail.RequestQuery = selected.Query;
         Detail.RequestHex = ToHex(requestBodyBytes);
         Detail.RequestCookies = ExtractCookies(requestHeader);
-        Detail.RequestJson = requestDisplayBytes.Length > LargePayloadThresholdBytes ? "请求内容较大，已跳过 JSON 自动格式化。" : TryFormatJson(Detail.RequestBody);
+        Detail.RequestJson = BuildJsonViewText(requestDisplayBytes, Detail.RequestBody);
         Detail.RequestImageBytes = requestDisplayBytes.Length > LargePayloadThresholdBytes ? Array.Empty<byte>() : TryGetImageBytes(requestContentType, requestDisplayBytes);
         Detail.RequestImageType = ExtractImageType(requestContentType);
         (byte[] requestRawBytes, int requestHeaderLength) = BuildHttpBytes($"{method} {url} {proto}", requestHeadersText, requestBodyBytes);
@@ -2981,8 +2980,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             Detail.ResponseText = Detail.ResponseBody;
             Detail.ResponseHex = responseBodyBytes.Length > LargePayloadThresholdBytes ? "" : ToHex(responseBodyBytes);
             Detail.ResponseCookies = ExtractCookies(responseHeader);
-            Detail.ResponseJson = responseDisplayBytes.Length > LargePayloadThresholdBytes ? "响应内容较大，已跳过 JSON 自动格式化。" : TryFormatJson(Detail.ResponseBody);
-            Detail.ResponseHtml = responseDisplayBytes.Length > LargePayloadThresholdBytes ? "响应内容较大，已跳过 HTML 自动预览。" : Detail.ResponseBody;
+            Detail.ResponseJson = BuildJsonViewText(responseDisplayBytes, Detail.ResponseBody);
+            Detail.ResponseHtml = Detail.ResponseBody;
             Detail.ResponseImageBytes = responseDisplayBytes.Length > LargePayloadThresholdBytes ? Array.Empty<byte>() : TryGetImageBytes(responseContentType, responseDisplayBytes);
             Detail.ResponseImageType = ExtractImageType(responseContentType);
             (byte[] responseRawBytes, int responseHeaderLength) = BuildHttpBytes($"HTTP {Detail.ResponseStateCode} {Detail.ResponseStateText}", responseHeadersText, responseBodyBytes);
@@ -3267,14 +3266,14 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
     private static string BytesToPreviewText(byte[] bytes)
     {
-        if (bytes.Length <= LargePayloadThresholdBytes)
-        {
-            return BytesToDisplayText(bytes);
-        }
+        return BytesToDisplayText(bytes);
+    }
 
-        byte[] previewBytes = bytes.Take(LargePayloadPreviewBytes).ToArray();
-        string preview = BytesToDisplayText(previewBytes);
-        return $"响应内容较大：{bytes.Length:N0} Bytes，已预览前 {previewBytes.Length:N0} Bytes。\r\n\r\n{preview}";
+    private static string BuildJsonViewText(byte[] bytes, string displayText)
+    {
+        return bytes.Length > LargePayloadThresholdBytes
+            ? displayText
+            : TryFormatJson(displayText);
     }
 
     private static bool LooksBinary(byte[] bytes)
