@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"changeme/MapHash"
 	"compress/gzip"
 	"compress/zlib"
 	"encoding/base64"
@@ -18,6 +19,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const ReplaceRulesType_Bytes = uint8(1)
@@ -111,11 +113,11 @@ func ReplaceRulesEvent(command string, args *JSON.SyJson) any {
 		return HostsRulesEvent(command, args)
 	}
 }
-func ReplaceURL(method string, u *url.URL) (*url.URL, []byte) {
+func ReplaceURL(theology int, method string, u *url.URL) (*url.URL, []byte) {
 	if u == nil {
 		return u, nil
 	}
-	if mappedURL, responseBody, ok := ApplyRequestMapping(method, u); ok {
+	if mappedURL, responseBody, ok := ApplyRequestMapping(theology, method, u); ok {
 		return mappedURL, responseBody
 	}
 
@@ -153,7 +155,7 @@ type RequestBlockResult struct {
 	Close    bool
 }
 
-func ApplyRequestBlock(method string, u *url.URL) (*RequestBlockResult, bool) {
+func ApplyRequestBlock(theology int, method string, u *url.URL) (*RequestBlockResult, bool) {
 	if u == nil {
 		return nil, false
 	}
@@ -177,6 +179,7 @@ func ApplyRequestBlock(method string, u *url.URL) (*RequestBlockResult, bool) {
 		if !mappingMethodMatches(rule.Method, method) || !mappingURLMatches(rule.UrlMatchType, rule.UrlPattern, requestURL) {
 			continue
 		}
+		recordTrafficRuleHit(theology, "请求屏蔽", rule.ConfigTrafficRuleBase, rule.Action, "请求", requestURL)
 		if strings.TrimSpace(rule.Action) == "断开连接" {
 			return &RequestBlockResult{Close: true}, true
 		}
@@ -249,7 +252,7 @@ func buildStatusText(statusCode int) string {
 	return strconv.Itoa(statusCode) + " " + statusText
 }
 
-func ApplyRequestMapping(method string, u *url.URL) (*url.URL, []byte, bool) {
+func ApplyRequestMapping(theology int, method string, u *url.URL) (*url.URL, []byte, bool) {
 	if u == nil {
 		return u, nil, false
 	}
@@ -281,12 +284,14 @@ func ApplyRequestMapping(method string, u *url.URL) (*url.URL, []byte, bool) {
 			if err != nil {
 				continue
 			}
+			recordTrafficRuleHit(theology, "请求映射", rule.ConfigTrafficRuleBase, rule.MappingType, "响应", requestURL)
 			return u, body, true
 		case "固定响应":
 			body, err := decodeMappingBody(rule.TargetContent, rule.ValueType)
 			if err != nil {
 				continue
 			}
+			recordTrafficRuleHit(theology, "请求映射", rule.ConfigTrafficRuleBase, rule.MappingType, "响应", requestURL)
 			return u, body, true
 		case "远程地址", "远程URL", "重定向":
 			target := strings.TrimSpace(rule.TargetContent)
@@ -300,6 +305,7 @@ func ApplyRequestMapping(method string, u *url.URL) (*url.URL, []byte, bool) {
 			if !parsed.IsAbs() {
 				parsed = u.ResolveReference(parsed)
 			}
+			recordTrafficRuleHit(theology, "请求映射", rule.ConfigTrafficRuleBase, rule.MappingType, "请求", requestURL)
 			return parsed, nil, true
 		}
 	}
@@ -307,7 +313,7 @@ func ApplyRequestMapping(method string, u *url.URL) (*url.URL, []byte, bool) {
 	return u, nil, false
 }
 
-func ApplyRequestRewrite(method string, u *url.URL, header http.Header, body []byte) (string, *url.URL, []byte) {
+func ApplyRequestRewrite(theology int, method string, u *url.URL, header http.Header, body []byte) (string, *url.URL, []byte) {
 	if u == nil {
 		return method, u, body
 	}
@@ -325,13 +331,14 @@ func ApplyRequestRewrite(method string, u *url.URL, header http.Header, body []b
 			continue
 		}
 
+		recordTrafficRuleHit(theology, "请求重写", rule.ConfigTrafficRuleBase, buildRewriteAction(rule), "请求", currentURL.String())
 		currentMethod, currentURL, currentBody = applyRequestRewriteRule(rule, currentMethod, currentURL, header, currentBody)
 	}
 
 	return currentMethod, currentURL, currentBody
 }
 
-func ApplyResponseRewrite(method string, u *url.URL, response *http.Response, body []byte) []byte {
+func ApplyResponseRewrite(theology int, method string, u *url.URL, response *http.Response, body []byte) []byte {
 	if u == nil || response == nil {
 		return body
 	}
@@ -347,6 +354,7 @@ func ApplyResponseRewrite(method string, u *url.URL, response *http.Response, bo
 			continue
 		}
 
+		recordTrafficRuleHit(theology, "请求重写", rule.ConfigTrafficRuleBase, buildRewriteAction(rule), "响应", u.String())
 		currentBody = applyResponseRewriteRule(rule, response, currentBody)
 	}
 
@@ -385,6 +393,7 @@ func ApplyHTTPDecodeRules(theology int, request bool, method string, u *url.URL,
 		if !ok || len(decoded) == 0 {
 			continue
 		}
+		recordTrafficRuleHit(theology, "请求解密", rule.ConfigTrafficRuleBase, rule.DecoderType, directionText(request), u.String())
 		currentBody = decoded
 		applied = true
 	}
@@ -706,6 +715,52 @@ func applyHeaderRewrite(header http.Header, operation string, key string, value 
 		return
 	}
 	header.Set(key, value)
+}
+
+func buildRewriteAction(rule ConfigRequestRewriteRule) string {
+	target := strings.TrimSpace(rule.Target)
+	operation := strings.TrimSpace(rule.Operation)
+	if target == "" {
+		target = "内容"
+	}
+	if operation == "" {
+		operation = "设置"
+	}
+	if strings.TrimSpace(rule.Key) == "" {
+		return operation + target
+	}
+	return operation + target + ":" + strings.TrimSpace(rule.Key)
+}
+
+func directionText(request bool) string {
+	if request {
+		return "请求"
+	}
+	return "响应"
+}
+
+func recordTrafficRuleHit(theology int, ruleType string, rule ConfigTrafficRuleBase, action string, direction string, rawURL string) {
+	if theology < 1 {
+		return
+	}
+	hit := MapHash.TrafficRuleHit{
+		Time:      time.Now().Format("15:04:05.000"),
+		Theology:  theology,
+		RuleType:  ruleType,
+		RuleHash:  rule.Hash,
+		RuleName:  rule.Name,
+		Action:    strings.TrimSpace(action),
+		Direction: strings.TrimSpace(direction),
+		URL:       rawURL,
+	}
+	if hit.RuleName == "" {
+		hit.RuleName = "未命名规则"
+	}
+	if hit.Action == "" {
+		hit.Action = "命中"
+	}
+	HashMap.RecordRuleHit(theology, hit)
+	CallJs("规则命中", hit)
 }
 
 func isDeleteOperation(operation string) bool {

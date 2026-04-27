@@ -1,5 +1,7 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Input;
+using Microsoft.Win32;
 using SunnyNet.Wpf.Models;
 using SunnyNet.Wpf.ViewModels;
 
@@ -54,6 +56,7 @@ public partial class RulesCenterWindow : Window
         AddRuleButton.IsEnabled = implemented;
         RemoveRuleButton.IsEnabled = implemented;
         EditRuleButton.IsEnabled = implemented;
+        ToggleRuleButton.IsEnabled = implemented;
 
         SelectFirstRuleIfNeeded();
     }
@@ -163,6 +166,71 @@ public partial class RulesCenterWindow : Window
         await SaveRulesAsync();
         RuleStatusTextBlock.Text = $"{GetRuleCount(_currentPage)} 条";
         SelectFirstRuleIfNeeded();
+    }
+
+    private async void ToggleSelectedRule_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        if (GetSelectedRule() is not TrafficRuleItemBase rule)
+        {
+            return;
+        }
+
+        rule.Enabled = !rule.Enabled;
+        await SaveRulesAsync();
+    }
+
+    private async void ImportRules_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        OpenFileDialog dialog = new()
+        {
+            Title = "导入规则中心配置",
+            Filter = "规则配置 (*.json)|*.json|所有文件 (*.*)|*.*"
+        };
+
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            string json = await File.ReadAllTextAsync(dialog.FileName);
+            await _viewModel.ImportRuleCenterConfigJsonAsync(json);
+            ApplyPage(_currentPage);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(this, exception.Message, "导入规则", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private async void ExportRules_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        SaveFileDialog dialog = new()
+        {
+            Title = "导出规则中心配置",
+            Filter = "规则配置 (*.json)|*.json|所有文件 (*.*)|*.*",
+            FileName = $"SunnyNet-Rules-{DateTime.Now:yyyyMMdd-HHmmss}.json"
+        };
+
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            await File.WriteAllTextAsync(dialog.FileName, _viewModel.ExportRuleCenterConfigJson());
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(this, exception.Message, "导出规则", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void ClearRuleLogs_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        _viewModel.RuleHitLogs.Clear();
     }
 
     private async Task AddBlockRuleAsync()
@@ -324,6 +392,18 @@ public partial class RulesCenterWindow : Window
                 break;
             }
         }
+    }
+
+    private TrafficRuleItemBase? GetSelectedRule()
+    {
+        return _currentPage switch
+        {
+            "请求屏蔽" => BlockRulesGrid.SelectedItem as TrafficRuleItemBase,
+            "请求重写" => RewriteRulesGrid.SelectedItem as TrafficRuleItemBase,
+            "请求映射" => MappingRulesGrid.SelectedItem as TrafficRuleItemBase,
+            "请求解密" => DecodeRulesGrid.SelectedItem as TrafficRuleItemBase,
+            _ => null
+        };
     }
 
     private bool? ShowRuleEditor(string ruleType, object rule)

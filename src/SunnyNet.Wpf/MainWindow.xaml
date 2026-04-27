@@ -917,7 +917,7 @@
                                                     <Border Width="3"
                                                             Margin="0,3,0,3"
                                                             HorizontalAlignment="Left"
-                                                            Background="{Binding TagAccentBrush}"
+                                                            Background="{Binding RowAccentBrush}"
                                                             CornerRadius="0,2,2,0" />
                                                     <StackPanel Margin="16,0,0,0"
                                                                 Orientation="Horizontal"

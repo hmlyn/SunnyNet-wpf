@@ -92,9 +92,18 @@
                         Click="EditSelectedRule_Click"
                         Content="编辑"
                         Style="{StaticResource RulesToolbarButtonStyle}" />
-                <Button x:Name="ShareRuleButton"
-                        Content="分享"
-                        IsEnabled="False"
+                <Button x:Name="ToggleRuleButton"
+                        Click="ToggleSelectedRule_Click"
+                        Content="启停"
+                        Style="{StaticResource RulesToolbarButtonStyle}" />
+                <Button Click="ImportRules_Click"
+                        Content="导入"
+                        Style="{StaticResource RulesToolbarButtonStyle}" />
+                <Button Click="ExportRules_Click"
+                        Content="导出"
+                        Style="{StaticResource RulesToolbarButtonStyle}" />
+                <Button Click="ClearRuleLogs_Click"
+                        Content="清日志"
                         Style="{StaticResource RulesToolbarButtonStyle}" />
                 <Button Click="Close_Click"
                         Content="关闭"
@@ -103,7 +112,13 @@
         </DockPanel>
 
         <Grid Grid.Row="1">
-            <DataGrid x:Name="BlockRulesGrid"
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="146" />
+            </Grid.RowDefinitions>
+
+            <Grid>
+                <DataGrid x:Name="BlockRulesGrid"
                       ItemsSource="{Binding RequestBlockRules}"
                       MouseDoubleClick="RulesGrid_MouseDoubleClick"
                       Style="{StaticResource RulesDataGridStyle}"
@@ -122,9 +137,9 @@
                     <DataGridTextColumn Header="备注" Binding="{Binding Note}" Width="180" />
                     <DataGridTextColumn Header="状态" Binding="{Binding State}" Width="100" />
                 </DataGrid.Columns>
-            </DataGrid>
+                </DataGrid>
 
-            <DataGrid x:Name="RewriteRulesGrid"
+                <DataGrid x:Name="RewriteRulesGrid"
                       ItemsSource="{Binding RequestRewriteRules}"
                       MouseDoubleClick="RulesGrid_MouseDoubleClick"
                       Style="{StaticResource RulesDataGridStyle}"
@@ -145,9 +160,9 @@
                     <DataGridTextColumn Header="备注" Binding="{Binding Note}" Width="180" />
                     <DataGridTextColumn Header="状态" Binding="{Binding State}" Width="100" />
                 </DataGrid.Columns>
-            </DataGrid>
+                </DataGrid>
 
-            <DataGrid x:Name="MappingRulesGrid"
+                <DataGrid x:Name="MappingRulesGrid"
                       ItemsSource="{Binding RequestMappingRules}"
                       MouseDoubleClick="RulesGrid_MouseDoubleClick"
                       Style="{StaticResource RulesDataGridStyle}"
@@ -165,9 +180,9 @@
                     <DataGridTextColumn Header="备注" Binding="{Binding Note}" Width="180" />
                     <DataGridTextColumn Header="状态" Binding="{Binding State}" Width="100" />
                 </DataGrid.Columns>
-            </DataGrid>
+                </DataGrid>
 
-            <DataGrid x:Name="DecodeRulesGrid"
+                <DataGrid x:Name="DecodeRulesGrid"
                       ItemsSource="{Binding RequestDecodeRules}"
                       MouseDoubleClick="RulesGrid_MouseDoubleClick"
                       Style="{StaticResource RulesDataGridStyle}"
@@ -185,9 +200,9 @@
                     <DataGridTextColumn Header="备注" Binding="{Binding Note}" Width="180" />
                     <DataGridTextColumn Header="状态" Binding="{Binding State}" Width="100" />
                 </DataGrid.Columns>
-            </DataGrid>
+                </DataGrid>
 
-            <Border x:Name="PlaceholderListPanel"
+                <Border x:Name="PlaceholderListPanel"
                     Background="#FFFFFF"
                     Visibility="Collapsed">
                 <TextBlock x:Name="PlaceholderTextBlock"
@@ -196,6 +211,47 @@
                            FontSize="13"
                            Foreground="{StaticResource TextSecondaryBrush}"
                            Text="该规则类型将在下一步接入。" />
+                </Border>
+            </Grid>
+
+            <Border Grid.Row="1"
+                    Margin="0,8,0,0"
+                    Padding="0"
+                    BorderBrush="{StaticResource DividerBrush}"
+                    BorderThickness="0,1,0,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="30" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <DockPanel Margin="14,0,12,0">
+                        <TextBlock VerticalAlignment="Center"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   Text="命中日志" />
+                        <TextBlock Margin="10,0,0,0"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   Text="最近 500 条规则命中记录" />
+                    </DockPanel>
+                    <DataGrid Grid.Row="1"
+                              ItemsSource="{Binding RuleHitLogs}"
+                              Style="{StaticResource RulesDataGridStyle}"
+                              RowHeight="24"
+                              MinRowHeight="24">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="时间" Binding="{Binding Time}" Width="90" />
+                            <DataGridTextColumn Header="会话" Binding="{Binding Theology}" Width="70" />
+                            <DataGridTextColumn Header="类型" Binding="{Binding RuleType}" Width="90" />
+                            <DataGridTextColumn Header="方向" Binding="{Binding Direction}" Width="70" />
+                            <DataGridTextColumn Header="规则" Binding="{Binding RuleName}" Width="150" />
+                            <DataGridTextColumn Header="动作" Binding="{Binding Action}" Width="140" />
+                            <DataGridTextColumn Header="URL" Binding="{Binding URL}" Width="*" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
             </Border>
         </Grid>
     </Grid>

@@ -31,6 +31,7 @@ type Map struct {
 	BodyStore          *BodyStore
 	httpActionLock     sync.Mutex
 	pendingHTTPActions []pendingHTTPAction
+	pendingRuleHits    map[int][]TrafficRuleHit
 }
 
 type WaitGroup struct {
@@ -105,6 +106,18 @@ type Request struct {
 		TagColor string `json:"TagColor"` //标记的文本颜色
 		Search   string `json:"search"`   //搜索的背景颜色
 	} `json:"color"` //显示图标
+	RuleHits []TrafficRuleHit `json:"RuleHits"`
+}
+
+type TrafficRuleHit struct {
+	Time      string `json:"Time"`
+	Theology  int    `json:"Theology"`
+	RuleType  string `json:"RuleType"`
+	RuleHash  string `json:"RuleHash"`
+	RuleName  string `json:"RuleName"`
+	Action    string `json:"Action"`
+	Direction string `json:"Direction"`
+	URL       string `json:"URL"`
 }
 type RequestWeb struct {
 	Method                 string
@@ -186,7 +199,51 @@ func (m *Map) addResponseLength(TheologyID int, a, b int) {
 func (m *Map) SetRequest(TheologyID int, h *Request) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
+	if h != nil && len(m.pendingRuleHits[TheologyID]) > 0 {
+		h.RuleHits = appendRuleHits(h.RuleHits, m.pendingRuleHits[TheologyID]...)
+		delete(m.pendingRuleHits, TheologyID)
+	}
 	m.Request[TheologyID] = h
+}
+
+func (m *Map) RecordRuleHit(TheologyID int, hit TrafficRuleHit) {
+	if m == nil || TheologyID < 1 {
+		return
+	}
+
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	if hit.Theology <= 0 {
+		hit.Theology = TheologyID
+	}
+	if h := m.Request[TheologyID]; h != nil {
+		h.RuleHits = appendRuleHits(h.RuleHits, hit)
+		return
+	}
+	if m.pendingRuleHits == nil {
+		m.pendingRuleHits = make(map[int][]TrafficRuleHit)
+	}
+	m.pendingRuleHits[TheologyID] = appendRuleHits(m.pendingRuleHits[TheologyID], hit)
+}
+
+func appendRuleHits(target []TrafficRuleHit, hits ...TrafficRuleHit) []TrafficRuleHit {
+	for _, hit := range hits {
+		duplicate := false
+		for _, existing := range target {
+			if existing.RuleHash == hit.RuleHash &&
+				existing.RuleType == hit.RuleType &&
+				existing.Direction == hit.Direction &&
+				existing.Action == hit.Action &&
+				existing.Time == hit.Time {
+				duplicate = true
+				break
+			}
+		}
+		if !duplicate {
+			target = append(target, hit)
+		}
+	}
+	return target
 }
 func (m *Map) TrackBody(body []byte) BodyRef {
 	if m == nil || m.BodyStore == nil {
@@ -556,7 +613,12 @@ func (m *Map) SetSocketDataEmpty(Theology int) bool {
 	return h != nil
 }
 func NewHashMap() *Map {
-	return &Map{Request: make(map[int]*Request), UpdateLength: make(map[int]*ResponseLength), BodyStore: NewBodyStore()}
+	return &Map{
+		Request:         make(map[int]*Request),
+		UpdateLength:    make(map[int]*ResponseLength),
+		BodyStore:       NewBodyStore(),
+		pendingRuleHits: make(map[int][]TrafficRuleHit),
+	}
 }
 func (m *Map) Empty() {
 	m.lock.Lock()
@@ -579,6 +641,7 @@ func (m *Map) Empty() {
 	}
 	m.Request = mz
 	m.UpdateLength = make(map[int]*ResponseLength)
+	m.pendingRuleHits = make(map[int][]TrafficRuleHit)
 }
 
 // ReleaseAll 全部放行

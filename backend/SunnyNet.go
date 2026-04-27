@@ -279,14 +279,14 @@ func HttpCallback(Conn *SunnyNet.HttpConn) {
 	{
 		if Conn.Type == public.HttpSendRequest {
 			HostsRulesUrl(Conn.Request.URL)
-			if block, ok := ApplyRequestBlock(Conn.Request.Method, Conn.Request.URL); ok {
+			if block, ok := ApplyRequestBlock(Conn.Theology, Conn.Request.Method, Conn.Request.URL); ok {
 				if block.Close {
 					Conn.Close()
 				} else {
 					Conn.Response = block.Response
 				}
 			} else {
-				u, b := ReplaceURL(Conn.Request.Method, Conn.Request.URL)
+				u, b := ReplaceURL(Conn.Theology, Conn.Request.Method, Conn.Request.URL)
 				if b != nil {
 					Conn.Response = new(http.Response)
 					Conn.Response.Body = io.NopCloser(bytes.NewBuffer(b))
@@ -316,7 +316,7 @@ func HttpCallback(Conn *SunnyNet.HttpConn) {
 						_ = Conn.Request.Body.Close()
 					}
 					Body = ReplaceBody(Body)
-					method, rewrittenURL, rewrittenBody := ApplyRequestRewrite(Conn.Request.Method, Conn.Request.URL, Conn.Request.Header, Body)
+					method, rewrittenURL, rewrittenBody := ApplyRequestRewrite(Conn.Theology, Conn.Request.Method, Conn.Request.URL, Conn.Request.Header, Body)
 					Conn.Request.Method = method
 					Conn.Request.URL = rewrittenURL
 					Body = rewrittenBody
@@ -394,7 +394,7 @@ func HttpCallback(Conn *SunnyNet.HttpConn) {
 				_ = Conn.Response.Body.Close()
 			}
 			Body = ReplaceBody(Body)
-			Body = ApplyResponseRewrite(Conn.Request.Method, Conn.Request.URL, Conn.Response, Body)
+			Body = ApplyResponseRewrite(Conn.Theology, Conn.Request.Method, Conn.Request.URL, Conn.Response, Body)
 			Conn.Response.ContentLength = int64(len(Body))
 			if Conn.Response.Header != nil {
 				Conn.Response.Header.Set("Content-Length", strconv.Itoa(len(Body)))

@@ -249,3 +249,26 @@ public sealed class RequestDecodeRuleItem : TrafficRuleItemBase
 
     public override string Summary => $"{Direction} · {DecoderType}";
 }
+
+public sealed class TrafficRuleHitItem
+{
+    public string Time { get; set; } = "";
+
+    public int Theology { get; set; }
+
+    public string RuleType { get; set; } = "";
+
+    public string RuleHash { get; set; } = "";
+
+    public string RuleName { get; set; } = "";
+
+    public string Action { get; set; } = "";
+
+    public string Direction { get; set; } = "";
+
+    public string URL { get; set; } = "";
+
+    public string Summary => string.IsNullOrWhiteSpace(Direction)
+        ? $"{RuleType} · {Action}"
+        : $"{RuleType} · {Direction} · {Action}";
+}

@@ -25,6 +25,8 @@ public sealed class CaptureEntry : ViewModelBase
     private static readonly Brush WarningRowBackgroundBrush = CreateFrozenBrush("#FFF8EA");
     private static readonly Brush DangerRowBackgroundBrush = CreateFrozenBrush("#FFF1F1");
     private static readonly Brush InfoRowBackgroundBrush = CreateFrozenBrush("#F4F8FF");
+    private static readonly Brush RuleHitRowBackgroundBrush = CreateFrozenBrush("#E7F7FF");
+    private static readonly Brush RuleHitAccentBrush = CreateFrozenBrush("#0088A8");
     private static readonly IReadOnlyDictionary<string, ImageSource> SessionIconImages = CreateSessionIconImages();
     private int _index;
     private int _theology;
@@ -46,6 +48,7 @@ public sealed class CaptureEntry : ViewModelBase
     private CaptureEntryColor _color = new();
     private int _breakMode;
     private bool _isFavorite;
+    private List<TrafficRuleHitItem> _ruleHits = new();
 
     [JsonPropertyName("序号")]
     public int Index
@@ -224,6 +227,9 @@ public sealed class CaptureEntry : ViewModelBase
         : CreateFrozenBrush(TagColor);
 
     [JsonIgnore]
+    public Brush RowAccentBrush => HasTagColor && !IsStrikeMarked ? TagAccentBrush : HasRuleHits ? RuleHitAccentBrush : Brushes.Transparent;
+
+    [JsonIgnore]
     public Brush UrlForeground => HasTagColor && !IsStrikeMarked
         ? CreateReadableTagForeground(TagColor)
         : CreateFrozenBrush("#1F2D3D");
@@ -249,6 +255,28 @@ public sealed class CaptureEntry : ViewModelBase
 
     [JsonIgnore]
     public Brush RowBackground => HasSearchHighlight ? SearchBackground : HasTagColor && !IsStrikeMarked ? TagBackground : GetRowBackground();
+
+    [JsonPropertyName("RuleHits")]
+    public List<TrafficRuleHitItem> RuleHits
+    {
+        get => _ruleHits;
+        set
+        {
+            _ruleHits = value ?? new List<TrafficRuleHitItem>();
+            NotifyRuleHitVisualsChanged();
+        }
+    }
+
+    [JsonIgnore]
+    public bool HasRuleHits => RuleHits.Count > 0;
+
+    [JsonIgnore]
+    public string RuleHitSummary => HasRuleHits
+        ? string.Join(Environment.NewLine, RuleHits.TakeLast(4).Select(static hit => $"{hit.Time} {hit.Summary} {hit.RuleName}".Trim()))
+        : "";
+
+    [JsonIgnore]
+    public string RuleHitBadgeText => HasRuleHits ? $"规则×{RuleHits.Count}" : "";
 
     [JsonIgnore]
     public Brush StatusBrush => GetStatusBrush();
@@ -339,8 +367,49 @@ public sealed class CaptureEntry : ViewModelBase
             SearchColor = entry.SearchColor;
         }
 
+        if (entry.RuleHits.Count > 0)
+        {
+            MergeRuleHits(entry.RuleHits);
+        }
+
         BreakMode = entry.BreakMode;
         NormalizeDerivedFields();
+    }
+
+    public void AddRuleHit(TrafficRuleHitItem hit)
+    {
+        MergeRuleHits(new[] { hit });
+    }
+
+    private void MergeRuleHits(IEnumerable<TrafficRuleHitItem> hits)
+    {
+        bool changed = false;
+        foreach (TrafficRuleHitItem hit in hits)
+        {
+            if (string.IsNullOrWhiteSpace(hit.RuleType) && string.IsNullOrWhiteSpace(hit.RuleName))
+            {
+                continue;
+            }
+
+            bool exists = RuleHits.Any(existing =>
+                string.Equals(existing.Time, hit.Time, StringComparison.Ordinal)
+                && string.Equals(existing.RuleHash, hit.RuleHash, StringComparison.Ordinal)
+                && string.Equals(existing.RuleType, hit.RuleType, StringComparison.Ordinal)
+                && string.Equals(existing.Direction, hit.Direction, StringComparison.Ordinal)
+                && string.Equals(existing.Action, hit.Action, StringComparison.Ordinal));
+            if (exists)
+            {
+                continue;
+            }
+
+            RuleHits.Add(hit);
+            changed = true;
+        }
+
+        if (changed)
+        {
+            NotifyRuleHitVisualsChanged();
+        }
     }
 
     public void NormalizeDerivedFields()
@@ -382,6 +451,7 @@ public sealed class CaptureEntry : ViewModelBase
         OnPropertyChanged(nameof(IsStrikeMarked));
         OnPropertyChanged(nameof(TagBackground));
         OnPropertyChanged(nameof(TagAccentBrush));
+        OnPropertyChanged(nameof(RowAccentBrush));
         OnPropertyChanged(nameof(UrlForeground));
         OnPropertyChanged(nameof(UrlFontWeight));
         OnPropertyChanged(nameof(RowTextDecorations));
@@ -414,6 +484,15 @@ public sealed class CaptureEntry : ViewModelBase
         OnPropertyChanged(nameof(SessionIconGlyph));
         OnPropertyChanged(nameof(SessionIconToolTip));
         OnPropertyChanged(nameof(SessionIconImage));
+    }
+
+    private void NotifyRuleHitVisualsChanged()
+    {
+        OnPropertyChanged(nameof(HasRuleHits));
+        OnPropertyChanged(nameof(RuleHitSummary));
+        OnPropertyChanged(nameof(RuleHitBadgeText));
+        OnPropertyChanged(nameof(RowAccentBrush));
+        OnPropertyChanged(nameof(RowBackground));
     }
 
     private Brush GetStatusBrush()
@@ -467,6 +546,11 @@ public sealed class CaptureEntry : ViewModelBase
         if (IsIntercepted)
         {
             return InterceptRowBackgroundBrush;
+        }
+
+        if (HasRuleHits)
+        {
+            return RuleHitRowBackgroundBrush;
         }
 
         if (IsErrorState())

@@ -78,6 +78,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     private readonly HashSet<string> _selectedProcessFilterKeys = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _selectedDomainFilterKeys = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<PendingInterceptReplay> _pendingInterceptReplays = new();
+    private readonly Dictionary<int, List<TrafficRuleHitItem>> _pendingRuleHits = new();
     private readonly DispatcherTimer _sessionFilterRefreshTimer;
     private const string AllProcessFilterKey = "__all_process__";
     private const string AllDomainFilterKey = "__all_domain__";
@@ -146,6 +147,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     public ObservableCollection<RequestRewriteRuleItem> RequestRewriteRules { get; } = new();
     public ObservableCollection<RequestMappingRuleItem> RequestMappingRules { get; } = new();
     public ObservableCollection<RequestDecodeRuleItem> RequestDecodeRules { get; } = new();
+    public ObservableCollection<TrafficRuleHitItem> RuleHitLogs { get; } = new();
     public ObservableCollection<RequestCertificateRuleItem> RequestCertificateItems { get; } = new();
     public ObservableCollection<ProcessCaptureNameItem> ProcessCaptureNames { get; } = new();
     public ObservableCollection<RunningProcessItem> RunningProcesses { get; } = new();
@@ -1020,6 +1022,18 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         NotificationRequested?.Invoke(ok ? "提示" : "错误", ok ? "规则中心配置已保存。" : "规则中心配置保存失败。");
     }
 
+    public string ExportRuleCenterConfigJson()
+    {
+        return SyncRuleCenterRulesText();
+    }
+
+    public async Task ImportRuleCenterConfigJsonAsync(string json)
+    {
+        using JsonDocument document = JsonDocument.Parse(json);
+        ApplyRuleCenterConfig(document.RootElement);
+        await ApplyRuleCenterConfigAsync();
+    }
+
     public async Task RestoreDefaultScriptAsync()
     {
         JsonElement? result = await _backend.InvokeAsync("获取默认Go脚本代码");
@@ -1875,6 +1889,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             case "更新ICO":
                 ApplyIconUpdate(envelope.Args);
                 break;
+            case "规则命中":
+                ApplyRuleHit(envelope.Args);
+                break;
             case "加载配置":
                 ApplyConfig(envelope.Args);
                 break;
@@ -1920,6 +1937,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             if (_sessionMap.TryGetValue(entry.Theology, out CaptureEntry? existing))
             {
                 existing.UpdateFrom(entry);
+                ApplyPendingRuleHits(existing);
                 ApplyFavoriteState(existing, forceRefresh: false);
                 if (SelectedSession?.Theology == existing.Theology)
                 {
@@ -1936,6 +1954,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             }
 
             AddEntry(entry);
+            ApplyPendingRuleHits(entry);
             CompletePendingInterceptReplay(entry);
             if (entry.BreakMode > 0)
             {
@@ -1966,6 +1985,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             if (_sessionMap.TryGetValue(entry.Theology, out CaptureEntry? existing))
             {
                 existing.UpdateFrom(entry);
+                ApplyPendingRuleHits(existing);
                 ApplyFavoriteState(existing, forceRefresh: false);
                 changed = true;
                 if (SelectedSession?.Theology == existing.Theology)
@@ -1983,6 +2003,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             else
             {
                 AddEntry(entry);
+                ApplyPendingRuleHits(entry);
                 CompletePendingInterceptReplay(entry);
                 if (entry.BreakMode > 0)
                 {
@@ -1998,6 +2019,62 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         }
 
         OpenInterceptedSession(interceptedEntry);
+    }
+
+    private void ApplyRuleHit(JsonElement args)
+    {
+        TrafficRuleHitItem? hit;
+        try
+        {
+            hit = JsonSerializer.Deserialize<TrafficRuleHitItem>(args.GetRawText(), JsonOptions);
+        }
+        catch
+        {
+            return;
+        }
+
+        if (hit is null || hit.Theology <= 0)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(hit.Time))
+        {
+            hit.Time = DateTime.Now.ToString("HH:mm:ss.fff");
+        }
+
+        RuleHitLogs.Insert(0, hit);
+        while (RuleHitLogs.Count > 500)
+        {
+            RuleHitLogs.RemoveAt(RuleHitLogs.Count - 1);
+        }
+
+        if (_sessionMap.TryGetValue(hit.Theology, out CaptureEntry? entry))
+        {
+            entry.AddRuleHit(hit);
+            return;
+        }
+
+        if (!_pendingRuleHits.TryGetValue(hit.Theology, out List<TrafficRuleHitItem>? pending))
+        {
+            pending = new List<TrafficRuleHitItem>();
+            _pendingRuleHits[hit.Theology] = pending;
+        }
+
+        pending.Add(hit);
+    }
+
+    private void ApplyPendingRuleHits(CaptureEntry entry)
+    {
+        if (!_pendingRuleHits.Remove(entry.Theology, out List<TrafficRuleHitItem>? hits))
+        {
+            return;
+        }
+
+        foreach (TrafficRuleHitItem hit in hits)
+        {
+            entry.AddRuleHit(hit);
+        }
     }
 
     private void OpenInterceptedSession(CaptureEntry? entry)
