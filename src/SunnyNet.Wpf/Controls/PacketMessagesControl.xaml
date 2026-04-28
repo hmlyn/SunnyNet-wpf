@@ -243,8 +243,8 @@
                 CornerRadius="10">
             <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="38" />
-                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="0" />
+                    <RowDefinition Height="0" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
@@ -252,7 +252,8 @@
                         Background="{StaticResource SurfaceAltBrush}"
                         BorderBrush="{StaticResource DividerBrush}"
                         BorderThickness="0,0,0,1"
-                        CornerRadius="10,10,0,0">
+                        CornerRadius="10,10,0,0"
+                        Visibility="Collapsed">
                     <Grid Margin="12,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -299,7 +300,8 @@
                         Background="{StaticResource SurfaceAltBrush}"
                         BorderBrush="{StaticResource DividerBrush}"
                         BorderThickness="1"
-                        CornerRadius="8">
+                        CornerRadius="8"
+                        Visibility="Collapsed">
                     <TextBlock x:Name="InspectorHintTextBlock"
                                Style="{StaticResource CaptionTextStyle}"
                                Text="左侧选择数据包后，这里异步载入正文、JSON 和 HEX。"
@@ -307,7 +309,7 @@
                 </Border>
 
                 <Grid Grid.Row="2"
-                      Margin="10,0,10,8"
+                      Margin="6,0,6,6"
                       MinHeight="0">
                     <Grid x:Name="InspectorEmptyPanel">
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -336,6 +338,207 @@
                         <TabItem Header="HEX视图">
                             <controls:HexViewControl x:Name="PacketHexViewer"
                                                      EmptyText="当前数据包无二进制内容" />
+                        </TabItem>
+                        <TabItem x:Name="PacketProtobufTab" Header="ProtoBuf">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <Border Margin="0,0,0,6"
+                                        Padding="0"
+                                        Background="Transparent">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="34" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="4" />
+                                                <ColumnDefinition Width="28" />
+                                                <ColumnDefinition Width="6" />
+                                                <ColumnDefinition Width="58" />
+                                                <ColumnDefinition Width="4" />
+                                                <ColumnDefinition Width="42" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock VerticalAlignment="Center"
+                                                       Style="{StaticResource CaptionTextStyle}"
+                                                       Text="结构" />
+                                            <TextBox x:Name="PacketProtoSchemaPathTextBox"
+                                                     Grid.Column="1"
+                                                     MinHeight="26"
+                                                     Padding="8,2"
+                                                     ToolTip="支持选择一个或多个 .proto / .pb / .desc / .protoset 描述文件" />
+                                            <Button Grid.Column="3"
+                                                    MinHeight="26"
+                                                    Padding="0"
+                                                    Content="…"
+                                                    ToolTip="选择并自动导入 Protobuf 描述文件"
+                                                    Click="BrowsePacketProtoSchema_Click" />
+                                            <Button Grid.Column="5"
+                                                    MinHeight="26"
+                                                    Padding="6,2"
+                                                    Content="解析"
+                                                    Click="ParsePacketProtobuf_Click" />
+                                            <Button Grid.Column="7"
+                                                    MinHeight="26"
+                                                    Padding="6,2"
+                                                    Content="清空"
+                                                    Click="ClearPacketProtobuf_Click" />
+                                        </Grid>
+
+                                        <Grid Grid.Row="1" Margin="0,4,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="34" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="6" />
+                                                <ColumnDefinition Width="34" />
+                                                <ColumnDefinition Width="54" />
+                                                <ColumnDefinition Width="4" />
+                                                <ColumnDefinition Width="26" />
+                                                <ColumnDefinition Width="4" />
+                                                <ColumnDefinition Width="26" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock VerticalAlignment="Center"
+                                                       Style="{StaticResource CaptionTextStyle}"
+                                                       Text="类型" />
+                                            <ComboBox x:Name="PacketProtoMessageTypeComboBox"
+                                                      Grid.Column="1"
+                                                      MinHeight="26"
+                                                      Padding="8,2"
+                                                      IsEditable="True"
+                                                      IsTextSearchEnabled="True"
+                                                      ToolTip="选择 Protobuf 消息类型" />
+                                            <TextBlock Grid.Column="3"
+                                                       VerticalAlignment="Center"
+                                                       Style="{StaticResource CaptionTextStyle}"
+                                                       Text="头部" />
+                                            <TextBox x:Name="PacketProtobufSkipTextBox"
+                                                     Grid.Column="4"
+                                                     MinHeight="26"
+                                                     Padding="8,2"
+                                                     Text="0"
+                                                     ToolTip="忽略前 N 个自定义包头字节"
+                                                     TextChanged="PacketProtobufSkipTextBox_TextChanged" />
+                                            <Button Grid.Column="6"
+                                                    MinHeight="26"
+                                                    Padding="0"
+                                                    Content="-"
+                                                    Tag="-1"
+                                                    Click="AdjustPacketProtobufSkip_Click" />
+                                            <Button Grid.Column="8"
+                                                    MinHeight="26"
+                                                    Padding="0"
+                                                    Content="+"
+                                                    Tag="1"
+                                                    Click="AdjustPacketProtobufSkip_Click" />
+                                        </Grid>
+
+                                        <TextBlock x:Name="PacketProtobufStatusTextBlock"
+                                                   Grid.Row="2"
+                                                   Margin="0,5,0,0"
+                                                   Style="{StaticResource CaptionTextStyle}"
+                                                   Text="选择数据包后，可按结构解析当前载荷。"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </Grid>
+                                </Border>
+
+                                <Grid Grid.Row="1" MinHeight="0">
+                                    <controls:JsonTreeViewControl x:Name="PacketProtobufViewer" />
+                                    <Border x:Name="PacketProtobufEmptyPanel"
+                                            Background="#F8FAFD"
+                                            IsHitTestVisible="False">
+                                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock HorizontalAlignment="Center"
+                                                       FontFamily="Segoe MDL2 Assets"
+                                                       FontSize="22"
+                                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                                       Text="&#xE943;" />
+                                            <TextBlock x:Name="PacketProtobufEmptyTextBlock"
+                                                       Margin="0,8,0,0"
+                                                       HorizontalAlignment="Center"
+                                                       Style="{StaticResource CaptionTextStyle}"
+                                                       Text="设置结构、类型和头部字节后解析" />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </Grid>
+                        </TabItem>
+                        <TabItem x:Name="PacketReplayTab" Header="主动发送">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="34" />
+                                        <ColumnDefinition Width="126" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="34" />
+                                        <ColumnDefinition Width="108" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="78" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock VerticalAlignment="Center"
+                                               Style="{StaticResource CaptionTextStyle}"
+                                               Text="方向" />
+                                    <ComboBox x:Name="PacketReplayDirectionComboBox"
+                                              Grid.Column="1"
+                                              MinHeight="26"
+                                              Padding="8,2">
+                                        <ComboBoxItem Content="发送到服务端" Tag="Server" />
+                                        <ComboBoxItem Content="发送到客户端" Tag="Client" />
+                                    </ComboBox>
+                                    <TextBlock Grid.Column="3"
+                                               VerticalAlignment="Center"
+                                               Style="{StaticResource CaptionTextStyle}"
+                                               Text="格式" />
+                                    <ComboBox x:Name="PacketReplayEncodingComboBox"
+                                              Grid.Column="4"
+                                              MinHeight="26"
+                                              Padding="8,2"
+                                              SelectionChanged="PacketReplayEncodingComboBox_SelectionChanged">
+                                        <ComboBoxItem Content="HEX" Tag="HEX" />
+                                        <ComboBoxItem Content="文本" Tag="UTF8" />
+                                        <ComboBoxItem Content="Base64" Tag="Base64" />
+                                    </ComboBox>
+                                    <Button Grid.Column="6"
+                                            MinHeight="26"
+                                            Padding="10,2"
+                                            Content="发送"
+                                            Click="SendPacketReplay_Click" />
+                                </Grid>
+
+                                <Grid Grid.Row="1" MinHeight="0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <TextBox x:Name="PacketReplayEditorTextBox"
+                                             AcceptsReturn="True"
+                                             AcceptsTab="True"
+                                             FontFamily="Consolas, Microsoft YaHei UI"
+                                             FontSize="12"
+                                             HorizontalScrollBarVisibility="Disabled"
+                                             TextChanged="PacketReplayEditorTextBox_TextChanged"
+                                             TextWrapping="Wrap"
+                                             VerticalScrollBarVisibility="Auto" />
+                                    <TextBlock x:Name="PacketReplayStatusTextBlock"
+                                               Grid.Row="1"
+                                               Margin="0,5,0,0"
+                                               Style="{StaticResource CaptionTextStyle}"
+                                               Text="选择数据包后会自动回填当前载荷，可修改后发送。"
+                                               TextTrimming="CharacterEllipsis" />
+                                </Grid>
+                            </Grid>
                         </TabItem>
                     </TabControl>
                 </Grid>

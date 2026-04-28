@@ -791,6 +791,7 @@ func event(command string, args *JSON.SyJson) any {
 		Theology := getInt(args.GetData("Theology"))
 		IsWs := args.GetData("IsWs") == "true"
 		IsTCP := args.GetData("IsTCP") == "true"
+		IsUDP := args.GetData("IsUDP") == "true"
 		wsType := args.GetData("wsType")
 		SendType := args.GetData("SendType")
 		direction := args.GetData("direction")
@@ -918,6 +919,44 @@ func event(command string, args *JSON.SyJson) any {
 					Length:   len(_Bytes),
 					Time:     time.Now().Format("15:04:05.000"),
 					WsType:   wsType,
+				},
+			}
+			HashMap.SetSocketData(Theology, _update, Ico == "上行", len(_Bytes))
+			Insert.Lock()
+			_update.Info.Index = len(h.SocketData)
+			isUpdateRequestInfo := currentlySelected == Theology
+			if isUpdateRequestInfo {
+				SocketData = append(SocketData, _update.Info)
+			}
+			Insert.Unlock()
+			return true
+		}
+		if IsUDP {
+			if h.UdpConn == nil {
+				CallJs("弹出错误提示", "发送失败:请求已断开")
+				return false
+			}
+			SendBool := false
+			if direction == "Server" {
+				SendBool = Api.UdpSendToServer(Theology, _Bytes)
+			} else {
+				SendBool = Api.UdpSendToClient(Theology, _Bytes)
+			}
+			if SendBool {
+				CallJs("弹出成功提示", "发送成功")
+			} else {
+				CallJs("弹出错误提示", "主动发送 UDP 消息失败")
+				return false
+			}
+			_update := &MapHash.UpdateSocketData{
+				Body: _Bytes,
+				Info: &MapHash.UpdateSocketList{
+					Theology: Theology,
+					Ico:      Ico,
+					BodyHash: BodyHash,
+					Length:   len(_Bytes),
+					Time:     time.Now().Format("15:04:05.000"),
+					WsType:   "UDP",
 				},
 			}
 			HashMap.SetSocketData(Theology, _update, Ico == "上行", len(_Bytes))

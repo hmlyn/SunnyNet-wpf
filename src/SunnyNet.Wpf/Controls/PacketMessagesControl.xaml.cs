@@ -1,12 +1,14 @@
 using System.Collections;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.IO;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using Microsoft.Win32;
 using SunnyNet.Wpf.Models;
 using SunnyNet.Wpf.ViewModels;
 
@@ -31,12 +33,16 @@ public partial class PacketMessagesControl : UserControl
 
     private const string DisplayModeFlow = "Flow";
     private const string DisplayModeInspector = "Inspector";
+    private const char ProtobufSchemaPathSeparator = '|';
     private const int MaxInlineTextChars = 131_072;
     private INotifyCollectionChanged? _trackedCollection;
     private CollectionViewSource? _entriesViewSource;
     private readonly Dictionary<string, PacketPayloadSnapshot> _payloadCache = new(StringComparer.Ordinal);
     private bool _syncingSelectedEntry;
+    private bool _suspendPacketReplayEditorEvents;
+    private bool _packetReplayEditorDirty;
     private int _payloadVersion;
+    private string _loadedPacketProtobufSchemaPath = "";
     private SocketEntry? _currentEntry;
     private PacketPayloadSnapshot? _currentSnapshot;
 
@@ -46,6 +52,8 @@ public partial class PacketMessagesControl : UserControl
         Loaded += (_, _) =>
         {
             ApplyDisplayModeVisualState();
+            SetComboBoxSelectionByTag(PacketReplayEncodingComboBox, "HEX");
+            SetComboBoxSelectionByTag(PacketReplayDirectionComboBox, "Server");
             RebuildEntriesView();
             RefreshState();
             ApplyExternalSelection(SelectedEntry);
@@ -85,6 +93,12 @@ public partial class PacketMessagesControl : UserControl
     private bool IsInspectorMode => string.Equals(DisplayMode, DisplayModeInspector, StringComparison.OrdinalIgnoreCase);
 
     private bool IsFlowMode => string.Equals(DisplayMode, DisplayModeFlow, StringComparison.OrdinalIgnoreCase);
+
+    private bool IsTcpProtocol => string.Equals(ProtocolName, "TCP", StringComparison.OrdinalIgnoreCase);
+
+    private bool IsUdpProtocol => string.Equals(ProtocolName, "UDP", StringComparison.OrdinalIgnoreCase);
+
+    private bool SupportsPacketTools => IsTcpProtocol || IsUdpProtocol;
 
     private static void OnEntriesChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs args)
     {
@@ -164,6 +178,7 @@ public partial class PacketMessagesControl : UserControl
 
         FlowPanel.Visibility = IsInspectorMode ? Visibility.Collapsed : Visibility.Visible;
         InspectorPanel.Visibility = IsFlowMode ? Visibility.Collapsed : Visibility.Visible;
+        RefreshPacketToolsAvailability();
     }
 
     private void RebuildEntriesView()
@@ -223,6 +238,29 @@ public partial class PacketMessagesControl : UserControl
         }
 
         InspectorHintTextBlock.Text = $"左侧选择 {ProtocolName} 数据包后，这里异步载入正文、JSON 和 HEX。";
+        RefreshPacketToolsAvailability();
+    }
+
+    private void RefreshPacketToolsAvailability()
+    {
+        if (PacketProtobufTab is null || PacketReplayTab is null)
+        {
+            return;
+        }
+
+        PacketProtobufTab.Visibility = SupportsPacketTools ? Visibility.Visible : Visibility.Collapsed;
+        PacketReplayTab.Visibility = SupportsPacketTools ? Visibility.Visible : Visibility.Collapsed;
+        if (!SupportsPacketTools && (ReferenceEquals(PacketPayloadTabs.SelectedItem, PacketProtobufTab) || ReferenceEquals(PacketPayloadTabs.SelectedItem, PacketReplayTab)))
+        {
+            PacketPayloadTabs.SelectedItem = PacketRawTab;
+        }
+
+        if (InspectorHintTextBlock is not null)
+        {
+            InspectorHintTextBlock.Text = SupportsPacketTools
+                ? $"左侧选择 {ProtocolName} 数据包后，这里异步载入正文、JSON、HEX 和 ProtoBuf。"
+                : $"左侧选择 {ProtocolName} 数据包后，这里异步载入正文、JSON 和 HEX。";
+        }
     }
 
     private IEnumerable<SocketEntry> EnumerateEntries()
@@ -387,6 +425,8 @@ public partial class PacketMessagesControl : UserControl
         PacketJsonViewer.JsonText = "";
         PacketHexViewer.Bytes = Array.Empty<byte>();
         PacketHexViewer.HeaderLength = 0;
+        ClearPacketProtobufResult("等待当前包载入完成。");
+        ClearPacketReplay("等待当前包载入完成。");
         ApplyInspectorMeta(entry, "正在载入正文...");
     }
 
@@ -403,6 +443,8 @@ public partial class PacketMessagesControl : UserControl
         PacketHexViewer.Bytes = snapshot.Bytes;
         PacketHexViewer.HeaderLength = 0;
         PacketPayloadTabs.SelectedItem = snapshot.HasJson ? PacketJsonTab : PacketRawTab;
+        ClearPacketProtobufResult(snapshot.Bytes.Length > 0 ? $"可按结构解析当前 {ProtocolName} 包。" : "当前数据包没有可解析字节。");
+        ResetPacketReplayForSelection(entry, snapshot);
         ApplyInspectorMeta(entry, snapshot.StatusText);
     }
 
@@ -437,6 +479,463 @@ public partial class PacketMessagesControl : UserControl
         PacketJsonTab.Visibility = Visibility.Collapsed;
         PacketHexViewer.Bytes = Array.Empty<byte>();
         PacketHexViewer.HeaderLength = 0;
+        ClearPacketProtobufResult($"选择 {ProtocolName} 包后，可按结构解析当前载荷。");
+        ClearPacketReplay($"选择 {ProtocolName} 包后会自动回填当前载荷，可修改后发送。");
+    }
+
+    private async void BrowsePacketProtoSchema_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        OpenFileDialog dialog = new()
+        {
+            Title = "选择 Protobuf 描述文件",
+            Filter = "Protobuf 描述文件 (*.proto;*.pb;*.desc;*.protoset)|*.proto;*.pb;*.desc;*.protoset|所有文件 (*.*)|*.*",
+            Multiselect = true
+        };
+
+        string currentPath = GetFirstProtoSchemaPath(GetPacketProtoSchemaPath());
+        if (File.Exists(currentPath))
+        {
+            dialog.InitialDirectory = Path.GetDirectoryName(currentPath);
+            dialog.FileName = Path.GetFileName(currentPath);
+        }
+        else if (Directory.Exists(currentPath))
+        {
+            dialog.InitialDirectory = currentPath;
+        }
+
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        PacketProtoSchemaPathTextBox.Text = BuildProtoSchemaPathValue(dialog.FileNames);
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            await EnsurePacketProtobufSchemaLoadedAsync(viewModel, forceReload: true);
+        }
+    }
+
+    private async void ParsePacketProtobuf_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        if (!SupportsPacketTools)
+        {
+            PacketProtobufStatusTextBlock.Text = "当前协议暂未开启 ProtoBuf 包解析。";
+            return;
+        }
+
+        PacketPayloadSnapshot? snapshot = await GetSelectedPayloadAsync();
+        if (snapshot is null)
+        {
+            PacketProtobufStatusTextBlock.Text = $"请先选择一个 {ProtocolName} 数据包。";
+            return;
+        }
+
+        if (snapshot.Bytes.Length == 0)
+        {
+            ClearPacketProtobufResult("当前数据包没有可解析字节。");
+            return;
+        }
+
+        if (!TryGetPacketProtobufSkip(out int skip) || skip < 0 || skip > snapshot.Bytes.Length)
+        {
+            PacketProtobufStatusTextBlock.Text = "头部字节请输入有效范围。";
+            return;
+        }
+
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            PacketProtobufStatusTextBlock.Text = "后台尚未就绪，无法解析 ProtoBuf。";
+            return;
+        }
+
+        PacketProtobufStatusTextBlock.Text = $"正在解析 {ProtocolName} 载荷 · {snapshot.Bytes.Length - skip:N0}/{snapshot.Bytes.Length:N0} Bytes";
+        string schemaPath = GetPacketProtoSchemaPath();
+        string json;
+        if (!string.IsNullOrWhiteSpace(schemaPath))
+        {
+            if (!await EnsurePacketProtobufSchemaLoadedAsync(viewModel))
+            {
+                return;
+            }
+
+            string messageType = GetPacketProtoMessageType();
+            if (string.IsNullOrWhiteSpace(messageType))
+            {
+                ClearPacketProtobufResult("已导入结构，请先选择消息类型。");
+                PacketProtobufStatusTextBlock.Text = "请选择消息类型后再解析。";
+                return;
+            }
+
+            (bool ok, string schemaJson, string error) = await viewModel.ParseProtobufBySchemaAsync(snapshot.Bytes, skip, schemaPath, messageType);
+            if (!ok || string.IsNullOrWhiteSpace(schemaJson))
+            {
+                ClearPacketProtobufResult("按结构解析失败。");
+                PacketProtobufStatusTextBlock.Text = string.IsNullOrWhiteSpace(error) ? "按结构解析失败，请检查消息类型、头部字节或载荷。" : error;
+                return;
+            }
+
+            json = schemaJson;
+            PacketProtobufStatusTextBlock.Text = $"结构解析成功 · {messageType}";
+        }
+        else
+        {
+            json = await viewModel.ParseProtobufAsync(snapshot.Bytes, skip);
+            PacketProtobufStatusTextBlock.Text = "已使用通用 ProtoBuf 解析。";
+        }
+
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            ClearPacketProtobufResult("解析失败，当前数据未识别为有效 ProtoBuf。");
+            PacketProtobufStatusTextBlock.Text = "ProtoBuf 解析失败，请检查头部字节或消息类型。";
+            return;
+        }
+
+        PacketProtobufViewer.JsonText = json;
+        PacketProtobufEmptyPanel.Visibility = Visibility.Collapsed;
+    }
+
+    private void ClearPacketProtobuf_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        ResetPacketProtobufState();
+    }
+
+    private void PacketProtobufSkipTextBox_TextChanged(object sender, TextChangedEventArgs textChangedEventArgs)
+    {
+        UpdatePacketProtobufStatusSummary();
+    }
+
+    private void AdjustPacketProtobufSkip_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        int current = TryGetPacketProtobufSkip(out int skip) ? skip : 0;
+        int delta = int.TryParse((sender as FrameworkElement)?.Tag?.ToString(), out int parsedDelta) ? parsedDelta : 0;
+        int max = _currentSnapshot?.Bytes.Length ?? 0;
+        int next = Math.Clamp(current + delta, 0, max);
+        PacketProtobufSkipTextBox.Text = next.ToString();
+        PacketProtobufSkipTextBox.SelectAll();
+        PacketProtobufSkipTextBox.Focus();
+    }
+
+    private void ClearPacketProtobufResult(string message)
+    {
+        if (PacketProtobufViewer is null)
+        {
+            return;
+        }
+
+        PacketProtobufViewer.JsonText = "";
+        PacketProtobufEmptyPanel.Visibility = Visibility.Visible;
+        PacketProtobufEmptyTextBlock.Text = message;
+        UpdatePacketProtobufStatusSummary();
+    }
+
+    private void ResetPacketProtobufState()
+    {
+        _loadedPacketProtobufSchemaPath = "";
+        PacketProtoSchemaPathTextBox.Text = "";
+        ApplyPacketProtoMessageTypes(Array.Empty<string>(), "");
+        PacketProtobufSkipTextBox.Text = "0";
+        ClearPacketProtobufResult("已清空 ProtoBuf 配置。");
+        PacketProtobufStatusTextBlock.Text = "已清空 ProtoBuf 配置。";
+    }
+
+    private async Task<bool> EnsurePacketProtobufSchemaLoadedAsync(MainWindowViewModel viewModel, bool forceReload = false)
+    {
+        string schemaPath = GetPacketProtoSchemaPath();
+        if (string.IsNullOrWhiteSpace(schemaPath))
+        {
+            PacketProtobufStatusTextBlock.Text = "未选择结构文件，将使用通用 ProtoBuf 解析。";
+            return false;
+        }
+
+        string normalizedCurrent = NormalizeSchemaPath(schemaPath);
+        if (!forceReload
+            && !string.IsNullOrWhiteSpace(_loadedPacketProtobufSchemaPath)
+            && string.Equals(_loadedPacketProtobufSchemaPath, normalizedCurrent, StringComparison.OrdinalIgnoreCase)
+            && PacketProtoMessageTypeComboBox.Items.Count > 0)
+        {
+            return true;
+        }
+
+        string preferredMessageType = GetPacketProtoMessageType();
+        PacketProtobufStatusTextBlock.Text = "正在导入 Protobuf 描述...";
+        (bool ok, string directory, IReadOnlyList<string> messages, string error) = await viewModel.ImportProtobufSchemaAsync(schemaPath);
+        if (!ok || messages.Count == 0)
+        {
+            _loadedPacketProtobufSchemaPath = "";
+            ApplyPacketProtoMessageTypes(Array.Empty<string>(), "");
+            ClearPacketProtobufResult("结构导入失败。");
+            PacketProtobufStatusTextBlock.Text = string.IsNullOrWhiteSpace(error) ? "导入 Protobuf 描述失败。" : error;
+            return false;
+        }
+
+        string effectivePath = string.IsNullOrWhiteSpace(directory) ? schemaPath : directory;
+        _loadedPacketProtobufSchemaPath = NormalizeSchemaPath(effectivePath);
+        PacketProtoSchemaPathTextBox.Text = effectivePath;
+        ApplyPacketProtoMessageTypes(messages, preferredMessageType);
+        PacketProtobufStatusTextBlock.Text = $"结构已就绪 · {messages.Count:N0} 个消息类型";
+        return true;
+    }
+
+    private void ApplyPacketProtoMessageTypes(IReadOnlyList<string> messages, string? preferredMessageType)
+    {
+        string preferred = preferredMessageType?.Trim() ?? "";
+        PacketProtoMessageTypeComboBox.ItemsSource = messages;
+
+        if (!string.IsNullOrWhiteSpace(preferred) && messages.Contains(preferred))
+        {
+            PacketProtoMessageTypeComboBox.SelectedItem = preferred;
+            PacketProtoMessageTypeComboBox.Text = preferred;
+            return;
+        }
+
+        if (messages.Count == 1)
+        {
+            PacketProtoMessageTypeComboBox.SelectedItem = messages[0];
+            PacketProtoMessageTypeComboBox.Text = messages[0];
+            return;
+        }
+
+        PacketProtoMessageTypeComboBox.SelectedItem = null;
+        PacketProtoMessageTypeComboBox.Text = preferred;
+    }
+
+    private void UpdatePacketProtobufStatusSummary()
+    {
+        if (PacketProtobufStatusTextBlock is null || PacketProtobufStatusTextBlock.Text.StartsWith("正在", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        int total = _currentSnapshot?.Bytes.Length ?? 0;
+        if (!TryGetPacketProtobufSkip(out int skip))
+        {
+            PacketProtobufStatusTextBlock.Text = $"载荷 {total:N0} Bytes · 头部无效";
+            return;
+        }
+
+        int normalizedSkip = Math.Clamp(skip, 0, total);
+        PacketProtobufStatusTextBlock.Text = $"载荷 {total:N0} Bytes · 头部 {normalizedSkip:N0} · 消息体 {Math.Max(total - normalizedSkip, 0):N0}";
+    }
+
+    private bool TryGetPacketProtobufSkip(out int skip)
+    {
+        return int.TryParse(PacketProtobufSkipTextBox.Text?.Trim(), out skip);
+    }
+
+    private string GetPacketProtoSchemaPath()
+    {
+        return PacketProtoSchemaPathTextBox.Text?.Trim() ?? "";
+    }
+
+    private string GetPacketProtoMessageType()
+    {
+        return (PacketProtoMessageTypeComboBox.SelectedItem as string ?? PacketProtoMessageTypeComboBox.Text)?.Trim() ?? "";
+    }
+
+    private static string NormalizeSchemaPath(string path)
+    {
+        string[] paths = SplitProtoSchemaPaths(path);
+        if (paths.Length > 1)
+        {
+            return string.Join(
+                ProtobufSchemaPathSeparator,
+                paths.Select(NormalizeSingleSchemaPath).OrderBy(item => item, StringComparer.OrdinalIgnoreCase));
+        }
+
+        return NormalizeSingleSchemaPath(path);
+    }
+
+    private static string NormalizeSingleSchemaPath(string path)
+    {
+        try
+        {
+            return Path.GetFullPath(path.Trim());
+        }
+        catch
+        {
+            return path.Trim();
+        }
+    }
+
+    private static string BuildProtoSchemaPathValue(IEnumerable<string> paths)
+    {
+        return string.Join(
+            $" {ProtobufSchemaPathSeparator} ",
+            paths.Where(path => !string.IsNullOrWhiteSpace(path)).Select(path => path.Trim()));
+    }
+
+    private static string GetFirstProtoSchemaPath(string path)
+    {
+        string[] paths = SplitProtoSchemaPaths(path);
+        return paths.Length > 0 ? paths[0] : path;
+    }
+
+    private static string[] SplitProtoSchemaPaths(string path)
+    {
+        return (path ?? "").Split(ProtobufSchemaPathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
+
+    private async void SendPacketReplay_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        if (!SupportsPacketTools)
+        {
+            PacketReplayStatusTextBlock.Text = "当前协议暂未开启主动发送。";
+            return;
+        }
+
+        if (DataContext is not MainWindowViewModel viewModel || GetSelectedEntry() is null)
+        {
+            PacketReplayStatusTextBlock.Text = $"请先选择一个 {ProtocolName} 数据包。";
+            return;
+        }
+
+        string data = PacketReplayEditorTextBox.Text ?? "";
+        if (string.IsNullOrWhiteSpace(data))
+        {
+            PacketReplayStatusTextBlock.Text = "请输入要发送的数据。";
+            return;
+        }
+
+        try
+        {
+            PacketReplayStatusTextBlock.Text = $"正在发送 {ProtocolName} 数据...";
+            string sendType = GetSelectedComboTag(PacketReplayEncodingComboBox, "HEX");
+            string direction = GetSelectedComboTag(PacketReplayDirectionComboBox, "Server");
+            bool sent = IsTcpProtocol
+                ? await viewModel.SendTcpPacketAsync(
+                    Theology,
+                    sendType,
+                    direction,
+                    data)
+                : await viewModel.SendUdpPacketAsync(
+                    Theology,
+                    sendType,
+                    direction,
+                    data);
+            PacketReplayStatusTextBlock.Text = sent ? "发送成功，消息流会追加手动包。" : "发送失败，请检查连接状态或数据格式。";
+            if (sent)
+            {
+                _packetReplayEditorDirty = false;
+            }
+        }
+        catch (Exception exception)
+        {
+            PacketReplayStatusTextBlock.Text = $"发送失败：{exception.Message}";
+        }
+    }
+
+    private void PacketReplayEncodingComboBox_SelectionChanged(object sender, SelectionChangedEventArgs selectionChangedEventArgs)
+    {
+        if (_suspendPacketReplayEditorEvents || _packetReplayEditorDirty || _currentSnapshot is null)
+        {
+            return;
+        }
+
+        FillPacketReplayEditor(_currentSnapshot);
+    }
+
+    private void PacketReplayEditorTextBox_TextChanged(object sender, TextChangedEventArgs textChangedEventArgs)
+    {
+        if (!_suspendPacketReplayEditorEvents)
+        {
+            _packetReplayEditorDirty = true;
+        }
+    }
+
+    private void ResetPacketReplayForSelection(SocketEntry entry, PacketPayloadSnapshot snapshot)
+    {
+        if (!SupportsPacketTools)
+        {
+            ClearPacketReplay("当前协议暂未开启主动发送。");
+            return;
+        }
+
+        SetComboBoxSelectionByTag(PacketReplayDirectionComboBox, entry.Icon == "下行" ? "Client" : "Server");
+        FillPacketReplayEditor(snapshot);
+        PacketReplayStatusTextBlock.Text = snapshot.Bytes.Length > 0
+            ? $"已按当前格式回填当前 {ProtocolName} 包，可修改后发送。"
+            : "当前数据包没有可发送字节。";
+    }
+
+    private void FillPacketReplayEditor(PacketPayloadSnapshot snapshot)
+    {
+        _suspendPacketReplayEditorEvents = true;
+        PacketReplayEditorTextBox.Text = FormatPacketReplayText(snapshot);
+        _suspendPacketReplayEditorEvents = false;
+        _packetReplayEditorDirty = false;
+    }
+
+    private string FormatPacketReplayText(PacketPayloadSnapshot snapshot)
+    {
+        string encoding = GetSelectedComboTag(PacketReplayEncodingComboBox, "HEX");
+        if (encoding.Equals("Base64", StringComparison.OrdinalIgnoreCase))
+        {
+            return Convert.ToBase64String(snapshot.Bytes);
+        }
+
+        if (encoding.Equals("UTF8", StringComparison.OrdinalIgnoreCase))
+        {
+            return snapshot.IsBinary ? Encoding.UTF8.GetString(snapshot.Bytes) : snapshot.RawText;
+        }
+
+        return FormatHexWithSpaces(snapshot.Bytes);
+    }
+
+    private void ClearPacketReplay(string message)
+    {
+        if (PacketReplayEditorTextBox is null)
+        {
+            return;
+        }
+
+        _suspendPacketReplayEditorEvents = true;
+        PacketReplayEditorTextBox.Text = "";
+        _suspendPacketReplayEditorEvents = false;
+        _packetReplayEditorDirty = false;
+        PacketReplayStatusTextBlock.Text = message;
+    }
+
+    private static string FormatHexWithSpaces(byte[] bytes)
+    {
+        if (bytes.Length == 0)
+        {
+            return "";
+        }
+
+        StringBuilder builder = new(bytes.Length * 3);
+        for (int index = 0; index < bytes.Length; index++)
+        {
+            if (index > 0)
+            {
+                builder.Append(' ');
+            }
+
+            builder.Append(bytes[index].ToString("X2"));
+        }
+
+        return builder.ToString();
+    }
+
+    private static void SetComboBoxSelectionByTag(ComboBox comboBox, string tag)
+    {
+        foreach (object item in comboBox.Items)
+        {
+            if (item is ComboBoxItem comboBoxItem && string.Equals(comboBoxItem.Tag?.ToString(), tag, StringComparison.OrdinalIgnoreCase))
+            {
+                comboBox.SelectedItem = comboBoxItem;
+                return;
+            }
+        }
+
+        if (comboBox.Items.Count > 0)
+        {
+            comboBox.SelectedIndex = 0;
+        }
+    }
+
+    private static string GetSelectedComboTag(ComboBox comboBox, string fallback)
+    {
+        return (comboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? fallback;
     }
 
     private void PacketContextMenu_Opened(object sender, RoutedEventArgs routedEventArgs)

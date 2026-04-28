@@ -1474,6 +1474,50 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         return result is { ValueKind: JsonValueKind.True };
     }
 
+    public async Task<bool> SendUdpPacketAsync(int theology, string sendType, string direction, string text)
+    {
+        if (theology <= 0)
+        {
+            return false;
+        }
+
+        JsonElement? result = await _backend.InvokeAsync("主动发送", new
+        {
+            Theology = theology,
+            IsWs = false,
+            IsTCP = false,
+            IsUDP = true,
+            wsType = "UDP",
+            SendType = sendType,
+            direction,
+            Data = Convert.ToBase64String(Encoding.UTF8.GetBytes(text ?? ""))
+        });
+
+        return result is { ValueKind: JsonValueKind.True };
+    }
+
+    public async Task<bool> SendTcpPacketAsync(int theology, string sendType, string direction, string text)
+    {
+        if (theology <= 0)
+        {
+            return false;
+        }
+
+        JsonElement? result = await _backend.InvokeAsync("主动发送", new
+        {
+            Theology = theology,
+            IsWs = false,
+            IsTCP = true,
+            IsUDP = false,
+            wsType = "TCP",
+            SendType = sendType,
+            direction,
+            Data = Convert.ToBase64String(Encoding.UTF8.GetBytes(text ?? ""))
+        });
+
+        return result is { ValueKind: JsonValueKind.True };
+    }
+
     public async Task<SearchExecutionResult> SearchAsync(SearchRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Value))

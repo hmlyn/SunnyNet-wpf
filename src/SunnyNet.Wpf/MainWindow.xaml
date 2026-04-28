@@ -1302,6 +1302,12 @@
                                                         <DataTrigger Binding="{Binding Detail.HasSelection}" Value="False">
                                                             <Setter Property="Visibility" Value="Collapsed" />
                                                         </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Detail.IsTcpSession}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Detail.IsUdpSession}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
                                             </TabControl.Style>
@@ -1450,7 +1456,7 @@
                                                                                    DisplayMode="Replay"
                                                                                    Theology="{Binding SelectedSession.Theology, TargetNullValue=0}" />
                                             </TabItem>
-                                            <TabItem x:Name="ResponseTcpTab" Header="TCP详情">
+                                            <TabItem x:Name="ResponseTcpTab" Header="TCP">
                                                 <TabItem.Style>
                                                     <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
                                                         <Setter Property="Visibility" Value="Visible" />
@@ -1466,7 +1472,7 @@
                                                                              DisplayMode="Inspector"
                                                                              Theology="{Binding SelectedSession.Theology, TargetNullValue=0}" />
                                             </TabItem>
-                                            <TabItem x:Name="ResponseUdpTab" Header="UDP详情">
+                                            <TabItem x:Name="ResponseUdpTab" Header="UDP">
                                                 <TabItem.Style>
                                                     <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
                                                         <Setter Property="Visibility" Value="Visible" />
@@ -1491,6 +1497,48 @@
                                                 <controls:JsonTreeViewControl JsonText="{Binding Detail.ResponseJson}" />
                                             </TabItem>
                                         </TabControl>
+
+                                        <controls:TcpMessagesControl Margin="8,4,8,8"
+                                                                     Entries="{Binding Detail.SocketEntries}"
+                                                                     SelectedEntry="{Binding Detail.SelectedSocketEntry, Mode=TwoWay}"
+                                                                     DisplayMode="Inspector"
+                                                                     Theology="{Binding SelectedSession.Theology, TargetNullValue=0}">
+                                            <controls:TcpMessagesControl.Style>
+                                                <Style TargetType="{x:Type controls:TcpMessagesControl}">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <MultiDataTrigger>
+                                                            <MultiDataTrigger.Conditions>
+                                                                <Condition Binding="{Binding Detail.HasSelection}" Value="True" />
+                                                                <Condition Binding="{Binding Detail.IsTcpSession}" Value="True" />
+                                                            </MultiDataTrigger.Conditions>
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </MultiDataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </controls:TcpMessagesControl.Style>
+                                        </controls:TcpMessagesControl>
+
+                                        <controls:UdpMessagesControl Margin="8,4,8,8"
+                                                                     Entries="{Binding Detail.SocketEntries}"
+                                                                     SelectedEntry="{Binding Detail.SelectedSocketEntry, Mode=TwoWay}"
+                                                                     DisplayMode="Inspector"
+                                                                     Theology="{Binding SelectedSession.Theology, TargetNullValue=0}">
+                                            <controls:UdpMessagesControl.Style>
+                                                <Style TargetType="{x:Type controls:UdpMessagesControl}">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <MultiDataTrigger>
+                                                            <MultiDataTrigger.Conditions>
+                                                                <Condition Binding="{Binding Detail.HasSelection}" Value="True" />
+                                                                <Condition Binding="{Binding Detail.IsUdpSession}" Value="True" />
+                                                            </MultiDataTrigger.Conditions>
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </MultiDataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </controls:UdpMessagesControl.Style>
+                                        </controls:UdpMessagesControl>
                                     </Grid>
                                 </Grid>
                             </Border>
