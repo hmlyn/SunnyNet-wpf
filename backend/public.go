@@ -660,7 +660,7 @@ func event(command string, args *JSON.SyJson) any {
 		h := HashMap.GetRequest(Theology)
 		Insert.Lock()
 		defer Insert.Unlock()
-		if len(h.SocketData) < Index {
+		if h == nil || Index >= len(h.SocketData) {
 			return nil
 		}
 		return base64.StdEncoding.EncodeToString(h.SocketData[Index].Body)

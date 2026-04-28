@@ -2206,6 +2206,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
     private void ApplySocketUpdate(JsonElement args)
     {
+        List<SocketEntry> newEntries = new();
         foreach (SocketEntry socketEntry in DeserializeList<SocketEntry>(args))
         {
             if (SelectedSession is null || socketEntry.Theology != SelectedSession.Theology)
@@ -2213,9 +2214,23 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
                 continue;
             }
 
-            Detail.IsSocketSession = true;
-            Detail.SocketEntries.Add(socketEntry);
+            newEntries.Add(socketEntry);
         }
+
+        if (newEntries.Count == 0)
+        {
+            return;
+        }
+
+        string protocol = SelectedSession is null ? "" : ResolveSocketProtocol(SelectedSession, default);
+        if (string.IsNullOrWhiteSpace(protocol))
+        {
+            protocol = string.IsNullOrWhiteSpace(Detail.SocketProtocol) ? "WebSocket" : Detail.SocketProtocol;
+        }
+
+        Detail.SocketProtocol = protocol;
+        Detail.IsSocketSession = true;
+        Detail.SocketEntries.AddRange(newEntries);
     }
 
     private void ApplyConfig(JsonElement args)
@@ -2754,11 +2769,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         Detail.HasSelection = true;
         Detail.Summary = $"{selected.Method} {selected.Url}";
         Detail.IsSocketSession = false;
+        Detail.SocketProtocol = "";
         Detail.RequestHeaders = "正在读取请求数据...";
         Detail.RequestBody = "";
         Detail.ResponseHeaders = "";
         Detail.ResponseBody = "";
-        Detail.SocketEntries.Clear();
+        Detail.SocketEntries.ReplaceAll(Array.Empty<SocketEntry>());
         Detail.SelectedSocketEntry = null;
         Detail.RequestHeaderRows.Clear();
         Detail.RequestQueryRows.Clear();
@@ -3636,7 +3652,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         string requestContentType = GetHeaderValue(requestHeader, "Content-Type");
         Detail.RequestMethod = method;
         Detail.RequestUrl = url;
-        Detail.IsSocketSession = IsSocketSession(selected, socketData);
+        string socketProtocol = ResolveSocketProtocol(selected, socketData);
+        Detail.SocketProtocol = socketProtocol;
+        Detail.IsSocketSession = !string.IsNullOrWhiteSpace(socketProtocol);
         Detail.Summary = $"{method} {url}";
         Detail.HasRequestDisplayBody = hasRequestDisplayBody;
         string requestHeadersText = FormatHeaders(requestHeader);
@@ -3705,12 +3723,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             Detail.ResponseHexSource = null;
         }
 
-        Detail.SocketEntries.Clear();
+        Detail.SocketEntries.ReplaceAll(DeserializeList<SocketEntry>(socketData));
         Detail.SelectedSocketEntry = null;
-        foreach (SocketEntry socketEntry in DeserializeList<SocketEntry>(socketData))
-        {
-            Detail.SocketEntries.Add(socketEntry);
-        }
     }
 
     private static List<T> DeserializeList<T>(JsonElement element)
@@ -4401,20 +4415,32 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         return type.StartsWith("image/", StringComparison.OrdinalIgnoreCase) ? type : "";
     }
 
-    private static bool IsSocketSession(CaptureEntry selected, JsonElement socketData)
+    private static string ResolveSocketProtocol(CaptureEntry selected, JsonElement socketData)
     {
-        if (socketData.ValueKind == JsonValueKind.Array && socketData.GetArrayLength() > 0)
+        if (selected.Method.Equals("UDP", StringComparison.OrdinalIgnoreCase)
+            || selected.ResponseType.Contains("UDP", StringComparison.OrdinalIgnoreCase))
         {
-            return true;
+            return "UDP";
         }
 
-        return selected.Icon is "websocket_connect" or "websocket_close"
+        if (selected.Method.Contains("TCP", StringComparison.OrdinalIgnoreCase)
+            || selected.ResponseType.Contains("TCP", StringComparison.OrdinalIgnoreCase))
+        {
+            return "TCP";
+        }
+
+        if (selected.Icon is "websocket_connect" or "websocket_close"
             || selected.Method.Equals("Websocket", StringComparison.OrdinalIgnoreCase)
-            || selected.Method.Contains("TCP", StringComparison.OrdinalIgnoreCase)
-            || selected.Method.Equals("UDP", StringComparison.OrdinalIgnoreCase)
+            || selected.Method.Equals("WebSocket", StringComparison.OrdinalIgnoreCase)
             || selected.ResponseType.Contains("Websocket", StringComparison.OrdinalIgnoreCase)
-            || selected.ResponseType.Contains("TCP", StringComparison.OrdinalIgnoreCase)
-            || selected.ResponseType.Contains("UDP", StringComparison.OrdinalIgnoreCase);
+            || selected.ResponseType.Contains("WebSocket", StringComparison.OrdinalIgnoreCase))
+        {
+            return "WebSocket";
+        }
+
+        return socketData.ValueKind == JsonValueKind.Array && socketData.GetArrayLength() > 0
+            ? "WebSocket"
+            : "";
     }
 }
 

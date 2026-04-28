@@ -1,0 +1,220 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/url"
+	"strings"
+	"sync"
+)
+
+// 只设置右侧详情显示用明文，不修改 Sunny.Body / Sunny.Response.Body。
+// 因此重发、断点放行、导出 syn 仍然保留原始密文数据。
+
+type HTTP struct {
+	uniqueId int                        `json:"uniqueId"`
+	Break    bool                       `json:"Break"`
+	Display  bool                       `json:"Display"`
+	Type     int                        `json:"Type"` // 1=发起请求, 2=请求完成, 3=请求失败
+	PID      int                        `json:"PID"`
+	URL      string                     `json:"URL"`
+	Method   string                     `json:"Method"`
+	Header   http.Header                `json:"Header"`
+	Body     []byte                     `json:"Body"`
+	SetAgent func(ProxyUrl string) bool `json:"-"`
+	Response struct {
+		Header    http.Header `json:"Header"`
+		Body      []byte      `json:"Body"`
+		StateCode int         `json:"StateCode"`
+	} `json:"Response"`
+}
+
+func HttpRequestCallbackFunction(Sunny *HTTP) {
+	if Sunny.Type == 3 {
+		Sunny.Display = false
+		return
+	}
+
+	ApplyGameDisplayDecrypt(Sunny)
+}
+
+const gameDisplayBaseKey = "a392960421913165197845f34bf5d1a8|"
+
+var gameDisplayDomains = map[string]bool{
+	"i.365you.com":         true,
+	"i.yoyo007.com":        true,
+	"i.leqi-game.com":      true,
+	"report.365you.com":    true,
+	"report.yoyo007.com":   true,
+	"report.leqi-game.com": true,
+	"gw.365you.com":        true,
+	"gws.365you.com":       true,
+	"i.letsgaga.com":       true,
+	"support.365you.com":   true,
+	"pv.365you.com":        true,
+}
+
+var gameSignKeyLock sync.RWMutex
+var gameSignKeyCache = map[string]string{}
+
+func ApplyGameDisplayDecrypt(Sunny *HTTP) {
+	if Sunny == nil || strings.ToUpper(Sunny.Method) != "POST" {
+		return
+	}
+
+	parsedURL, err := url.Parse(Sunny.URL)
+	if err != nil {
+		return
+	}
+	if !gameDisplayDomains[strings.ToLower(parsedURL.Hostname())] {
+		return
+	}
+
+	requestKey := gameDisplayKey(Sunny, parsedURL)
+	if Sunny.Type == 1 {
+		if decrypted := gameDecryptBody(Sunny.Body, requestKey); len(decrypted) > 0 {
+			HTTPSetRequestDisplayBody(Sunny, decrypted)
+		}
+		return
+	}
+
+	if Sunny.Type != 2 {
+		return
+	}
+
+	responseKey := requestKey
+	if strings.Contains(parsedURL.Path, "/v4/pay/huawei/login") {
+		responseKey = gameHeaderValue(Sunny.Header, "time")
+		if decrypted := gameDecryptBody(Sunny.Response.Body, responseKey); len(decrypted) > 0 {
+			HTTPSetResponseDisplayBody(Sunny, decrypted)
+			gameCacheSignKey(decrypted)
+		}
+		return
+	}
+
+	if decrypted := gameDecryptBody(Sunny.Response.Body, responseKey); len(decrypted) > 0 {
+		HTTPSetResponseDisplayBody(Sunny, decrypted)
+	}
+}
+
+func gameDisplayKey(Sunny *HTTP, parsedURL *url.URL) string {
+	userId := parsedURL.Query().Get("userId")
+	if userId == "" {
+		return gameHeaderValue(Sunny.Header, "time")
+	}
+
+	gameSignKeyLock.RLock()
+	key := gameSignKeyCache[userId]
+	gameSignKeyLock.RUnlock()
+	return key
+}
+
+func gameHeaderValue(header http.Header, name string) string {
+	for key, values := range header {
+		if strings.EqualFold(key, name) && len(values) > 0 {
+			return values[0]
+		}
+	}
+	return ""
+}
+
+func gameCacheSignKey(decrypted []byte) {
+	var data map[string]interface{}
+	if err := json.Unmarshal(decrypted, &data); err != nil {
+		return
+	}
+
+	userId := gameJsonString(data, "userId")
+	signKey := gameJsonString(data, "signkey")
+	if userId == "" || signKey == "" {
+		return
+	}
+
+	gameSignKeyLock.Lock()
+	gameSignKeyCache[userId] = signKey
+	gameSignKeyLock.Unlock()
+}
+
+func gameJsonString(data map[string]interface{}, key string) string {
+	value, ok := data[key]
+	if !ok || value == nil {
+		return ""
+	}
+	if text, ok := value.(string); ok {
+		return text
+	}
+	return fmt.Sprintf("%v", value)
+}
+
+func gameDecryptBody(body []byte, key string) []byte {
+	if len(body) < 1 || key == "" {
+		return nil
+	}
+
+	md5Hex := GoHexEncode(GoMD5(gameDisplayBaseKey + key))
+	xorBody := gameXorEncrypt(body, []byte(md5Hex))
+	return GoGzipUnCompress(xorBody)
+}
+
+func gameXorEncrypt(input []byte, key []byte) []byte {
+	if len(input) < 1 || len(key) < 1 {
+		return nil
+	}
+
+	output := make([]byte, len(input))
+	keyLen := len(key)
+	for i := 0; i < len(input); i++ {
+		output[i] = input[i] ^ key[i%keyLen] ^ byte(i&0xFF)
+	}
+	return output
+}
+
+type WebSocket struct {
+	uniqueId         int
+	Display          bool
+	Type             int
+	PID              int
+	URL              string
+	Method           string
+	Header           http.Header
+	MessageType      int
+	Body             []byte
+	SendDataToServer func(MessageType int, data []byte) bool
+	SendDataToClient func(MessageType int, data []byte) bool
+	Close            func() bool
+}
+
+func WebSocketCallbackFunction(Sunny *WebSocket) {
+}
+
+type TcpSocket struct {
+	uniqueId         int
+	Display          bool
+	Type             int
+	PID              int
+	Body             []byte
+	LocalAddress     string
+	RemoteAddress    string
+	SetConnectionIP  func(NewAddress string) bool
+	SetAgent         func(ProxyUrl string) bool
+	SendDataToServer func(data []byte) bool
+	SendDataToClient func(data []byte) bool
+	Close            func() bool
+}
+
+func tcpCallbackFunction(Sunny *TcpSocket) {
+}
+
+type UdpSocket struct {
+	Display       bool
+	uniqueId      int
+	Type          int
+	PID           int
+	LocalAddress  string
+	RemoteAddress string
+	Body          []byte
+}
+
+func udpCallbackFunction(Sunny *UdpSocket) {
+}

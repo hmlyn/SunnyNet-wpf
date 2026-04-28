@@ -7,6 +7,7 @@ public sealed class SessionDetail : ViewModelBase
 {
     private bool _hasSelection;
     private bool _isSocketSession;
+    private string _socketProtocol = "";
     private int _inlineInterceptMode;
     private bool _syncingEditableRaw = true;
     private string _requestMethod = "";
@@ -296,8 +297,50 @@ public sealed class SessionDetail : ViewModelBase
     public bool IsSocketSession
     {
         get => _isSocketSession;
-        set => SetProperty(ref _isSocketSession, value);
+        set
+        {
+            if (SetProperty(ref _isSocketSession, value))
+            {
+                RaiseSessionProtocolProperties();
+            }
+        }
     }
+
+    public string SocketProtocol
+    {
+        get => _socketProtocol;
+        set
+        {
+            if (SetProperty(ref _socketProtocol, value ?? ""))
+            {
+                RaiseSessionProtocolProperties();
+            }
+        }
+    }
+
+    public bool IsHttpSession => !IsSocketSession;
+
+    public bool IsWebSocketSession => IsSocketSession && SocketProtocol.Equals("WebSocket", StringComparison.OrdinalIgnoreCase);
+
+    public bool IsTcpSession => IsSocketSession && SocketProtocol.Equals("TCP", StringComparison.OrdinalIgnoreCase);
+
+    public bool IsUdpSession => IsSocketSession && SocketProtocol.Equals("UDP", StringComparison.OrdinalIgnoreCase);
+
+    public string RequestSectionTitle => SocketProtocol switch
+    {
+        "WebSocket" => "WebSocket消息流",
+        "TCP" => "TCP数据流",
+        "UDP" => "UDP数据流",
+        _ => "请求内容"
+    };
+
+    public string ResponseSectionTitle => SocketProtocol switch
+    {
+        "WebSocket" => "WebSocket调试",
+        "TCP" => "TCP包详情",
+        "UDP" => "UDP包详情",
+        _ => "响应内容"
+    };
 
     public int InlineInterceptMode
     {
@@ -372,7 +415,7 @@ public sealed class SessionDetail : ViewModelBase
         set => SetProperty(ref _selectedSocketEntry, value);
     }
 
-    public ObservableCollection<SocketEntry> SocketEntries { get; } = new();
+    public BulkObservableCollection<SocketEntry> SocketEntries { get; } = new();
 
     public ObservableCollection<DetailNameValueRow> RequestHeaderRows { get; } = new();
 
@@ -428,6 +471,7 @@ public sealed class SessionDetail : ViewModelBase
         ResponseStateCode = 0;
         ResponseStateText = "";
         IsSocketSession = false;
+        SocketProtocol = "";
         DisableInlineIntercept();
         Summary = "请选择一个会话";
         HasRequestDisplayBody = false;
@@ -447,5 +491,15 @@ public sealed class SessionDetail : ViewModelBase
         ResponseHexRows.Clear();
         RequestHexSource = null;
         ResponseHexSource = null;
+    }
+
+    private void RaiseSessionProtocolProperties()
+    {
+        OnPropertyChanged(nameof(IsHttpSession));
+        OnPropertyChanged(nameof(IsWebSocketSession));
+        OnPropertyChanged(nameof(IsTcpSession));
+        OnPropertyChanged(nameof(IsUdpSession));
+        OnPropertyChanged(nameof(RequestSectionTitle));
+        OnPropertyChanged(nameof(ResponseSectionTitle));
     }
 }

@@ -1073,7 +1073,7 @@ public partial class HexViewControl : UserControl
         string text = length == 0
             ? "HEX 数据"
             : ActiveVirtualSource is null
-                ? $"{length:N0} Bytes · 每行 {_bytesPerLine} Bytes · 自绘虚拟渲染"
+                ? $"{length:N0} Bytes · 每行 {_bytesPerLine} Bytes"
                 : $"{length:N0} Bytes · 每行 {_bytesPerLine} Bytes · 分页加载";
         if (HasSelection)
         {

@@ -41,11 +41,22 @@ public partial class WebSocketMessagesControl : UserControl
     private const string DisplayModeFull = "Full";
     private const string DisplayModeFlow = "Flow";
     private const string DisplayModeInspector = "Inspector";
+    private const string DisplayModePayloadText = "PayloadText";
+    private const string DisplayModePayloadHex = "PayloadHex";
+    private const string DisplayModePayloadJson = "PayloadJson";
+    private const string DisplayModePayloadProtobuf = "PayloadProtobuf";
+    private const string DisplayModeReplay = "Replay";
     private const string DirectionAll = "All";
     private const string DirectionSend = "Send";
     private const string DirectionReceive = "Receive";
+    private const string PayloadViewText = "Text";
+    private const string PayloadViewHex = "Hex";
+    private const string PayloadViewJson = "Json";
+    private const string PayloadViewProtobuf = "Protobuf";
     private const int MaxRecentSearchTerms = 6;
+    private const int MaxAutoSelectFrameCount = 2000;
     private INotifyCollectionChanged? _trackedCollection;
+    private CollectionViewSource? _entriesViewSource;
     private ICollectionView? _entriesView;
     private readonly Dictionary<string, SocketPayloadSnapshot> _payloadCache = new(StringComparer.Ordinal);
     private readonly List<string> _recentSearchTerms = new();
@@ -99,13 +110,39 @@ public partial class WebSocketMessagesControl : UserControl
         set => SetValue(SelectedEntryProperty, value);
     }
 
-    private bool IsInspectorMode => string.Equals(DisplayMode, DisplayModeInspector, StringComparison.OrdinalIgnoreCase);
+    private bool IsInspectorMode =>
+        string.Equals(DisplayMode, DisplayModeInspector, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(DisplayMode, DisplayModePayloadText, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(DisplayMode, DisplayModePayloadHex, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(DisplayMode, DisplayModePayloadJson, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(DisplayMode, DisplayModePayloadProtobuf, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(DisplayMode, DisplayModeReplay, StringComparison.OrdinalIgnoreCase);
 
     private bool IsFlowMode => string.Equals(DisplayMode, DisplayModeFlow, StringComparison.OrdinalIgnoreCase);
 
+    private bool IsPayloadTextMode => string.Equals(DisplayMode, DisplayModePayloadText, StringComparison.OrdinalIgnoreCase);
+
+    private bool IsPayloadHexMode => string.Equals(DisplayMode, DisplayModePayloadHex, StringComparison.OrdinalIgnoreCase);
+
+    private bool IsPayloadJsonMode => string.Equals(DisplayMode, DisplayModePayloadJson, StringComparison.OrdinalIgnoreCase);
+
+    private bool IsPayloadProtobufMode => string.Equals(DisplayMode, DisplayModePayloadProtobuf, StringComparison.OrdinalIgnoreCase);
+
+    private bool IsReplayMode => string.Equals(DisplayMode, DisplayModeReplay, StringComparison.OrdinalIgnoreCase);
+
+    private bool IsClassicInspectorMode => string.Equals(DisplayMode, DisplayModeInspector, StringComparison.OrdinalIgnoreCase);
+
     private void ApplyDisplayModeVisualState()
     {
-        if (SummaryPanel is null || FlowPanel is null || InspectorPanel is null || FlowInspectorSplitter is null || FlowColumn is null || SplitterColumn is null || InspectorColumn is null)
+        if (SummaryPanel is null
+            || FlowPanel is null
+            || InspectorPanel is null
+            || FlowInspectorSplitter is null
+            || FlowColumn is null
+            || SplitterColumn is null
+            || InspectorColumn is null
+            || PayloadContentPanel is null
+            || ReplayPanel is null)
         {
             return;
         }
@@ -113,15 +150,49 @@ public partial class WebSocketMessagesControl : UserControl
         bool flowOnly = IsFlowMode;
         bool inspectorOnly = IsInspectorMode;
         bool full = !flowOnly && !inspectorOnly;
+        bool showPayloadContent = !flowOnly && !IsReplayMode;
+        bool showReplay = !flowOnly && (IsClassicInspectorMode || IsReplayMode || IsPayloadProtobufMode);
+        bool showReplayEditor = IsClassicInspectorMode || IsReplayMode;
+        bool showProtobufTools = IsClassicInspectorMode || IsPayloadProtobufMode;
 
         SummaryPanel.Visibility = inspectorOnly ? Visibility.Collapsed : Visibility.Visible;
         FlowPanel.Visibility = inspectorOnly ? Visibility.Collapsed : Visibility.Visible;
         FlowInspectorSplitter.Visibility = full ? Visibility.Visible : Visibility.Collapsed;
         InspectorPanel.Visibility = flowOnly ? Visibility.Collapsed : Visibility.Visible;
+        PayloadContentPanel.Visibility = showPayloadContent ? Visibility.Visible : Visibility.Collapsed;
+        ReplayPanel.Visibility = showReplay ? Visibility.Visible : Visibility.Collapsed;
+        PayloadContentRow.Height = showPayloadContent ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        PayloadContentRow.MaxHeight = IsClassicInspectorMode ? 168 : double.PositiveInfinity;
+        ReplayRow.Height = IsReplayMode ? new GridLength(1, GridUnitType.Star) : showReplay ? GridLength.Auto : new GridLength(0);
+
+        if (ReplayEditorPanel is not null)
+        {
+            ReplayEditorPanel.Visibility = showReplayEditor ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        if (ReplayToolbarPanel is not null)
+        {
+            ReplayToolbarPanel.Visibility = showReplayEditor ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        if (ProtobufToolsPanel is not null)
+        {
+            ProtobufToolsPanel.Visibility = showProtobufTools ? Visibility.Visible : Visibility.Collapsed;
+            Grid.SetColumn(ProtobufToolsPanel, IsPayloadProtobufMode && !showReplayEditor ? 0 : 2);
+            Grid.SetColumnSpan(ProtobufToolsPanel, IsPayloadProtobufMode && !showReplayEditor ? 3 : 1);
+        }
+
+        if (ReplayMainColumn is not null && ReplayGapColumn is not null && ReplaySideColumn is not null)
+        {
+            ReplayMainColumn.Width = showReplayEditor ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+            ReplayGapColumn.Width = showReplayEditor && showProtobufTools ? new GridLength(8) : new GridLength(0);
+            ReplaySideColumn.Width = showReplayEditor && showProtobufTools ? new GridLength(198) : new GridLength(0);
+        }
 
         FlowColumn.Width = inspectorOnly ? new GridLength(0) : full ? new GridLength(336) : new GridLength(1, GridUnitType.Star);
         SplitterColumn.Width = full ? new GridLength(10) : new GridLength(0);
         InspectorColumn.Width = flowOnly ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
+        ApplyPayloadDisplayMode();
     }
 
     private async void ApplyExternalSelection(SocketEntry? entry)
@@ -131,7 +202,7 @@ public partial class WebSocketMessagesControl : UserControl
             return;
         }
 
-        if (FramesList is not null && !ReferenceEquals(FramesList.SelectedItem, entry))
+        if (!IsInspectorMode && FramesList is not null && !ReferenceEquals(FramesList.SelectedItem, entry))
         {
             _syncingSelectedEntry = true;
             FramesList.SelectedItem = entry;
@@ -198,6 +269,7 @@ public partial class WebSocketMessagesControl : UserControl
         }
 
         control.ApplyDisplayModeVisualState();
+        control.RebuildEntriesView();
         control.RefreshState(autoSelectLatest: !control.IsInspectorMode);
     }
 
@@ -216,6 +288,11 @@ public partial class WebSocketMessagesControl : UserControl
         if (args.Action == NotifyCollectionChangedAction.Reset)
         {
             _payloadCache.Clear();
+        }
+
+        if (IsInspectorMode)
+        {
+            return;
         }
 
         bool shouldAutoSelectLatest = FramesList.SelectedItem is null
@@ -266,7 +343,7 @@ public partial class WebSocketMessagesControl : UserControl
     private async Task ApplyEntrySelectionAsync(SocketEntry entry)
     {
         PayloadEmptyPanel.Visibility = Visibility.Collapsed;
-        PayloadTabs.Visibility = Visibility.Visible;
+        PayloadViewsHost.Visibility = Visibility.Visible;
         ApplySelectedMeta(entry);
 
         if (TryGetCachedPayload(entry, out SocketPayloadSnapshot? cached))
@@ -446,11 +523,6 @@ public partial class WebSocketMessagesControl : UserControl
         UpdateReplayEditorStatus();
     }
 
-    private void FillFromSelectedFrame_Click(object sender, RoutedEventArgs routedEventArgs)
-    {
-        FillReplayEditorFromSelected();
-    }
-
     private async void ParseProtobuf_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         if (DataContext is not MainWindowViewModel viewModel)
@@ -460,7 +532,7 @@ public partial class WebSocketMessagesControl : UserControl
 
         try
         {
-            byte[] bytes = DecodeReplayEditorBytes();
+            byte[] bytes = GetProtobufPayloadBytes();
             if (!TryGetSkipBytes(out int skip))
             {
                 ParserStatusTextBlock.Text = "Protobuf 跳过字节请输入有效整数。";
@@ -486,7 +558,7 @@ public partial class WebSocketMessagesControl : UserControl
             {
                 if (!await EnsureProtobufSchemaLoadedAsync(viewModel))
                 {
-                    PayloadTabs.SelectedItem = PayloadProtobufTab;
+                    SetActivePayloadView(PayloadViewProtobuf);
                     return;
                 }
 
@@ -497,7 +569,7 @@ public partial class WebSocketMessagesControl : UserControl
                     PayloadProtobufEmptyPanel.Visibility = Visibility.Visible;
                     PayloadProtobufStatusTextBlock.Text = "已导入结构，请先选择消息类型。";
                     ParserStatusTextBlock.Text = "请选择消息类型后再解析。";
-                    PayloadTabs.SelectedItem = PayloadProtobufTab;
+                    SetActivePayloadView(PayloadViewProtobuf);
                     return;
                 }
 
@@ -508,7 +580,7 @@ public partial class WebSocketMessagesControl : UserControl
                     PayloadProtobufEmptyPanel.Visibility = Visibility.Visible;
                     PayloadProtobufStatusTextBlock.Text = "按结构解析失败。";
                     ParserStatusTextBlock.Text = string.IsNullOrWhiteSpace(error) ? "按结构解析失败，请检查消息类型、跳过字节或载荷内容。" : error;
-                    PayloadTabs.SelectedItem = PayloadProtobufTab;
+                    SetActivePayloadView(PayloadViewProtobuf);
                     return;
                 }
 
@@ -527,13 +599,13 @@ public partial class WebSocketMessagesControl : UserControl
                 PayloadProtobufEmptyPanel.Visibility = Visibility.Visible;
                 PayloadProtobufStatusTextBlock.Text = "解析失败，当前数据未识别为有效 Protobuf。";
                 ParserStatusTextBlock.Text = "Protobuf 解析失败，请检查编码或跳过字节。";
-                PayloadTabs.SelectedItem = PayloadProtobufTab;
+                SetActivePayloadView(PayloadViewProtobuf);
                 return;
             }
 
             PayloadProtobufViewer.JsonText = json;
             PayloadProtobufEmptyPanel.Visibility = Visibility.Collapsed;
-            PayloadTabs.SelectedItem = PayloadProtobufTab;
+            SetActivePayloadView(PayloadViewProtobuf);
             if (string.IsNullOrWhiteSpace(schemaPath))
             {
                 PayloadProtobufStatusTextBlock.Text = $"解析成功 · Skip {skip} · {bytes.Length:N0} Bytes";
@@ -547,6 +619,16 @@ public partial class WebSocketMessagesControl : UserControl
             PayloadProtobufStatusTextBlock.Text = "解析失败。";
             ParserStatusTextBlock.Text = exception.Message;
         }
+    }
+
+    private byte[] GetProtobufPayloadBytes()
+    {
+        if (IsReplayMode || IsClassicInspectorMode)
+        {
+            return DecodeReplayEditorBytes();
+        }
+
+        return _currentPayloadSnapshot?.Bytes ?? Array.Empty<byte>();
     }
 
     private void ClearProtobuf_Click(object sender, RoutedEventArgs routedEventArgs)
@@ -567,25 +649,27 @@ public partial class WebSocketMessagesControl : UserControl
 
     private void BrowseProtoSchemaDirectory_Click(object sender, RoutedEventArgs routedEventArgs)
     {
-        OpenFolderDialog dialog = new()
+        OpenFileDialog dialog = new()
         {
-            Title = "选择 Protobuf 描述目录（支持目录内 .proto / .pb）"
+            Title = "选择 Protobuf 描述文件",
+            Filter = "Protobuf 描述文件 (*.proto;*.pb)|*.proto;*.pb|所有文件 (*.*)|*.*"
         };
 
         string currentPath = GetProtoSchemaPath();
-        if (Directory.Exists(currentPath))
-        {
-            dialog.InitialDirectory = currentPath;
-        }
-        else if (File.Exists(currentPath))
+        if (File.Exists(currentPath))
         {
             dialog.InitialDirectory = Path.GetDirectoryName(currentPath);
+            dialog.FileName = Path.GetFileName(currentPath);
+        }
+        else if (Directory.Exists(currentPath))
+        {
+            dialog.InitialDirectory = currentPath;
         }
 
         if (dialog.ShowDialog() == true)
         {
-            ProtoSchemaPathTextBox.Text = dialog.FolderName;
-            ParserStatusTextBlock.Text = "已选择目录，请点击“导入”读取消息结构。";
+            ProtoSchemaPathTextBox.Text = dialog.FileName;
+            ParserStatusTextBlock.Text = "已选择描述文件，请点击“导入”读取消息结构。";
         }
     }
 
@@ -744,10 +828,19 @@ public partial class WebSocketMessagesControl : UserControl
             return;
         }
 
-        _entriesView = Entries is null ? null : CollectionViewSource.GetDefaultView(Entries);
+        if (IsInspectorMode)
+        {
+            _entriesViewSource = null;
+            _entriesView = null;
+            FramesList.ItemsSource = null;
+            return;
+        }
+
+        _entriesViewSource = Entries is null ? null : new CollectionViewSource { Source = Entries };
+        _entriesView = _entriesViewSource?.View;
         if (_entriesView is not null)
         {
-            _entriesView.Filter = MatchesEntry;
+            _entriesView.Filter = HasActiveFrameFilter() ? MatchesEntry : null;
         }
 
         FramesList.ItemsSource = _entriesView ?? Entries;
@@ -755,7 +848,19 @@ public partial class WebSocketMessagesControl : UserControl
 
     private void ApplyActiveFilters(bool autoSelectLatest)
     {
-        _entriesView?.Refresh();
+        if (IsInspectorMode)
+        {
+            UpdateSearchAffordance();
+            RefreshState(autoSelectLatest: false);
+            return;
+        }
+
+        if (_entriesView is not null)
+        {
+            _entriesView.Filter = HasActiveFrameFilter() ? MatchesEntry : null;
+            _entriesView.Refresh();
+        }
+
         UpdateSearchAffordance();
         RefreshState(autoSelectLatest);
     }
@@ -813,11 +918,26 @@ public partial class WebSocketMessagesControl : UserControl
 
     private void RefreshState(bool autoSelectLatest)
     {
-        int total = CountEntries(Entries);
-        int upstream = CountEntries(entry => entry.Icon == "上行");
-        int downstream = CountEntries(entry => entry.Icon == "下行");
-        int textFrames = CountEntries(entry => entry.IsTextFrame);
-        int visible = CountVisibleEntries();
+        if (IsInspectorMode)
+        {
+            if (SelectedEntry is not null)
+            {
+                ApplyExternalSelection(SelectedEntry);
+            }
+            else
+            {
+                ClearPayload();
+            }
+
+            return;
+        }
+
+        FrameStatistics statistics = CountFrameStatistics();
+        int total = statistics.Total;
+        int upstream = statistics.Upstream;
+        int downstream = statistics.Downstream;
+        int textFrames = statistics.Text;
+        int visible = HasActiveFrameFilter() ? CountVisibleEntries() : total;
 
         TotalFramesTextBlock.Text = total.ToString();
         UpstreamFramesTextBlock.Text = upstream.ToString();
@@ -856,11 +976,14 @@ public partial class WebSocketMessagesControl : UserControl
 
         if (autoSelectLatest)
         {
-            SelectLatestVisibleFrame();
+            if (visible <= MaxAutoSelectFrameCount)
+            {
+                SelectLatestVisibleFrame();
+            }
             return;
         }
 
-        if (FramesList.SelectedItem is null && FramesList.Items.Count > 0)
+        if (FramesList.SelectedItem is null && FramesList.Items.Count > 0 && visible <= MaxAutoSelectFrameCount)
         {
             FramesList.SelectedIndex = FramesList.Items.Count - 1;
         }
@@ -897,16 +1020,15 @@ public partial class WebSocketMessagesControl : UserControl
     private void ApplyPayloadLoadingState(SocketEntry entry)
     {
         PayloadEmptyPanel.Visibility = Visibility.Collapsed;
-        PayloadTabs.Visibility = Visibility.Visible;
+        PayloadViewsHost.Visibility = Visibility.Visible;
         ApplySelectedMeta(entry);
         PayloadRawViewer.SourceText = "正在读取消息内容...";
         PayloadRawViewer.HighlightMode = "Body";
         PayloadJsonViewer.JsonText = "";
-        PayloadJsonTab.Visibility = Visibility.Collapsed;
         PayloadHexViewer.Bytes = Array.Empty<byte>();
         PayloadHexViewer.HeaderLength = 0;
-        PayloadTabs.SelectedItem = PayloadRawTab;
-        PayloadKindTextBlock.Text = $"消息类型 · {BuildPayloadKindLabel(entry, hasJson: false, isBinary: entry.IsBinaryFrame)}";
+        ApplyPayloadDisplayMode();
+        PayloadKindTextBlock.Text = $"消息类型 · {BuildPayloadKindLabel(entry, hasJson: false, isBinary: entry.IsBinaryFrame || entry.IsControlFrame)}";
         PayloadPreviewModeTextBlock.Text = "预览模式 · 读取中";
         PayloadStatusTextBlock.Text = "载荷状态 · 正在从核心加载";
         PayloadHintTextBlock.Text = entry.IsControlFrame ? "控制帧会在消息类型区域显示专用说明，原始字节请切换到 HEX 视图查看。" : "下方依次提供内容查看、编辑重放和协议解析。";
@@ -924,7 +1046,6 @@ public partial class WebSocketMessagesControl : UserControl
         PayloadRawViewer.SourceText = snapshot.DisplayText;
         PayloadRawViewer.HighlightMode = snapshot.HasJson ? "Json" : "Body";
         PayloadJsonViewer.JsonText = snapshot.Json;
-        PayloadJsonTab.Visibility = snapshot.HasJson ? Visibility.Visible : Visibility.Collapsed;
         PayloadHexViewer.Bytes = snapshot.Bytes;
         PayloadHexViewer.HeaderLength = 0;
         PayloadKindTextBlock.Text = $"消息类型 · {snapshot.PayloadKind}";
@@ -934,12 +1055,7 @@ public partial class WebSocketMessagesControl : UserControl
         UpdateSpecialFrame(entry, snapshot);
         ClearProtobufView();
         ResetReplayForSelection(entry, snapshot);
-
-        PayloadTabs.SelectedItem = snapshot.HasJson
-            ? PayloadJsonTab
-            : entry.IsBinaryFrame || entry.IsControlFrame
-                ? PayloadHexTab
-                : PayloadRawTab;
+        ApplyPayloadDisplayMode();
     }
 
     private void ClearPayload()
@@ -957,14 +1073,14 @@ public partial class WebSocketMessagesControl : UserControl
         SelectedDirectionTextBlock.Text = "消息";
         SelectedTypeTextBlock.Text = "Text";
         SelectedLengthTextBlock.Text = "0 B";
-        PayloadTabs.Visibility = Visibility.Collapsed;
+        PayloadViewsHost.Visibility = Visibility.Collapsed;
         PayloadEmptyPanel.Visibility = Visibility.Visible;
         PayloadRawViewer.SourceText = "";
         PayloadRawViewer.HighlightMode = "Body";
         PayloadJsonViewer.JsonText = "";
-        PayloadJsonTab.Visibility = Visibility.Collapsed;
         PayloadHexViewer.Bytes = Array.Empty<byte>();
         PayloadHexViewer.HeaderLength = 0;
+        ApplyPayloadDisplayMode();
         PayloadKindTextBlock.Text = "消息类型 · 待选择";
         PayloadPreviewModeTextBlock.Text = "预览模式 · 待选择";
         PayloadStatusTextBlock.Text = "载荷状态 · 等待选择";
@@ -972,6 +1088,48 @@ public partial class WebSocketMessagesControl : UserControl
         SpecialFrameCard.Visibility = Visibility.Collapsed;
         ClearProtobufView();
         ClearReplayEditor();
+    }
+
+    private void ApplyPayloadDisplayMode()
+    {
+        if (PayloadRawViewer is null || PayloadJsonViewer is null || PayloadProtobufPanel is null || PayloadHexViewer is null)
+        {
+            return;
+        }
+
+        if (IsPayloadHexMode)
+        {
+            SetActivePayloadView(PayloadViewHex);
+            return;
+        }
+
+        if (IsPayloadJsonMode)
+        {
+            SetActivePayloadView(PayloadViewJson);
+            return;
+        }
+
+        if (IsPayloadProtobufMode)
+        {
+            SetActivePayloadView(PayloadViewProtobuf);
+            return;
+        }
+
+        if (IsClassicInspectorMode)
+        {
+            SetActivePayloadView(_currentPayloadSnapshot?.HasJson == true ? PayloadViewJson : PayloadViewText);
+            return;
+        }
+
+        SetActivePayloadView(PayloadViewText);
+    }
+
+    private void SetActivePayloadView(string view)
+    {
+        PayloadRawViewer.Visibility = view == PayloadViewText ? Visibility.Visible : Visibility.Collapsed;
+        PayloadJsonViewer.Visibility = view == PayloadViewJson ? Visibility.Visible : Visibility.Collapsed;
+        PayloadProtobufPanel.Visibility = view == PayloadViewProtobuf ? Visibility.Visible : Visibility.Collapsed;
+        PayloadHexViewer.Visibility = view == PayloadViewHex ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private async Task<SocketPayloadSnapshot?> GetSelectedPayloadAsync()
@@ -998,29 +1156,36 @@ public partial class WebSocketMessagesControl : UserControl
             return BuildPayloadSnapshot(entry, Array.Empty<byte>(), entry.PreviewText, "");
         }
 
-        (byte[] bytes, string text, string json) = await viewModel.LoadSocketPayloadAsync(Theology, entry.Index);
+        (byte[] bytes, string text, string json) = await viewModel.LoadSocketPayloadAsync(Theology, entry.Index - 1);
         if (bytes.Length == 0 && string.IsNullOrWhiteSpace(text))
         {
             return BuildPayloadSnapshot(entry, Array.Empty<byte>(), entry.PreviewText, "");
         }
 
-        return BuildPayloadSnapshot(entry, bytes, string.IsNullOrWhiteSpace(text) ? entry.PreviewText : text, json);
+        string displayText = ResolveWebSocketDisplayText(entry, bytes, text, entry.PreviewText);
+        return BuildPayloadSnapshot(entry, bytes, displayText, json);
+    }
+
+    private static string ResolveWebSocketDisplayText(SocketEntry entry, byte[] bytes, string text, string fallback)
+    {
+        if (entry.IsTextFrame && bytes.Length > 0)
+        {
+            return Encoding.UTF8.GetString(bytes);
+        }
+
+        return string.IsNullOrWhiteSpace(text) ? fallback : text;
     }
 
     private static SocketPayloadSnapshot BuildPayloadSnapshot(SocketEntry entry, byte[] bytes, string text, string jsonCandidate)
     {
         bool hasJson = TryNormalizeJson(jsonCandidate, out string normalizedJson);
-        bool isBinary = entry.IsBinaryFrame || entry.IsControlFrame;
-        string rawText = text;
-        string displayText = isBinary ? BuildBinaryRawPreview(entry, bytes, text) : text;
+        bool isBinary = entry.IsBinaryFrame || entry.IsControlFrame || LooksBinary(bytes);
         string payloadKind = BuildPayloadKindLabel(entry, hasJson, isBinary);
         string previewMode = hasJson
-            ? "JSON / 原文 / HEX"
+            ? "JSON / 文本 / HEX / Protobuf"
             : entry.IsControlFrame
-                ? "专用说明 / HEX / 原文"
-                : isBinary
-                    ? "HEX / 原文"
-                    : "原文 / HEX";
+                ? "HEX / 控制帧 / Protobuf"
+                : "文本 / HEX / Protobuf";
         string status = entry.IsStatusFrame
             ? "连接状态事件"
             : bytes.Length > 0
@@ -1032,11 +1197,9 @@ public partial class WebSocketMessagesControl : UserControl
                 ? "识别为 JSON，默认切到 JSON 视图。"
                 : entry.IsControlFrame
                     ? "控制帧在上方显示专用解释，HEX 中保留原始载荷。"
-                    : isBinary
-                        ? "检测为二进制帧，建议优先查看 HEX 或 Protobuf。"
-                        : "当前是普通文本帧，可直接在原文中查看和编辑。";
+                    : "消息流显示摘要，右侧通过文本、HEX、JSON/Protobuf 视图切换查看。";
 
-        return new SocketPayloadSnapshot(bytes, rawText, displayText, normalizedJson, hasJson, isBinary, payloadKind, previewMode, status, hint);
+        return new SocketPayloadSnapshot(bytes, text, text, normalizedJson, hasJson, isBinary, payloadKind, previewMode, status, hint);
     }
 
     private static string BuildPayloadKindLabel(SocketEntry entry, bool hasJson, bool isBinary)
@@ -1085,33 +1248,6 @@ public partial class WebSocketMessagesControl : UserControl
         {
             return false;
         }
-    }
-
-    private static string BuildBinaryRawPreview(SocketEntry entry, byte[] bytes, string textPreview)
-    {
-        StringBuilder builder = new();
-        builder.AppendLine($"[{entry.TypeLabel}]");
-        builder.AppendLine($"方向: {entry.DirectionLabel}");
-        builder.AppendLine($"长度: {entry.LengthLabel}");
-        builder.AppendLine();
-        builder.AppendLine("建议切换到 HEX 视图查看完整内容。");
-
-        string cleanedPreview = (textPreview ?? "").Trim();
-        if (!string.IsNullOrWhiteSpace(cleanedPreview))
-        {
-            cleanedPreview = cleanedPreview.Replace("\r\n", "\n").Replace('\r', '\n');
-            builder.AppendLine();
-            builder.AppendLine("文本探测:");
-            builder.AppendLine(cleanedPreview);
-        }
-
-        if (bytes.Length > 0)
-        {
-            builder.AppendLine();
-            builder.Append("完整字节内容请切换到 HEX 视图查看。");
-        }
-
-        return builder.ToString().TrimEnd();
     }
 
     private void UpdateSpecialFrame(SocketEntry entry, SocketPayloadSnapshot snapshot)
@@ -1204,8 +1340,8 @@ public partial class WebSocketMessagesControl : UserControl
         UpdateReplayEditorStatus();
         ReplayActionStatusTextBlock.Text = "";
         ParserStatusTextBlock.Text = snapshot is null
-            ? "可先回填当前帧，再切换 HEX / Base64 后解析。"
-            : "可先回填当前帧，再切换 HEX / Base64 后解析。";
+            ? "选择消息后会自动填入编辑区，可切换 HEX / Base64 后解析。"
+            : "当前帧已自动填入编辑区，可切换 HEX / Base64 后解析。";
     }
 
     private void FillReplayEditorFromSelected()
@@ -1273,11 +1409,11 @@ public partial class WebSocketMessagesControl : UserControl
         ReplayHintTextBlock.Text = wsType switch
         {
             "Ping" => "Ping 建议使用 HEX 或小文本载荷，便于模拟心跳探测。",
-            "Pong" => "Pong 常用于模拟应答，可直接回填当前帧后再发送。",
+            "Pong" => "Pong 常用于模拟应答，选择当前帧后可直接修改再发送。",
             "Close" => "Close 建议使用 HEX，前 2 字节通常是关闭码，后续可带原因文本。",
             "Binary" when sendType == "HEX" => "Binary + HEX 最适合精确修改原始字节内容。",
             "Text" when sendType == "UTF8" => "Text + UTF8 适合直接编辑文本消息。",
-            _ => "回填当前帧后可直接修改，再按当前方向与帧类型发送。"
+            _ => "选择消息后会自动填入编辑区，可直接修改后按当前方向与帧类型发送。"
         };
     }
 
@@ -1342,7 +1478,7 @@ public partial class WebSocketMessagesControl : UserControl
 
     private SocketEntry? GetSelectedEntry()
     {
-        return FramesList.SelectedItem as SocketEntry;
+        return _currentEntry ?? SelectedEntry ?? (FramesList.SelectedItem as SocketEntry);
     }
 
     private int CountVisibleEntries()
@@ -1359,6 +1495,44 @@ public partial class WebSocketMessagesControl : UserControl
         }
 
         return count;
+    }
+
+    private FrameStatistics CountFrameStatistics()
+    {
+        if (Entries is null)
+        {
+            return new FrameStatistics();
+        }
+
+        int total = 0;
+        int upstream = 0;
+        int downstream = 0;
+        int text = 0;
+
+        foreach (object? item in Entries)
+        {
+            if (item is not SocketEntry entry)
+            {
+                continue;
+            }
+
+            total++;
+            if (entry.Icon == "上行")
+            {
+                upstream++;
+            }
+            else if (entry.Icon == "下行")
+            {
+                downstream++;
+            }
+
+            if (entry.IsTextFrame)
+            {
+                text++;
+            }
+        }
+
+        return new FrameStatistics(total, upstream, downstream, text);
     }
 
     private static bool EntryMatchesQuery(SocketEntry entry, string query)
@@ -1943,11 +2117,7 @@ public partial class WebSocketMessagesControl : UserControl
 
     private void UpdateSearchAffordance()
     {
-        bool active = !string.IsNullOrWhiteSpace(SearchTextBox?.Text)
-            || _currentKindFilter != FilterAll
-            || _currentDirectionFilter != DirectionAll
-            || _manualOnly
-            || _nonEmptyOnly;
+        bool active = HasActiveFrameFilter();
         bool popupOpen = IsSearchFlyoutOpen;
         SearchActiveDot.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
         SearchToggleButton.Background = popupOpen || active ? CreateBrush("#EEF4FF") : Brushes.Transparent;
@@ -1958,6 +2128,15 @@ public partial class WebSocketMessagesControl : UserControl
             : active
                 ? "当前已有筛选条件生效"
                 : "Ctrl+F 打开快速筛选";
+    }
+
+    private bool HasActiveFrameFilter()
+    {
+        return !string.IsNullOrWhiteSpace(SearchTextBox?.Text)
+            || _currentKindFilter != FilterAll
+            || _currentDirectionFilter != DirectionAll
+            || _manualOnly
+            || _nonEmptyOnly;
     }
 
     private bool IsSearchFlyoutOpen => SearchFlyoutPanel.Visibility == Visibility.Visible;
@@ -1989,4 +2168,6 @@ public partial class WebSocketMessagesControl : UserControl
         string PreviewMode,
         string StatusText,
         string HintText);
+
+    private readonly record struct FrameStatistics(int Total = 0, int Upstream = 0, int Downstream = 0, int Text = 0);
 }

@@ -26,7 +26,6 @@ public sealed class CaptureEntry : ViewModelBase
     private static readonly Brush DangerRowBackgroundBrush = CreateFrozenBrush("#FFF1F1");
     private static readonly Brush InfoRowBackgroundBrush = CreateFrozenBrush("#F4F8FF");
     private static readonly Brush RuleHitRowBackgroundBrush = CreateFrozenBrush("#E7F7FF");
-    private static readonly Brush RuleHitAccentBrush = CreateFrozenBrush("#0088A8");
     private static readonly Brush BlockRuleHitRowBackgroundBrush = CreateFrozenBrush("#FFF0DD");
     private static readonly Brush BlockRuleHitStatusBrush = CreateFrozenBrush("#C2410C");
     private static readonly IReadOnlyDictionary<string, ImageSource> SessionIconImages = CreateSessionIconImages();
@@ -231,11 +230,7 @@ public sealed class CaptureEntry : ViewModelBase
     [JsonIgnore]
     public Brush RowAccentBrush => HasTagColor && !IsStrikeMarked
         ? TagAccentBrush
-        : HasBlockRuleHits
-            ? Brushes.Transparent
-            : HasRuleHits
-                ? RuleHitAccentBrush
-                : Brushes.Transparent;
+        : Brushes.Transparent;
 
     [JsonIgnore]
     public Brush UrlForeground => HasTagColor && !IsStrikeMarked

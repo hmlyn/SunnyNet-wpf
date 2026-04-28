@@ -925,7 +925,7 @@
                                     </Style>
                                 </DataGrid.RowStyle>
                                 <DataGrid.Columns>
-                                    <DataGridTemplateColumn x:Name="IndexColumn" Header="#" Width="82" IsReadOnly="True" CellStyle="{StaticResource SessionIndexCellStyle}" HeaderStyle="{StaticResource SessionIndexHeaderStyle}">
+                                    <DataGridTemplateColumn x:Name="IndexColumn" Header="#" Width="82" MinWidth="76" IsReadOnly="True" CellStyle="{StaticResource SessionIndexCellStyle}" HeaderStyle="{StaticResource SessionIndexHeaderStyle}">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <Grid>
@@ -1016,6 +1016,16 @@
                                                         Margin="10,0,0,0"
                                                         Orientation="Horizontal"
                                                         VerticalAlignment="Center">
+                                                <StackPanel.Style>
+                                                    <Style TargetType="StackPanel">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Detail.IsHttpSession}" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </StackPanel.Style>
                                                 <TextBlock Style="{StaticResource DetailSearchLabelTextStyle}" Text="查找" />
                                                 <TextBox x:Name="RequestDetailSearchTextBox"
                                                          Style="{StaticResource DetailSearchTextBoxStyle}"
@@ -1023,7 +1033,7 @@
                                                          Text="{Binding Detail.RequestSearchText, UpdateSourceTrigger=PropertyChanged}" />
                                             </StackPanel>
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                <TextBlock Style="{StaticResource DetailSectionTitleTextStyle}" Text="请求内容" />
+                                                <TextBlock Style="{StaticResource DetailSectionTitleTextStyle}" Text="{Binding Detail.RequestSectionTitle}" />
                                                 <Border Style="{StaticResource DetailBadgeBorderStyle}"
                                                         Visibility="{Binding Detail.HasRequestDisplayBody, Converter={StaticResource BooleanToVisibilityConverter}}">
                                                     <TextBlock Text="显示解密" />
@@ -1063,7 +1073,7 @@
                                                     </Style.Triggers>
                                                 </Style>
                                             </TabControl.Style>
-                                            <TabItem Header="原始视图">
+                                            <TabItem x:Name="RequestRawTab" Header="原始视图">
                                                 <Grid>
                                                     <controls:HttpSyntaxTextBox x:Name="RequestRawViewer"
                                                                                 SourceText="{Binding Detail.RequestRaw}"
@@ -1104,13 +1114,13 @@
                                                     </TextBox>
                                                 </Grid>
                                             </TabItem>
-                                            <TabItem Header="协议头">
+                                            <TabItem x:Name="RequestHeadersTab" Header="协议头">
                                                 <controls:NameValueTableControl Rows="{Binding Detail.RequestHeaderRows}" EmptyText="无请求协议头" />
                                             </TabItem>
-                                            <TabItem Header="参数视图">
+                                            <TabItem x:Name="RequestParamsTab" Header="参数视图">
                                                 <controls:NameValueTableControl Rows="{Binding Detail.RequestQueryRows}" EmptyText="无请求参数" />
                                             </TabItem>
-                                            <TabItem Header="请求数据">
+                                            <TabItem x:Name="RequestBodyTab" Header="请求数据">
                                                 <controls:RequestBodyView x:Name="RequestBodyViewer"
                                                                           RawText="{Binding Detail.RequestBody}"
                                                                           SearchText="{Binding Detail.RequestSearchText}"
@@ -1118,17 +1128,17 @@
                                                                           UrlEncodedRows="{Binding Detail.RequestBodyRows}"
                                                                           HasUrlEncodedRows="{Binding Detail.HasRequestBodyRows}" />
                                             </TabItem>
-                                            <TabItem Header="HEX视图">
+                                            <TabItem x:Name="RequestHexTab" Header="HEX视图">
                                                 <controls:HexViewControl Bytes="{Binding Detail.RequestHexBytes}"
                                                                          HeaderLength="{Binding Detail.RequestHexHeaderLength}"
                                                                          VirtualSource="{Binding Detail.RequestHexSource}"
                                                                          EnableBodyCopyActions="True"
                                                                          EmptyText="无请求十六进制数据" />
                                             </TabItem>
-                                            <TabItem Header="Cookies">
+                                            <TabItem x:Name="RequestCookiesTab" Header="Cookies">
                                                 <controls:NameValueTableControl Rows="{Binding Detail.RequestCookieRows}" EmptyText="无请求 Cookies" />
                                             </TabItem>
-                                            <TabItem Header="JSON视图">
+                                            <TabItem x:Name="RequestJsonTab" Header="JSON视图">
                                                 <controls:JsonTreeViewControl JsonText="{Binding Detail.RequestJson}" />
                                             </TabItem>
                                             <TabItem x:Name="RequestWebSocketTab" Header="WebSocket">
@@ -1136,7 +1146,7 @@
                                                     <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
                                                         <Setter Property="Visibility" Value="Visible" />
                                                         <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding Detail.IsSocketSession}" Value="False">
+                                                            <DataTrigger Binding="{Binding Detail.IsWebSocketSession}" Value="False">
                                                                 <Setter Property="Visibility" Value="Collapsed" />
                                                             </DataTrigger>
                                                         </Style.Triggers>
@@ -1146,6 +1156,38 @@
                                                                                    SelectedEntry="{Binding Detail.SelectedSocketEntry, Mode=TwoWay}"
                                                                                    DisplayMode="Flow"
                                                                                    Theology="{Binding SelectedSession.Theology, TargetNullValue=0}" />
+                                            </TabItem>
+                                            <TabItem x:Name="RequestTcpTab" Header="TCP">
+                                                <TabItem.Style>
+                                                    <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Detail.IsTcpSession}" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TabItem.Style>
+                                                <controls:TcpMessagesControl Entries="{Binding Detail.SocketEntries}"
+                                                                             SelectedEntry="{Binding Detail.SelectedSocketEntry, Mode=TwoWay}"
+                                                                             DisplayMode="Flow"
+                                                                             Theology="{Binding SelectedSession.Theology, TargetNullValue=0}" />
+                                            </TabItem>
+                                            <TabItem x:Name="RequestUdpTab" Header="UDP">
+                                                <TabItem.Style>
+                                                    <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Detail.IsUdpSession}" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TabItem.Style>
+                                                <controls:UdpMessagesControl Entries="{Binding Detail.SocketEntries}"
+                                                                             SelectedEntry="{Binding Detail.SelectedSocketEntry, Mode=TwoWay}"
+                                                                             DisplayMode="Flow"
+                                                                             Theology="{Binding SelectedSession.Theology, TargetNullValue=0}" />
                                             </TabItem>
                                         </TabControl>
                                     </Grid>
@@ -1185,6 +1227,16 @@
                                                         Margin="10,0,0,0"
                                                         Orientation="Horizontal"
                                                         VerticalAlignment="Center">
+                                                <StackPanel.Style>
+                                                    <Style TargetType="StackPanel">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Detail.IsHttpSession}" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </StackPanel.Style>
                                                 <TextBlock Style="{StaticResource DetailSearchLabelTextStyle}" Text="查找" />
                                                 <TextBox x:Name="ResponseDetailSearchTextBox"
                                                          Style="{StaticResource DetailSearchTextBoxStyle}"
@@ -1208,12 +1260,13 @@
                                                         Content="断开连接" />
                                             </StackPanel>
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                <TextBlock Style="{StaticResource DetailSectionTitleTextStyle}" Text="响应内容" />
+                                                <TextBlock Style="{StaticResource DetailSectionTitleTextStyle}" Text="{Binding Detail.ResponseSectionTitle}" />
                                                 <Border Style="{StaticResource DetailBadgeBorderStyle}"
                                                         Visibility="{Binding Detail.HasResponseDisplayBody, Converter={StaticResource BooleanToVisibilityConverter}}">
                                                     <TextBlock Text="显示解密" />
                                                 </Border>
-                                                <Border Style="{StaticResource DetailBadgeBorderStyle}">
+                                                <Border Style="{StaticResource DetailBadgeBorderStyle}"
+                                                        Visibility="{Binding Detail.IsHttpSession, Converter={StaticResource BooleanToVisibilityConverter}}">
                                                     <TextBlock Text="{Binding Detail.ResponseStateCode}" />
                                                 </Border>
                                             </StackPanel>
@@ -1229,6 +1282,7 @@
                                                         <MultiDataTrigger>
                                                             <MultiDataTrigger.Conditions>
                                                                 <Condition Binding="{Binding Detail.HasSelection}" Value="True" />
+                                                                <Condition Binding="{Binding Detail.IsHttpSession}" Value="True" />
                                                                 <Condition Binding="{Binding Detail.ResponseHeaders}" Value="" />
                                                             </MultiDataTrigger.Conditions>
                                                             <Setter Property="Visibility" Value="Visible" />
@@ -1251,7 +1305,7 @@
                                                     </Style.Triggers>
                                                 </Style>
                                             </TabControl.Style>
-                                            <TabItem Header="原始响应">
+                                            <TabItem x:Name="ResponseRawTab" Header="原始响应">
                                                 <Grid>
                                                     <controls:HttpSyntaxTextBox x:Name="ResponseRawViewer"
                                                                                 SourceText="{Binding Detail.ResponseRaw}"
@@ -1292,36 +1346,36 @@
                                                     </TextBox>
                                                 </Grid>
                                             </TabItem>
-                                            <TabItem Header="协议头">
+                                            <TabItem x:Name="ResponseHeadersTab" Header="协议头">
                                                 <controls:NameValueTableControl Rows="{Binding Detail.ResponseHeaderRows}" EmptyText="无响应协议头" />
                                             </TabItem>
-                                            <TabItem Header="响应文本">
+                                            <TabItem x:Name="ResponseTextTab" Header="响应文本">
                                                 <controls:HttpSyntaxTextBox x:Name="ResponseTextViewer"
                                                                             SourceText="{Binding Detail.ResponseText}"
                                                                             HighlightMode="Body"
                                                                             SearchText="{Binding Detail.ResponseSearchText}"
                                                                             SearchIgnoreCase="{Binding Detail.DetailSearchIgnoreCase}" />
                                             </TabItem>
-                                            <TabItem Header="图片视图">
+                                            <TabItem x:Name="ResponseImageTab" Header="图片视图">
                                                 <controls:ImagePreviewControl ImageBytes="{Binding Detail.ResponseImageBytes}"
                                                                               ImageType="{Binding Detail.ResponseImageType}"
                                                                               EmptyText="暂无图片响应" />
                                             </TabItem>
-                                            <TabItem Header="HTML视图">
+                                            <TabItem x:Name="ResponseHtmlTab" Header="HTML视图">
                                                 <controls:HtmlPreviewControl HtmlText="{Binding Detail.ResponseHtml}" />
                                             </TabItem>
-                                            <TabItem Header="HEX视图">
+                                            <TabItem x:Name="ResponseHexTab" Header="HEX视图">
                                                 <controls:HexViewControl Bytes="{Binding Detail.ResponseHexBytes}"
                                                                          HeaderLength="{Binding Detail.ResponseHexHeaderLength}"
                                                                          VirtualSource="{Binding Detail.ResponseHexSource}"
                                                                          EmptyText="无响应十六进制数据" />
                                             </TabItem>
-                                            <TabItem x:Name="ResponseWebSocketTab" Header="WebSocket调试">
+                                            <TabItem x:Name="ResponseWebSocketTab" Header="文本视图">
                                                 <TabItem.Style>
                                                     <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
                                                         <Setter Property="Visibility" Value="Visible" />
                                                         <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding Detail.IsSocketSession}" Value="False">
+                                                            <DataTrigger Binding="{Binding Detail.IsWebSocketSession}" Value="False">
                                                                 <Setter Property="Visibility" Value="Collapsed" />
                                                             </DataTrigger>
                                                         </Style.Triggers>
@@ -1329,15 +1383,111 @@
                                                 </TabItem.Style>
                                                 <controls:WebSocketMessagesControl Entries="{Binding Detail.SocketEntries}"
                                                                                    SelectedEntry="{Binding Detail.SelectedSocketEntry, Mode=TwoWay}"
-                                                                                   DisplayMode="Inspector"
+                                                                                   DisplayMode="PayloadText"
                                                                                    Theology="{Binding SelectedSession.Theology, TargetNullValue=0}" />
                                             </TabItem>
-                                            <TabItem Header="Cookies">
+                                            <TabItem x:Name="ResponseWebSocketHexTab" Header="HEX视图">
+                                                <TabItem.Style>
+                                                    <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Detail.IsWebSocketSession}" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TabItem.Style>
+                                                <controls:WebSocketMessagesControl Entries="{Binding Detail.SocketEntries}"
+                                                                                   SelectedEntry="{Binding Detail.SelectedSocketEntry, Mode=TwoWay}"
+                                                                                   DisplayMode="PayloadHex"
+                                                                                   Theology="{Binding SelectedSession.Theology, TargetNullValue=0}" />
+                                            </TabItem>
+                                            <TabItem x:Name="ResponseWebSocketJsonTab" Header="JSON视图">
+                                                <TabItem.Style>
+                                                    <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Detail.IsWebSocketSession}" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TabItem.Style>
+                                                <controls:WebSocketMessagesControl Entries="{Binding Detail.SocketEntries}"
+                                                                                   SelectedEntry="{Binding Detail.SelectedSocketEntry, Mode=TwoWay}"
+                                                                                   DisplayMode="PayloadJson"
+                                                                                   Theology="{Binding SelectedSession.Theology, TargetNullValue=0}" />
+                                            </TabItem>
+                                            <TabItem x:Name="ResponseWebSocketProtobufTab" Header="ProtoBuf">
+                                                <TabItem.Style>
+                                                    <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Detail.IsWebSocketSession}" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TabItem.Style>
+                                                <controls:WebSocketMessagesControl Entries="{Binding Detail.SocketEntries}"
+                                                                                   SelectedEntry="{Binding Detail.SelectedSocketEntry, Mode=TwoWay}"
+                                                                                   DisplayMode="PayloadProtobuf"
+                                                                                   Theology="{Binding SelectedSession.Theology, TargetNullValue=0}" />
+                                            </TabItem>
+                                            <TabItem x:Name="ResponseWebSocketReplayTab" Header="主动发送">
+                                                <TabItem.Style>
+                                                    <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Detail.IsWebSocketSession}" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TabItem.Style>
+                                                <controls:WebSocketMessagesControl Entries="{Binding Detail.SocketEntries}"
+                                                                                   SelectedEntry="{Binding Detail.SelectedSocketEntry, Mode=TwoWay}"
+                                                                                   DisplayMode="Replay"
+                                                                                   Theology="{Binding SelectedSession.Theology, TargetNullValue=0}" />
+                                            </TabItem>
+                                            <TabItem x:Name="ResponseTcpTab" Header="TCP详情">
+                                                <TabItem.Style>
+                                                    <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Detail.IsTcpSession}" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TabItem.Style>
+                                                <controls:TcpMessagesControl Entries="{Binding Detail.SocketEntries}"
+                                                                             SelectedEntry="{Binding Detail.SelectedSocketEntry, Mode=TwoWay}"
+                                                                             DisplayMode="Inspector"
+                                                                             Theology="{Binding SelectedSession.Theology, TargetNullValue=0}" />
+                                            </TabItem>
+                                            <TabItem x:Name="ResponseUdpTab" Header="UDP详情">
+                                                <TabItem.Style>
+                                                    <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Detail.IsUdpSession}" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TabItem.Style>
+                                                <controls:UdpMessagesControl Entries="{Binding Detail.SocketEntries}"
+                                                                             SelectedEntry="{Binding Detail.SelectedSocketEntry, Mode=TwoWay}"
+                                                                             DisplayMode="Inspector"
+                                                                             Theology="{Binding SelectedSession.Theology, TargetNullValue=0}" />
+                                            </TabItem>
+                                            <TabItem x:Name="ResponseCookiesTab" Header="Cookies">
                                                 <controls:NameValueTableControl Rows="{Binding Detail.ResponseCookieRows}"
                                                                                ShowExtraColumn="True"
                                                                                EmptyText="无响应 Cookies" />
                                             </TabItem>
-                                            <TabItem Header="JSON视图">
+                                            <TabItem x:Name="ResponseJsonTab" Header="JSON视图">
                                                 <controls:JsonTreeViewControl JsonText="{Binding Detail.ResponseJson}" />
                                             </TabItem>
                                         </TabControl>
@@ -1425,6 +1575,46 @@
                         <TextBlock VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" Text="{Binding StatusRight}" />
                     </StackPanel>
                 </DockPanel>
+            </Border>
+
+            <Border x:Name="MainAlertBorder"
+                    Grid.RowSpan="4"
+                    Panel.ZIndex="80"
+                    MinWidth="292"
+                    MaxWidth="560"
+                    Margin="0,14,0,0"
+                    Padding="14,10"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Top"
+                    Background="#FEF0F0"
+                    BorderBrush="#FDE2E2"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Visibility="Collapsed">
+                <StackPanel Orientation="Horizontal">
+                    <Border x:Name="MainAlertIconBorder"
+                            Width="14"
+                            Height="14"
+                            VerticalAlignment="Center"
+                            Background="#F56C6C"
+                            CornerRadius="7">
+                        <TextBlock x:Name="MainAlertGlyphTextBlock"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   FontSize="8"
+                                   FontWeight="Bold"
+                                   Foreground="White"
+                                   Text="×" />
+                    </Border>
+                    <TextBlock x:Name="MainAlertTextBlock"
+                               MaxWidth="500"
+                               Margin="10,0,0,0"
+                               VerticalAlignment="Center"
+                               FontSize="13"
+                               Foreground="#F56C6C"
+                               TextTrimming="CharacterEllipsis"
+                               Text="操作失败" />
+                </StackPanel>
             </Border>
         </Grid>
     </Border>

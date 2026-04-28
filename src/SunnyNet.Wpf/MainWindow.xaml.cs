@@ -25,6 +25,7 @@ public partial class MainWindow : Window
     private const int MonitorDefaultToNearest = 0x00000002;
     private readonly MainWindowViewModel _viewModel = new();
     private readonly UiLayoutSettings _layoutSettings = UiLayoutSettingsStore.Load();
+    private readonly DispatcherTimer _mainAlertTimer = new() { Interval = TimeSpan.FromSeconds(2.8) };
     private SearchWindow? _searchWindow;
     private SettingsWindow? _processSettingsWindow;
     private DetailZoomMode _detailZoomMode;
@@ -52,6 +53,7 @@ public partial class MainWindow : Window
         Closing += MainWindow_Closing;
         SourceInitialized += MainWindow_SourceInitialized;
         StateChanged += MainWindow_StateChanged;
+        _mainAlertTimer.Tick += MainAlertTimer_Tick;
         _viewModel.NotificationRequested += ViewModel_NotificationRequested;
         _viewModel.ScrollToEntryRequested += ViewModel_ScrollToEntryRequested;
         _viewModel.PropertyChanged += ViewModel_PropertyChanged;
@@ -59,6 +61,7 @@ public partial class MainWindow : Window
         _viewModel.Detail.PropertyChanged += Detail_PropertyChanged;
         RegisterSessionColumnWidthListeners();
         UpdateLanIpPopupItems();
+        UpdateDetailTabsForSessionKind();
         UpdateFooterState();
     }
 
@@ -272,30 +275,83 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (propertyChangedEventArgs.PropertyName != nameof(SessionDetail.IsSocketSession))
+        if (propertyChangedEventArgs.PropertyName is not (
+            nameof(SessionDetail.IsSocketSession)
+            or nameof(SessionDetail.SocketProtocol)
+            or nameof(SessionDetail.IsWebSocketSession)
+            or nameof(SessionDetail.IsTcpSession)
+            or nameof(SessionDetail.IsUdpSession)
+            or nameof(SessionDetail.IsHttpSession)))
         {
             return;
         }
 
-        if (_viewModel.Detail.IsSocketSession)
+        UpdateDetailTabsForSessionKind();
+        ApplyDetailZoomMode();
+    }
+
+    private void UpdateDetailTabsForSessionKind()
+    {
+        bool isHttp = _viewModel.Detail.IsHttpSession;
+        bool isWebSocket = _viewModel.Detail.IsWebSocketSession;
+        bool isTcp = _viewModel.Detail.IsTcpSession;
+        bool isUdp = _viewModel.Detail.IsUdpSession;
+
+        SetTabVisibility(isHttp || isWebSocket, RequestRawTab, RequestHeadersTab, RequestHexTab);
+        SetTabVisibility(isHttp, RequestParamsTab, RequestBodyTab, RequestCookiesTab, RequestJsonTab);
+        SetTabVisibility(isWebSocket, RequestWebSocketTab);
+        SetTabVisibility(isTcp, RequestTcpTab);
+        SetTabVisibility(isUdp, RequestUdpTab);
+
+        SetTabVisibility(isHttp, ResponseRawTab, ResponseHeadersTab, ResponseTextTab, ResponseImageTab, ResponseHtmlTab, ResponseHexTab, ResponseCookiesTab, ResponseJsonTab);
+        SetTabVisibility(isWebSocket, ResponseWebSocketTab, ResponseWebSocketHexTab, ResponseWebSocketJsonTab, ResponseWebSocketProtobufTab, ResponseWebSocketReplayTab);
+        SetTabVisibility(isTcp, ResponseTcpTab);
+        SetTabVisibility(isUdp, ResponseUdpTab);
+
+        if (isWebSocket)
         {
             RequestTabControl.SelectedItem = RequestWebSocketTab;
             ResponseTabControl.SelectedItem = ResponseWebSocketTab;
+            return;
         }
-        else
+
+        if (isTcp)
         {
-            if (RequestWebSocketTab.IsSelected)
-            {
-                RequestTabControl.SelectedIndex = 0;
-            }
-
-            if (ResponseWebSocketTab.IsSelected)
-            {
-                ResponseTabControl.SelectedIndex = 0;
-            }
+            RequestTabControl.SelectedItem = RequestTcpTab;
+            ResponseTabControl.SelectedItem = ResponseTcpTab;
+            return;
         }
 
-        ApplyDetailZoomMode();
+        if (isUdp)
+        {
+            RequestTabControl.SelectedItem = RequestUdpTab;
+            ResponseTabControl.SelectedItem = ResponseUdpTab;
+            return;
+        }
+
+        if (!IsVisibleTab(RequestTabControl.SelectedItem as TabItem))
+        {
+            RequestTabControl.SelectedItem = RequestRawTab;
+        }
+
+        if (!IsVisibleTab(ResponseTabControl.SelectedItem as TabItem))
+        {
+            ResponseTabControl.SelectedItem = ResponseRawTab;
+        }
+    }
+
+    private static void SetTabVisibility(bool visible, params TabItem[] tabs)
+    {
+        Visibility visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        foreach (TabItem tab in tabs)
+        {
+            tab.Visibility = visibility;
+        }
+    }
+
+    private static bool IsVisibleTab(TabItem? tab)
+    {
+        return tab is not null && tab.Visibility == Visibility.Visible;
     }
 
     private void UpdateFooterState()
@@ -322,12 +378,143 @@ public partial class MainWindow : Window
 
     private void ViewModel_NotificationRequested(string title, string message)
     {
-        MessageBox.Show(this, message, title, MessageBoxButton.OK, title == "错误" ? MessageBoxImage.Error : MessageBoxImage.Information);
+        ShowMainAlert(title, message);
+    }
+
+    private void ShowMainAlert(string title, string message)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => ShowMainAlert(title, message));
+            return;
+        }
+
+        AlertKind kind = ResolveAlertKind(title, message);
+        ApplyMainAlertPalette(kind);
+        MainAlertTextBlock.Text = BuildAlertMessage(title, message);
+        MainAlertBorder.Visibility = Visibility.Visible;
+        _mainAlertTimer.Stop();
+        _mainAlertTimer.Start();
+    }
+
+    private void HideMainAlert()
+    {
+        _mainAlertTimer.Stop();
+        MainAlertBorder.Visibility = Visibility.Collapsed;
+    }
+
+    private void MainAlertTimer_Tick(object? sender, EventArgs eventArgs)
+    {
+        HideMainAlert();
+    }
+
+    private void ApplyMainAlertPalette(AlertKind kind)
+    {
+        string background;
+        string border;
+        string icon;
+        string foreground;
+        string glyph;
+
+        switch (kind)
+        {
+            case AlertKind.Success:
+                background = "#F0F9EB";
+                border = "#E1F3D8";
+                icon = "#67C23A";
+                foreground = "#2F8F45";
+                glyph = "✓";
+                break;
+            case AlertKind.Warning:
+                background = "#FDF6EC";
+                border = "#FAECD8";
+                icon = "#E6A23C";
+                foreground = "#A56B00";
+                glyph = "!";
+                break;
+            case AlertKind.Info:
+                background = "#ECF5FF";
+                border = "#D9ECFF";
+                icon = "#409EFF";
+                foreground = "#1D6FD2";
+                glyph = "i";
+                break;
+            default:
+                background = "#FEF0F0";
+                border = "#FDE2E2";
+                icon = "#F56C6C";
+                foreground = "#F56C6C";
+                glyph = "×";
+                break;
+        }
+
+        MainAlertBorder.Background = CreateSolidBrush(background);
+        MainAlertBorder.BorderBrush = CreateSolidBrush(border);
+        MainAlertIconBorder.Background = CreateSolidBrush(icon);
+        MainAlertTextBlock.Foreground = CreateSolidBrush(foreground);
+        MainAlertGlyphTextBlock.Text = glyph;
+    }
+
+    private static AlertKind ResolveAlertKind(string title, string message)
+    {
+        string text = $"{title} {message}";
+        if (text.Contains("失败", StringComparison.Ordinal)
+            || text.Contains("错误", StringComparison.Ordinal)
+            || text.Contains("异常", StringComparison.Ordinal))
+        {
+            return AlertKind.Error;
+        }
+
+        if (text.Contains("成功", StringComparison.Ordinal)
+            || text.Contains("已", StringComparison.Ordinal))
+        {
+            return AlertKind.Success;
+        }
+
+        if (text.Contains("警告", StringComparison.Ordinal)
+            || text.Contains("注意", StringComparison.Ordinal))
+        {
+            return AlertKind.Warning;
+        }
+
+        return AlertKind.Info;
+    }
+
+    private static string BuildAlertMessage(string title, string message)
+    {
+        if (string.IsNullOrWhiteSpace(title)
+            || title is "成功" or "错误" or "提示")
+        {
+            return message;
+        }
+
+        if (string.IsNullOrWhiteSpace(message)
+            || message.StartsWith(title, StringComparison.Ordinal))
+        {
+            return string.IsNullOrWhiteSpace(message) ? title : message;
+        }
+
+        return $"{title}：{message}";
+    }
+
+    private static SolidColorBrush CreateSolidBrush(string color)
+    {
+        SolidColorBrush brush = new((Color)ColorConverter.ConvertFromString(color));
+        brush.Freeze();
+        return brush;
     }
 
     private void ViewModel_ScrollToEntryRequested(CaptureEntry entry)
     {
         SessionsGrid.ScrollIntoView(entry);
+    }
+
+    private enum AlertKind
+    {
+        Error,
+        Success,
+        Warning,
+        Info
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs mouseButtonEventArgs)
@@ -662,9 +849,21 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (_viewModel.Detail.IsSocketSession && RequestWebSocketTab.IsSelected)
+        if (_viewModel.Detail.IsWebSocketSession && RequestWebSocketTab.IsSelected)
         {
             ResponseTabControl.SelectedItem = ResponseWebSocketTab;
+            return;
+        }
+
+        if (_viewModel.Detail.IsTcpSession && RequestTcpTab.IsSelected)
+        {
+            ResponseTabControl.SelectedItem = ResponseTcpTab;
+            return;
+        }
+
+        if (_viewModel.Detail.IsUdpSession && RequestUdpTab.IsSelected)
+        {
+            ResponseTabControl.SelectedItem = ResponseUdpTab;
         }
     }
 

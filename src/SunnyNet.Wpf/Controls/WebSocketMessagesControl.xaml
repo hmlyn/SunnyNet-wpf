@@ -106,9 +106,9 @@
         <Style x:Key="WebSocketPayloadSideTabItemStyle" TargetType="TabItem">
             <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Padding" Value="8,6" />
-            <Setter Property="Margin" Value="0,0,0,3" />
-            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+            <Setter Property="MinHeight" Value="27" />
             <Setter Property="SnapsToDevicePixels" Value="True" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -160,13 +160,13 @@
                         <Grid KeyboardNavigation.TabNavigation="Local"
                               SnapsToDevicePixels="True">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="82" />
+                                <ColumnDefinition Width="72" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
 
                             <Border Grid.Column="0"
-                                    Margin="0,0,8,0"
-                                    Padding="4"
+                                    Margin="0,0,6,0"
+                                    Padding="3"
                                     Background="{StaticResource SurfaceAltBrush}"
                                     BorderBrush="{StaticResource DividerBrush}"
                                     BorderThickness="1"
@@ -467,10 +467,6 @@
                     </Border>
                 </StackPanel>
 
-                <TextBlock DockPanel.Dock="Right"
-                           VerticalAlignment="Center"
-                           Style="{StaticResource CaptionTextStyle}"
-                           Text="控制帧专用展示 / Protobuf 解析 / 编辑重放" />
             </DockPanel>
         </Border>
 
@@ -498,7 +494,8 @@
                             Background="{StaticResource SurfaceAltBrush}"
                             BorderBrush="{StaticResource DividerBrush}"
                             BorderThickness="1"
-                            CornerRadius="10">
+                            CornerRadius="10"
+                            Visibility="Collapsed">
                         <DockPanel LastChildFill="False">
                             <TextBlock VerticalAlignment="Center"
                                        Style="{StaticResource SectionTitleTextStyle}"
@@ -578,7 +575,17 @@
                                  PreviewMouseRightButtonDown="FramesList_PreviewMouseRightButtonDown"
                                  ScrollViewer.CanContentScroll="True"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 VirtualizingPanel.CacheLength="1,1"
+                                 VirtualizingPanel.CacheLengthUnit="Page"
+                                 VirtualizingPanel.IsVirtualizing="True"
+                                 VirtualizingPanel.ScrollUnit="Pixel"
+                                 VirtualizingPanel.VirtualizationMode="Recycling"
                                  SelectionChanged="FramesList_SelectionChanged">
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <VirtualizingStackPanel />
+                                </ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
                             <ListBox.ContextMenu>
                                 <ContextMenu Opened="FramesContextMenu_Opened">
                                     <MenuItem x:Name="CopyFrameSummaryMenuItem" Header="复制帧摘要" Click="CopySelectedFrameSummary_Click" />
@@ -632,12 +639,12 @@
                                                        Text="{Binding LengthLabel}" />
                                             <TextBlock Grid.Column="5"
                                                        Style="{StaticResource WebSocketFlowCellTextStyle}"
-                                                       ToolTip="{Binding PreviewText}"
+                                                       ToolTip="{Binding PreviewTextShort}"
                                                        TextTrimming="CharacterEllipsis">
                                                 <TextBlock.Inlines>
                                                     <Run Text="{Binding FrameTitle, Mode=OneWay}" FontWeight="SemiBold" />
                                                     <Run Foreground="{StaticResource TextSecondaryBrush}" Text=" · " />
-                                                    <Run Foreground="{StaticResource TextSecondaryBrush}" Text="{Binding PreviewText, Mode=OneWay}" />
+                                                    <Run Foreground="{StaticResource TextSecondaryBrush}" Text="{Binding PreviewTextShort, Mode=OneWay}" />
                                                 </TextBlock.Inlines>
                                             </TextBlock>
                                         </Grid>
@@ -904,7 +911,7 @@
                     CornerRadius="10">
                 <Grid>
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="38" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
@@ -912,7 +919,8 @@
                             Background="{StaticResource SurfaceAltBrush}"
                             BorderBrush="{StaticResource DividerBrush}"
                             BorderThickness="0,0,0,1"
-                            CornerRadius="10,10,0,0">
+                            CornerRadius="10,10,0,0"
+                            Visibility="Collapsed">
                         <Grid x:Name="SelectedMetaPanel" Margin="12,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -976,8 +984,8 @@
                     <Grid Grid.Row="1" MinHeight="0">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" MaxHeight="250" />
-                            <RowDefinition Height="Auto" />
+                            <RowDefinition x:Name="PayloadContentRow" Height="*" MaxHeight="168" />
+                            <RowDefinition x:Name="ReplayRow" Height="Auto" />
                         </Grid.RowDefinitions>
 
                         <Border Grid.Row="0"
@@ -986,7 +994,8 @@
                                 Background="{StaticResource SurfaceAltBrush}"
                                 BorderBrush="{StaticResource DividerBrush}"
                                 BorderThickness="1"
-                                CornerRadius="8">
+                                CornerRadius="8"
+                                Visibility="Collapsed">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
@@ -1093,9 +1102,10 @@
                             </Grid>
                         </Border>
 
-                        <Border Grid.Row="1"
-                                Margin="10,0,10,8"
-                                Padding="8"
+                        <Border x:Name="PayloadContentPanel"
+                                Grid.Row="1"
+                                Margin="8,6,8,6"
+                                Padding="6"
                                 Background="{StaticResource SurfaceBrush}"
                                 BorderBrush="{StaticResource DividerBrush}"
                                 BorderThickness="1"
@@ -1108,10 +1118,11 @@
                                 <TextBlock FontSize="13"
                                            FontWeight="SemiBold"
                                            Foreground="{StaticResource TextPrimaryBrush}"
-                                           Text="消息内容" />
+                                           Text="消息内容"
+                                           Visibility="Collapsed" />
                                 <Grid Grid.Row="1"
                                       MinHeight="0"
-                                      Margin="0,8,0,0">
+                                      Margin="0">
                                     <Grid x:Name="PayloadEmptyPanel">
                                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                                             <TextBlock HorizontalAlignment="Center"
@@ -1130,59 +1141,50 @@
                                         </StackPanel>
                                     </Grid>
 
-                                    <TabControl x:Name="PayloadTabs"
-                                                ItemContainerStyle="{StaticResource WebSocketPayloadSideTabItemStyle}"
-                                                Style="{StaticResource WebSocketPayloadSideTabControlStyle}"
-                                                Visibility="Collapsed">
-                                        <TabItem x:Name="PayloadRawTab" Header="原文">
-                                            <controls:HttpSyntaxTextBox x:Name="PayloadRawViewer"
-                                                                        HorizontalScrollBarVisibility="Disabled"
-                                                                        HighlightMode="Body">
-                                                <controls:HttpSyntaxTextBox.ContextMenu>
-                                                    <ContextMenu Opened="PayloadContextMenu_Opened">
-                                                        <MenuItem x:Name="CopyCurrentTextMenuItem" Header="复制当前文本" Click="CopySelectedFrameText_Click" />
-                                                        <MenuItem x:Name="CopyCurrentJsonMenuItem" Header="复制当前 JSON" Click="CopySelectedFrameJson_Click" />
-                                                        <MenuItem x:Name="CopyCurrentHexMenuItem" Header="复制当前 HEX" Click="CopySelectedFrameHex_Click" />
-                                                    </ContextMenu>
-                                                </controls:HttpSyntaxTextBox.ContextMenu>
-                                            </controls:HttpSyntaxTextBox>
-                                        </TabItem>
-                                        <TabItem x:Name="PayloadJsonTab" Header="JSON视图">
-                                            <controls:JsonTreeViewControl x:Name="PayloadJsonViewer" />
-                                        </TabItem>
-                                        <TabItem x:Name="PayloadProtobufTab" Header="Protobuf">
-                                            <Grid>
-                                                <controls:JsonTreeViewControl x:Name="PayloadProtobufViewer" />
-                                                <Border x:Name="PayloadProtobufEmptyPanel"
-                                                        Background="#F8FAFD"
-                                                        IsHitTestVisible="False">
-                                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                        <TextBlock HorizontalAlignment="Center"
-                                                                   FontFamily="Segoe MDL2 Assets"
-                                                                   FontSize="22"
-                                                                   Foreground="{StaticResource TextSecondaryBrush}"
-                                                                   Text="&#xE943;" />
-                                                        <TextBlock x:Name="PayloadProtobufStatusTextBlock"
-                                                                   Margin="0,8,0,0"
-                                                                   HorizontalAlignment="Center"
-                                                                   Style="{StaticResource CaptionTextStyle}"
-                                                                   Text="点击下方“解析 Protobuf”开始解析当前载荷" />
-                                                    </StackPanel>
-                                                </Border>
-                                            </Grid>
-                                        </TabItem>
-                                        <TabItem x:Name="PayloadHexTab" Header="HEX视图">
-                                            <controls:HexViewControl x:Name="PayloadHexViewer"
-                                                                     EmptyText="当前消息无二进制内容" />
-                                        </TabItem>
-                                    </TabControl>
+                                    <Grid x:Name="PayloadViewsHost" Visibility="Collapsed">
+                                        <controls:HttpSyntaxTextBox x:Name="PayloadRawViewer"
+                                                                    HorizontalScrollBarVisibility="Disabled"
+                                                                    HighlightMode="Body">
+                                            <controls:HttpSyntaxTextBox.ContextMenu>
+                                                <ContextMenu Opened="PayloadContextMenu_Opened">
+                                                    <MenuItem x:Name="CopyCurrentTextMenuItem" Header="复制当前文本" Click="CopySelectedFrameText_Click" />
+                                                    <MenuItem x:Name="CopyCurrentJsonMenuItem" Header="复制当前 JSON" Click="CopySelectedFrameJson_Click" />
+                                                    <MenuItem x:Name="CopyCurrentHexMenuItem" Header="复制当前 HEX" Click="CopySelectedFrameHex_Click" />
+                                                </ContextMenu>
+                                            </controls:HttpSyntaxTextBox.ContextMenu>
+                                        </controls:HttpSyntaxTextBox>
+                                        <controls:JsonTreeViewControl x:Name="PayloadJsonViewer" Visibility="Collapsed" />
+                                        <Grid x:Name="PayloadProtobufPanel" Visibility="Collapsed">
+                                            <controls:JsonTreeViewControl x:Name="PayloadProtobufViewer" />
+                                            <Border x:Name="PayloadProtobufEmptyPanel"
+                                                    Background="#F8FAFD"
+                                                    IsHitTestVisible="False">
+                                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <TextBlock HorizontalAlignment="Center"
+                                                               FontFamily="Segoe MDL2 Assets"
+                                                               FontSize="22"
+                                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                                               Text="&#xE943;" />
+                                                    <TextBlock x:Name="PayloadProtobufStatusTextBlock"
+                                                               Margin="0,8,0,0"
+                                                               HorizontalAlignment="Center"
+                                                               Style="{StaticResource CaptionTextStyle}"
+                                                               Text="可在下方导入结构并解析当前载荷" />
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
+                                        <controls:HexViewControl x:Name="PayloadHexViewer"
+                                                                 EmptyText="当前消息无二进制内容"
+                                                                 Visibility="Collapsed" />
+                                    </Grid>
                                 </Grid>
                             </Grid>
                         </Border>
 
-                        <Border Grid.Row="2"
-                                Margin="10,0,10,8"
-                                Padding="8"
+                        <Border x:Name="ReplayPanel"
+                                Grid.Row="2"
+                                Margin="8,0,8,6"
+                                Padding="6"
                                 Background="{StaticResource SurfaceAltBrush}"
                                 BorderBrush="{StaticResource DividerBrush}"
                                 BorderThickness="1"
@@ -1190,10 +1192,10 @@
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
                                 </Grid.RowDefinitions>
 
-                                <DockPanel LastChildFill="False">
+                                <DockPanel x:Name="ReplayToolbarPanel" LastChildFill="False">
                                     <TextBlock VerticalAlignment="Center"
                                                FontSize="12"
                                                FontWeight="SemiBold"
@@ -1204,28 +1206,23 @@
                                                 VerticalAlignment="Center">
                                         <Button MinHeight="26"
                                                 Padding="10,3"
-                                                Content="回填当前帧"
-                                                Click="FillFromSelectedFrame_Click" />
-                                        <Button Margin="8,0,0,0"
-                                                MinHeight="26"
-                                                Padding="10,3"
                                                 Content="发送重放"
                                                 Click="ReplaySend_Click" />
                                     </StackPanel>
                                 </DockPanel>
 
-                                    <Grid Grid.Row="1" Margin="0,8,0,0">
+                                    <Grid x:Name="ReplayAndProtoGrid" Grid.Row="1" Margin="0,6,0,0">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="2*" />
-                                            <ColumnDefinition Width="10" />
-                                            <ColumnDefinition Width="228" />
+                                            <ColumnDefinition x:Name="ReplayMainColumn" Width="*" />
+                                            <ColumnDefinition x:Name="ReplayGapColumn" Width="8" />
+                                            <ColumnDefinition x:Name="ReplaySideColumn" Width="198" />
                                         </Grid.ColumnDefinitions>
 
-                                    <Grid>
+                                    <Grid x:Name="ReplayEditorPanel">
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
                                             <RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
                                         <Grid.ColumnDefinitions>
@@ -1279,7 +1276,7 @@
                                         <TextBox x:Name="ReplayEditorTextBox"
                                                  Grid.Row="2"
                                                  Grid.ColumnSpan="5"
-                                                 Height="70"
+                                                 MinHeight="120"
                                                  Margin="0,5,0,0"
                                                  AcceptsReturn="True"
                                                  AcceptsTab="True"
@@ -1326,8 +1323,9 @@
                                         </Border>
                                     </Grid>
 
-                                    <Border Grid.Column="2"
-                                            Padding="8"
+                                    <Border x:Name="ProtobufToolsPanel"
+                                            Grid.Column="2"
+                                            Padding="6"
                                             Background="{StaticResource SurfaceBrush}"
                                             BorderBrush="{StaticResource DividerBrush}"
                                             BorderThickness="1"
@@ -1346,21 +1344,21 @@
                                                            FontSize="12"
                                                            FontWeight="SemiBold"
                                                            Foreground="{StaticResource TextPrimaryBrush}"
-                                                           Text="Protobuf" />
+                                                           Text="ProtoBuf" />
                                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                                                     <Button MinHeight="26"
-                                                            Padding="7,2"
+                                                            Padding="6,2"
                                                             Content="解析"
                                                             Click="ParseProtobuf_Click" />
                                                     <Button Margin="6,0,0,0"
                                                             MinHeight="26"
-                                                            Padding="7,2"
+                                                            Padding="6,2"
                                                             Content="清空"
                                                             Click="ClearProtobuf_Click" />
                                                 </StackPanel>
                                             </DockPanel>
 
-                                            <Grid Grid.Row="1" Margin="0,8,0,0">
+                                            <Grid Grid.Row="1" Margin="0,5,0,0">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="6" />
@@ -1376,7 +1374,7 @@
                                                         MinHeight="26"
                                                         Padding="0"
                                                         Content="…"
-                                                        ToolTip="选择目录"
+                                                        ToolTip="选择 .proto / .pb 描述文件"
                                                         Click="BrowseProtoSchemaDirectory_Click" />
                                                 <Button Grid.Column="4"
                                                         MinHeight="26"
@@ -1385,7 +1383,7 @@
                                                         Click="ImportProtoSchema_Click" />
                                             </Grid>
 
-                                            <Grid Grid.Row="2" Margin="0,6,0,0">
+                                            <Grid Grid.Row="2" Margin="0,5,0,0">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="42" />
                                                     <ColumnDefinition Width="*" />
@@ -1401,7 +1399,7 @@
                                                           MaxDropDownHeight="260" />
                                             </Grid>
 
-                                            <Grid Grid.Row="3" Margin="0,6,0,0">
+                                            <Grid Grid.Row="3" Margin="0,5,0,0">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="42" />
                                                     <ColumnDefinition Width="*" />
@@ -1418,10 +1416,10 @@
 
                                             <TextBlock x:Name="ParserStatusTextBlock"
                                                        Grid.Row="4"
-                                                       Margin="0,6,0,0"
+                                                       Margin="0,5,0,0"
                                                        Style="{StaticResource CaptionTextStyle}"
                                                        Text="可导入 .proto / .pb 结构后选择消息类型解析。"
-                                                       TextWrapping="Wrap" />
+                                                       TextTrimming="CharacterEllipsis" />
                                         </Grid>
                                     </Border>
                                 </Grid>

@@ -116,7 +116,7 @@ public sealed class SocketEntry : ViewModelBase
     }
 
     [JsonIgnore]
-    public int DisplayIndex => Index + 1;
+    public int DisplayIndex => Index > 0 ? Index : 0;
 
     [JsonIgnore]
     public string CompactIndex => $"#{DisplayIndex:0000}";
@@ -219,6 +219,16 @@ public sealed class SocketEntry : ViewModelBase
     }
 
     [JsonIgnore]
+    public string PreviewTextShort
+    {
+        get
+        {
+            string preview = PreviewText;
+            return preview.Length <= 180 ? preview : preview[..180] + "...";
+        }
+    }
+
+    [JsonIgnore]
     public bool IsStatusFrame => Icon is "websocket_connect" or "websocket_close";
 
     [JsonIgnore]
@@ -260,6 +270,7 @@ public sealed class SocketEntry : ViewModelBase
         OnPropertyChanged(nameof(FlowTypeLabel));
         OnPropertyChanged(nameof(LengthLabel));
         OnPropertyChanged(nameof(PreviewText));
+        OnPropertyChanged(nameof(PreviewTextShort));
         OnPropertyChanged(nameof(IsStatusFrame));
         OnPropertyChanged(nameof(IsTrafficFrame));
         OnPropertyChanged(nameof(IsTextFrame));
