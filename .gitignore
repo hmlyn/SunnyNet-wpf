@@ -37,6 +37,9 @@ _source/
 _toolchain/
 sunnymcptool/
 .codex/skills/playwright-cli/
+请求重写界面参考/
+game-display-decrypt.goc
+docs/scripts/game-display-decrypt.goc
 
 # Logs and OS files
 *.log
