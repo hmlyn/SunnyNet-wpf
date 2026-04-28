@@ -149,7 +149,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     public ObservableCollection<UdpBlockRuleItem> UdpBlockRules { get; } = new();
     public ObservableCollection<RequestRewriteRuleItem> RequestRewriteRules { get; } = new();
     public ObservableCollection<RequestMappingRuleItem> RequestMappingRules { get; } = new();
-    public ObservableCollection<RequestDecodeRuleItem> RequestDecodeRules { get; } = new();
     public ObservableCollection<RequestCertificateRuleItem> RequestCertificateItems { get; } = new();
     public ObservableCollection<ProcessCaptureNameItem> ProcessCaptureNames { get; } = new();
     public ObservableCollection<RunningProcessItem> RunningProcesses { get; } = new();
@@ -1028,11 +1027,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         foreach (RequestMappingRuleItem item in RequestMappingRules)
         {
             item.State = item.LegacyReplaceRule ? "兼容旧规则" : state;
-        }
-
-        foreach (RequestDecodeRuleItem item in RequestDecodeRules)
-        {
-            item.State = state;
         }
 
         StatusRight = ok ? "规则中心配置已保存" : "规则中心配置保存失败";
@@ -2392,7 +2386,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         List<UdpBlockRuleItem> udpBlockRules = new();
         List<RequestRewriteRuleItem> rewriteRules = new();
         List<RequestMappingRuleItem> mappingRules = new();
-        List<RequestDecodeRuleItem> decodeRules = new();
 
         if (element.ValueKind == JsonValueKind.Object)
         {
@@ -2470,18 +2463,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
                 rule.State = rule.LegacyReplaceRule ? "兼容旧规则" : "已保存";
                 mappingRules.Add(rule);
             }
-
-            foreach (JsonElement item in EnumerateArrayProperty(element, "DecodeRules"))
-            {
-                RequestDecodeRuleItem rule = new()
-                {
-                    Direction = GetString(item, "Direction", "响应"),
-                    DecoderType = GetString(item, "DecoderType", "自动解压"),
-                    ScriptCode = DecodePayloadElement(GetProperty(item, "ScriptCode"))
-                };
-                ApplyCommonTrafficRuleFields(rule, item);
-                decodeRules.Add(rule);
-            }
         }
 
         if (mappingRules.Count == 0 && ReplaceRuleItems.Count > 0)
@@ -2495,7 +2476,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         ReplaceRows(UdpBlockRules, udpBlockRules);
         ReplaceRows(RequestRewriteRules, rewriteRules);
         ReplaceRows(RequestMappingRules, mappingRules);
-        ReplaceRows(RequestDecodeRules, decodeRules);
         SyncRuleCenterRulesText();
     }
 
@@ -3309,19 +3289,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
                     item.TargetContent,
                     item.ValueType,
                     item.LegacyReplaceRule
-                }),
-                DecodeRules = RequestDecodeRules.Select(static item => new
-                {
-                    item.Hash,
-                    Enable = item.Enabled,
-                    item.Name,
-                    item.Method,
-                    item.UrlMatchType,
-                    item.UrlPattern,
-                    item.Note,
-                    item.Direction,
-                    item.DecoderType,
-                    ScriptCode = EncodeTextBase64(item.ScriptCode)
                 })
             },
             JsonOptions);

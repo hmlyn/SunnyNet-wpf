@@ -835,33 +835,6 @@ public sealed class RequestMappingRuleItem : TrafficRuleItemBase
             : MappingType;
 }
 
-public sealed class RequestDecodeRuleItem : TrafficRuleItemBase
-{
-    private string _direction = "响应";
-    private string _decoderType = "自动解压";
-    private string _scriptCode = "";
-
-    public string Direction
-    {
-        get => _direction;
-        set => SetRuleProperty(ref _direction, string.IsNullOrWhiteSpace(value) ? "响应" : value);
-    }
-
-    public string DecoderType
-    {
-        get => _decoderType;
-        set => SetRuleProperty(ref _decoderType, string.IsNullOrWhiteSpace(value) ? "自动解压" : value);
-    }
-
-    public string ScriptCode
-    {
-        get => _scriptCode;
-        set => SetRuleProperty(ref _scriptCode, value ?? "");
-    }
-
-    public override string Summary => $"{Direction} · {DecoderType}";
-}
-
 public sealed class TrafficRuleHitItem
 {
     public string Time { get; set; } = "";

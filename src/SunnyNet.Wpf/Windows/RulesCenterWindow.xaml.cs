@@ -20,8 +20,7 @@ public partial class RulesCenterWindow : Window
         ["TCP屏蔽"] = new RulePageInfo("TCP屏蔽", "仅作用于 TCP/TLS-TCP：命中后可断开连接或按方向丢弃数据包。"),
         ["UDP屏蔽"] = new RulePageInfo("UDP屏蔽", "仅作用于 UDP：命中后可按方向丢弃数据包。"),
         ["请求重写"] = new RulePageInfo("请求重写", "命中规则后修改请求或响应的结构化内容。"),
-        ["请求映射"] = new RulePageInfo("请求映射", "把命中的请求映射到本地文件、固定内容或新的远程地址。"),
-        ["请求解密"] = new RulePageInfo("请求解密", "命中规则后生成请求或响应的明文展示副本，不改原始数据。")
+        ["请求映射"] = new RulePageInfo("请求映射", "把命中的请求映射到本地文件、固定内容或新的远程地址。")
     };
 
     public RulesCenterWindow(MainWindowViewModel viewModel, string initialPage = "请求重写")
@@ -52,8 +51,7 @@ public partial class RulesCenterWindow : Window
         bool udpBlockSelected = key == "UDP屏蔽";
         bool rewriteSelected = key == "请求重写";
         bool mappingSelected = key == "请求映射";
-        bool decodeSelected = key == "请求解密";
-        bool implemented = blockSelected || webSocketBlockSelected || tcpBlockSelected || udpBlockSelected || rewriteSelected || mappingSelected || decodeSelected;
+        bool implemented = blockSelected || webSocketBlockSelected || tcpBlockSelected || udpBlockSelected || rewriteSelected || mappingSelected;
 
         BlockRulesGrid.Visibility = blockSelected ? Visibility.Visible : Visibility.Collapsed;
         WebSocketBlockRulesGrid.Visibility = webSocketBlockSelected ? Visibility.Visible : Visibility.Collapsed;
@@ -61,7 +59,6 @@ public partial class RulesCenterWindow : Window
         UdpBlockRulesGrid.Visibility = udpBlockSelected ? Visibility.Visible : Visibility.Collapsed;
         RewriteRulesGrid.Visibility = rewriteSelected ? Visibility.Visible : Visibility.Collapsed;
         MappingRulesGrid.Visibility = mappingSelected ? Visibility.Visible : Visibility.Collapsed;
-        DecodeRulesGrid.Visibility = decodeSelected ? Visibility.Visible : Visibility.Collapsed;
         PlaceholderListPanel.Visibility = implemented ? Visibility.Collapsed : Visibility.Visible;
         PlaceholderTextBlock.Text = page.Placeholder;
 
@@ -125,12 +122,6 @@ public partial class RulesCenterWindow : Window
             return;
         }
 
-        if (_currentPage == "请求解密"
-            && DecodeRulesGrid.SelectedItem is null
-            && _viewModel.RequestDecodeRules.Count > 0)
-        {
-            DecodeRulesGrid.SelectedIndex = 0;
-        }
     }
 
     private int GetRuleCount(string key)
@@ -143,7 +134,6 @@ public partial class RulesCenterWindow : Window
             "UDP屏蔽" => _viewModel.UdpBlockRules.Count,
             "请求重写" => _viewModel.RequestRewriteRules.Count,
             "请求映射" => _viewModel.RequestMappingRules.Count,
-            "请求解密" => _viewModel.RequestDecodeRules.Count,
             _ => 0
         };
     }
@@ -169,9 +159,6 @@ public partial class RulesCenterWindow : Window
                 break;
             case "请求映射":
                 await AddMappingRuleAsync();
-                break;
-            case "请求解密":
-                await AddDecodeRuleAsync();
                 break;
         }
     }
@@ -227,9 +214,6 @@ public partial class RulesCenterWindow : Window
                 break;
             case "请求映射" when MappingRulesGrid.SelectedItem is RequestMappingRuleItem mappingRule:
                 _viewModel.RequestMappingRules.Remove(mappingRule);
-                break;
-            case "请求解密" when DecodeRulesGrid.SelectedItem is RequestDecodeRuleItem decodeRule:
-                _viewModel.RequestDecodeRules.Remove(decodeRule);
                 break;
             default:
                 return;
@@ -390,31 +374,6 @@ public partial class RulesCenterWindow : Window
         RuleStatusTextBlock.Text = $"{_viewModel.RequestMappingRules.Count} 条";
     }
 
-    private async Task AddDecodeRuleAsync()
-    {
-        RequestDecodeRuleItem item = new()
-        {
-            Name = "新请求解密",
-            Method = "ANY",
-            UrlMatchType = "通配",
-            UrlPattern = "",
-            Direction = "响应",
-            DecoderType = "自动解压",
-            Priority = 100,
-            State = "未保存"
-        };
-
-        if (ShowRuleEditor("请求解密", item) != true)
-        {
-            return;
-        }
-
-        _viewModel.RequestDecodeRules.Add(item);
-        DecodeRulesGrid.SelectedItem = item;
-        await SaveRulesAsync();
-        RuleStatusTextBlock.Text = $"{_viewModel.RequestDecodeRules.Count} 条";
-    }
-
     private async Task EditSelectedRuleAsync()
     {
         switch (_currentPage)
@@ -497,19 +456,6 @@ public partial class RulesCenterWindow : Window
                 RuleStatusTextBlock.Text = $"{_viewModel.RequestMappingRules.Count} 条";
                 break;
             }
-            case "请求解密" when DecodeRulesGrid.SelectedItem is RequestDecodeRuleItem decodeRule:
-            {
-                RequestDecodeRuleItem editing = CloneDecodeRule(decodeRule);
-                if (ShowRuleEditor("请求解密", editing) != true)
-                {
-                    return;
-                }
-
-                ApplyDecodeRule(decodeRule, editing);
-                await SaveRulesAsync();
-                RuleStatusTextBlock.Text = $"{_viewModel.RequestDecodeRules.Count} 条";
-                break;
-            }
         }
     }
 
@@ -523,7 +469,6 @@ public partial class RulesCenterWindow : Window
             "UDP屏蔽" => UdpBlockRulesGrid.SelectedItem as TrafficRuleItemBase,
             "请求重写" => RewriteRulesGrid.SelectedItem as TrafficRuleItemBase,
             "请求映射" => MappingRulesGrid.SelectedItem as TrafficRuleItemBase,
-            "请求解密" => DecodeRulesGrid.SelectedItem as TrafficRuleItemBase,
             _ => null
         };
     }
@@ -753,22 +698,6 @@ public partial class RulesCenterWindow : Window
         target.TargetContent = source.TargetContent;
         target.ValueType = source.ValueType;
         target.LegacyReplaceRule = source.LegacyReplaceRule;
-    }
-
-    private static RequestDecodeRuleItem CloneDecodeRule(RequestDecodeRuleItem source)
-    {
-        RequestDecodeRuleItem clone = new();
-        ApplyDecodeRule(clone, source);
-        clone.State = source.State;
-        return clone;
-    }
-
-    private static void ApplyDecodeRule(RequestDecodeRuleItem target, RequestDecodeRuleItem source)
-    {
-        ApplyCommonRuleFields(target, source);
-        target.Direction = source.Direction;
-        target.DecoderType = source.DecoderType;
-        target.ScriptCode = source.ScriptCode;
     }
 
     private static void ApplyCommonRuleFields(TrafficRuleItemBase target, TrafficRuleItemBase source)

@@ -344,29 +344,6 @@
                 </DataGrid.Columns>
                 </DataGrid>
 
-                <DataGrid x:Name="DecodeRulesGrid"
-                      ItemsSource="{Binding RequestDecodeRules}"
-                      MouseDoubleClick="RulesGrid_MouseDoubleClick"
-                      SelectionChanged="RulesGrid_SelectionChanged"
-                      Style="{StaticResource RulesDataGridStyle}"
-                      Visibility="Collapsed">
-                <DataGrid.Columns>
-                    <DataGridTemplateColumn HeaderTemplate="{StaticResource RuleEnableHeaderTemplate}"
-                                            CellTemplate="{StaticResource RuleEnableCellTemplate}"
-                                            CellStyle="{StaticResource RuleEnableCellStyle}"
-                                            Width="58" />
-                    <DataGridTextColumn Header="别名" Binding="{Binding Name}" Width="150" />
-                    <DataGridTextColumn Header="方法" Binding="{Binding Method}" Width="82" />
-                    <DataGridTextColumn Header="匹配" Binding="{Binding UrlMatchType}" Width="82" />
-                    <DataGridTextColumn Header="Url" Binding="{Binding UrlPattern}" Width="340" />
-                    <DataGridTextColumn Header="方向" Binding="{Binding Direction}" Width="82" />
-                    <DataGridTextColumn Header="解码器" Binding="{Binding DecoderType}" Width="130" />
-                    <DataGridTextColumn Header="参数/脚本" Binding="{Binding ScriptCode}" Width="420" />
-                    <DataGridTextColumn Header="备注" Binding="{Binding Note}" Width="180" />
-                    <DataGridTextColumn Header="状态" Binding="{Binding State}" Width="100" />
-                </DataGrid.Columns>
-                </DataGrid>
-
                 <Border x:Name="PlaceholderListPanel"
                     Background="#FFFFFF"
                     Visibility="Collapsed">

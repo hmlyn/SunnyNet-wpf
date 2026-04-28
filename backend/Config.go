@@ -732,7 +732,6 @@ type ConfigRuleCenter struct {
 	UdpBlockRules       []ConfigUdpBlockRule       `json:"UdpBlockRules"`
 	RewriteRules        []ConfigRequestRewriteRule `json:"RewriteRules"`
 	MappingRules        []ConfigRequestMappingRule `json:"MappingRules"`
-	DecodeRules         []ConfigRequestDecodeRule  `json:"DecodeRules"`
 }
 type ConfigTrafficRuleBase struct {
 	Hash         string `json:"Hash"`
@@ -777,12 +776,6 @@ type ConfigRequestMappingRule struct {
 	TargetContent     string `json:"TargetContent"`
 	ValueType         string `json:"ValueType"`
 	LegacyReplaceRule bool   `json:"LegacyReplaceRule"`
-}
-type ConfigRequestDecodeRule struct {
-	ConfigTrafficRuleBase
-	Direction   string `json:"Direction"`
-	DecoderType string `json:"DecoderType"`
-	ScriptCode  string `json:"ScriptCode"`
 }
 type ConfigRequestCertManager struct {
 	Rule     uint8  `json:"rule"`
@@ -884,9 +877,6 @@ func (c *UserConfig) loadDefaultValue() {
 	}
 	if c.RuleCenter.MappingRules == nil {
 		c.RuleCenter.MappingRules = make([]ConfigRequestMappingRule, 0)
-	}
-	if c.RuleCenter.DecodeRules == nil {
-		c.RuleCenter.DecodeRules = make([]ConfigRequestDecodeRule, 0)
 	}
 	if c.AuthenticationUserInfo == nil {
 		c.AuthenticationUserInfo = make(map[string]string)

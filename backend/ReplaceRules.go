@@ -1,19 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"changeme/MapHash"
-	"compress/gzip"
-	"compress/zlib"
 	"encoding/base64"
 	"encoding/json"
-	"github.com/andybalholm/brotli"
 	"github.com/qtgolang/SunnyNet/public"
 	"github.com/qtgolang/SunnyNet/src/encoding/hex"
 	"github.com/qtgolang/SunnyNet/src/protobuf/JSON"
-	"github.com/traefik/yaegi/interp"
-	"github.com/traefik/yaegi/stdlib"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -34,12 +27,6 @@ type ReplaceRules struct {
 }
 
 var _ReplaceRules []ReplaceRules
-var decodeScriptCache = make(map[string]decodeScriptCacheEntry)
-
-type decodeScriptCacheEntry struct {
-	fn  func(string, string, string, []byte) []byte
-	err error
-}
 
 type requestRewriteOperation struct {
 	Target    string `json:"Target"`
@@ -570,217 +557,6 @@ func ApplyResponseRewrite(theology int, method string, u *url.URL, response *htt
 	}
 
 	return currentBody
-}
-
-func ApplyHTTPDecodeRules(theology int, request bool, method string, u *url.URL, body []byte) bool {
-	if theology < 1 || u == nil || len(body) == 0 {
-		return false
-	}
-
-	_TmpLock.Lock()
-	rules := append([]ConfigRequestDecodeRule(nil), GlobalConfig.RuleCenter.DecodeRules...)
-	_TmpLock.Unlock()
-	if len(rules) == 0 {
-		return false
-	}
-
-	sort.SliceStable(rules, func(i, j int) bool {
-		return rules[i].Priority < rules[j].Priority
-	})
-
-	currentBody := body
-	applied := false
-	for _, rule := range rules {
-		if !rule.Enable {
-			continue
-		}
-		if !rewriteDirectionMatches(rule.Direction, request) {
-			continue
-		}
-		if !mappingMethodMatches(rule.Method, method) || !mappingURLMatches(rule.UrlMatchType, rule.UrlPattern, u.String()) {
-			continue
-		}
-		decoded, ok := decodeDisplayBody(currentBody, rule, request, method, u.String())
-		if !ok || len(decoded) == 0 {
-			continue
-		}
-		recordTrafficRuleHit(theology, "请求解密", rule.ConfigTrafficRuleBase, rule.DecoderType, directionText(request), u.String())
-		currentBody = decoded
-		applied = true
-	}
-
-	if !applied {
-		return false
-	}
-	if request {
-		return HashMap.SetRequestDisplayBody(theology, currentBody)
-	}
-	return HashMap.SetResponseDisplayBody(theology, currentBody)
-}
-
-func decodeDisplayBody(body []byte, rule ConfigRequestDecodeRule, request bool, method string, rawURL string) ([]byte, bool) {
-	direction := "响应"
-	if request {
-		direction = "请求"
-	}
-	switch strings.TrimSpace(rule.DecoderType) {
-	case "GZIP解压", "GZIP", "gzip":
-		return decodeGzipBody(body)
-	case "ZLIB解压", "ZLIB", "zlib", "Deflate解压":
-		return decodeZlibBody(body)
-	case "Brotli解压", "BROTLI", "br", "BR":
-		return decodeBrotliBody(body)
-	case "Base64解码", "Base64":
-		return decodeBase64Body(body)
-	case "URL解码", "URLDecode":
-		return decodeURLBody(body)
-	case "HEX解码", "HEX":
-		return decodeHexBody(body)
-	case "脚本", "Go脚本":
-		return decodeScriptBody(body, rule.ScriptCode, method, rawURL, direction)
-	case "自动解压", "":
-		return decodeAutoBody(body)
-	default:
-		return nil, false
-	}
-}
-
-func decodeAutoBody(body []byte) ([]byte, bool) {
-	if decoded, ok := decodeGzipBody(body); ok {
-		return decoded, true
-	}
-	if decoded, ok := decodeZlibBody(body); ok {
-		return decoded, true
-	}
-	if decoded, ok := decodeBrotliBody(body); ok {
-		return decoded, true
-	}
-	return nil, false
-}
-
-func decodeGzipBody(body []byte) ([]byte, bool) {
-	reader, err := gzip.NewReader(bytes.NewReader(body))
-	if err != nil {
-		return nil, false
-	}
-	defer reader.Close()
-	decoded, err := io.ReadAll(reader)
-	return decoded, err == nil
-}
-
-func decodeZlibBody(body []byte) ([]byte, bool) {
-	reader, err := zlib.NewReader(bytes.NewReader(body))
-	if err != nil {
-		return nil, false
-	}
-	defer reader.Close()
-	decoded, err := io.ReadAll(reader)
-	return decoded, err == nil
-}
-
-func decodeBrotliBody(body []byte) ([]byte, bool) {
-	decoded, err := io.ReadAll(brotli.NewReader(bytes.NewReader(body)))
-	return decoded, err == nil
-}
-
-func decodeBase64Body(body []byte) ([]byte, bool) {
-	text := strings.TrimSpace(string(body))
-	if text == "" {
-		return nil, false
-	}
-	decoded, err := base64.StdEncoding.DecodeString(text)
-	if err == nil {
-		return decoded, true
-	}
-	decoded, err = base64.RawStdEncoding.DecodeString(text)
-	return decoded, err == nil
-}
-
-func decodeURLBody(body []byte) ([]byte, bool) {
-	decoded, err := url.QueryUnescape(string(body))
-	if err != nil {
-		decoded, err = url.PathUnescape(string(body))
-	}
-	return []byte(decoded), err == nil
-}
-
-func decodeHexBody(body []byte) ([]byte, bool) {
-	text := strings.TrimSpace(string(body))
-	text = strings.ReplaceAll(text, "0x", "")
-	text = strings.ReplaceAll(text, "0X", "")
-	replacer := strings.NewReplacer(" ", "", "\r", "", "\n", "", "\t", "-", "")
-	text = replacer.Replace(text)
-	if text == "" || len(text)%2 != 0 {
-		return nil, false
-	}
-	decoded, err := hex.DecodeString(text)
-	return decoded, err == nil
-}
-
-func decodeScriptBody(body []byte, scriptCode string, method string, rawURL string, direction string) (decoded []byte, ok bool) {
-	fn, ok := getDecodeScriptFunc(scriptCode)
-	if !ok || fn == nil {
-		return nil, false
-	}
-	defer func() {
-		if recover() != nil {
-			decoded = nil
-			ok = false
-		}
-	}()
-	decoded = fn(method, rawURL, direction, body)
-	return decoded, len(decoded) > 0
-}
-
-func getDecodeScriptFunc(scriptCode string) (func(string, string, string, []byte) []byte, bool) {
-	source := normalizeDecodeScriptSource(scriptCode)
-	if strings.TrimSpace(source) == "" {
-		return nil, false
-	}
-
-	_TmpLock.Lock()
-	entry, exists := decodeScriptCache[source]
-	_TmpLock.Unlock()
-	if exists {
-		return entry.fn, entry.err == nil
-	}
-
-	fn, err := compileDecodeScript(source)
-	entry = decodeScriptCacheEntry{fn: fn, err: err}
-	_TmpLock.Lock()
-	decodeScriptCache[source] = entry
-	_TmpLock.Unlock()
-	return entry.fn, entry.err == nil
-}
-
-func normalizeDecodeScriptSource(scriptCode string) string {
-	scriptCode = strings.TrimSpace(scriptCode)
-	if scriptCode == "" {
-		return ""
-	}
-	if strings.HasPrefix(scriptCode, "package ") {
-		return scriptCode
-	}
-	return "package main\n\n" + scriptCode
-}
-
-func compileDecodeScript(source string) (func(string, string, string, []byte) []byte, error) {
-	iEval := interp.New(interp.Options{})
-	if err := iEval.Use(stdlib.Symbols); err != nil {
-		return nil, err
-	}
-	if _, err := iEval.Eval(source); err != nil {
-		return nil, err
-	}
-	v, err := iEval.Eval("main.Decode")
-	if err != nil {
-		return nil, err
-	}
-	fn, ok := v.Interface().(func(string, string, string, []byte) []byte)
-	if !ok {
-		return nil, strconv.ErrSyntax
-	}
-	return fn, nil
 }
 
 func getSortedRewriteRules() []ConfigRequestRewriteRule {

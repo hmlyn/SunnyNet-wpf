@@ -266,7 +266,6 @@
                                         </MenuItem>
                                         <MenuItem Header="请求重写" Click="RequestRewriteRules_Click" />
                                         <MenuItem Header="请求映射" Click="RequestMappingRules_Click" />
-                                        <MenuItem Header="请求解密" Click="RequestDecodeRules_Click" />
                                     </ContextMenu>
                                 </Button.ContextMenu>
                                 <StackPanel Orientation="Horizontal">

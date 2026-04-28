@@ -418,10 +418,6 @@ func HttpCallback(Conn *SunnyNet.HttpConn) {
 				return
 			}
 			httpActionMode := HashMap.ConsumeHTTPReplayAction(h.Method, h.URL, h.Body)
-			ApplyHTTPDecodeRules(Conn.Theology, true, h.Method, Conn.Request.URL, h.Body)
-			if len(h.Response.Body) > 0 {
-				ApplyHTTPDecodeRules(Conn.Theology, false, h.Method, Conn.Request.URL, h.Response.Body)
-			}
 			h.SendTime = time.Now().Format("15:04:05.000")
 			if len(h.Response.Header) > 0 {
 				h.RecTime = time.Now().Format("15:04:05.000")
@@ -562,7 +558,6 @@ func HttpCallback(Conn *SunnyNet.HttpConn) {
 		if h == nil {
 			return
 		}
-		ApplyHTTPDecodeRules(Conn.Theology, false, Conn.Request.Method, Conn.Request.URL, h.Response.Body)
 		IsBreak := uint8(0)
 		if Break {
 			h.Break = 2

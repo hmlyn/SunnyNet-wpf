@@ -56,17 +56,6 @@
             <sys:String>响应</sys:String>
         </x:Array>
 
-        <x:Array x:Key="DecodeTypeItems" Type="{x:Type sys:String}">
-            <sys:String>自动解压</sys:String>
-            <sys:String>GZIP解压</sys:String>
-            <sys:String>ZLIB解压</sys:String>
-            <sys:String>Brotli解压</sys:String>
-            <sys:String>Base64解码</sys:String>
-            <sys:String>URL解码</sys:String>
-            <sys:String>HEX解码</sys:String>
-            <sys:String>脚本</sys:String>
-        </x:Array>
-
         <x:Array x:Key="RewriteTargetItems" Type="{x:Type sys:String}">
             <sys:String>请求方法</sys:String>
             <sys:String>URL</sys:String>
@@ -606,29 +595,6 @@
                               Style="{StaticResource EditorComboBoxStyle}" />
                 </Grid>
 
-                <Grid x:Name="DecodePanel"
-                      Grid.Row="2"
-                      Grid.ColumnSpan="2"
-                      Visibility="Collapsed">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="118" />
-                        <ColumnDefinition Width="200" />
-                        <ColumnDefinition Width="24" />
-                        <ColumnDefinition Width="88" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Style="{StaticResource EditorLabelTextStyle}" Text="方向" />
-                    <ComboBox Grid.Column="1"
-                              ItemsSource="{StaticResource RewriteDirectionItems}"
-                              SelectedItem="{Binding Direction, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                              Style="{StaticResource EditorComboBoxStyle}" />
-                    <TextBlock Grid.Column="3" Style="{StaticResource EditorLabelTextStyle}" Text="解码器" />
-                    <ComboBox Grid.Column="4"
-                              ItemsSource="{StaticResource DecodeTypeItems}"
-                              SelectedItem="{Binding DecoderType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                              Style="{StaticResource EditorComboBoxStyle}" />
-                </Grid>
-
                 <TextBlock x:Name="KeyLabelTextBlock"
                            Grid.Row="7"
                            Style="{StaticResource EditorLabelTextStyle}"
@@ -663,25 +629,6 @@
                             MinWidth="86"
                             Padding="10,5" />
                 </Grid>
-
-                <TextBlock x:Name="DecodeScriptLabelTextBlock"
-                           Grid.Row="7"
-                           VerticalAlignment="Top"
-                           Margin="0,7,0,0"
-                           Style="{StaticResource EditorLabelTextStyle}"
-                           Text="脚本"
-                           Visibility="Collapsed" />
-                <TextBox x:Name="DecodeScriptTextBox"
-                         Grid.Row="7"
-                         Grid.Column="1"
-                         Height="72"
-                         AcceptsReturn="True"
-                         TextWrapping="Wrap"
-                         VerticalScrollBarVisibility="Auto"
-                         ToolTip="脚本类型需要提供 func Decode(method string, rawURL string, direction string, body []byte) []byte"
-                         Text="{Binding ScriptCode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                         Style="{StaticResource EditorTextBoxStyle}"
-                         Visibility="Collapsed" />
 
                 <TextBlock x:Name="ValueLabelTextBlock"
                            Grid.Row="8"

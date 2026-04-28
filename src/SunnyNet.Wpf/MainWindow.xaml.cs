@@ -757,11 +757,6 @@ public partial class MainWindow : Window
         OpenRulesCenter("请求映射");
     }
 
-    private void RequestDecodeRules_Click(object sender, RoutedEventArgs routedEventArgs)
-    {
-        OpenRulesCenter("请求解密");
-    }
-
     private void OpenRulesCenter(string page)
     {
         new RulesCenterWindow(_viewModel, page) { Owner = this }.Show();

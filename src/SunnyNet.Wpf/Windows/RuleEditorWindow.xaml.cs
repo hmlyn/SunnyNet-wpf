@@ -58,8 +58,7 @@ public partial class RuleEditorWindow : Window
         bool tcpBlock = ruleType == "TCP屏蔽";
         bool udpBlock = ruleType == "UDP屏蔽";
         bool block = (ruleType is "HTTP屏蔽" or "请求屏蔽") || webSocketBlock || tcpBlock || udpBlock;
-        bool decode = ruleType == "请求解密";
-        ConfigureRuleLayout(block, rewrite, mapping, decode, webSocketBlock || udpBlock);
+        ConfigureRuleLayout(block, rewrite, mapping, webSocketBlock || udpBlock);
 
         if (rewrite && DataContext is RequestRewriteRuleItem rewriteRule)
         {
@@ -70,12 +69,11 @@ public partial class RuleEditorWindow : Window
         RewriteWorkbenchPanel.Visibility = rewrite ? Visibility.Visible : Visibility.Collapsed;
         EditorScrollViewer.Visibility = rewrite ? Visibility.Collapsed : Visibility.Visible;
 
-        RewritePanel.Visibility = rewrite || mapping || block || decode ? Visibility.Collapsed : Visibility.Visible;
+        RewritePanel.Visibility = rewrite || mapping || block ? Visibility.Collapsed : Visibility.Visible;
         RewriteOperationPanel.Visibility = Visibility.Collapsed;
         RewriteOperationsPanel.Visibility = Visibility.Collapsed;
         MappingTypePanel.Visibility = mapping ? Visibility.Visible : Visibility.Collapsed;
         BlockActionPanel.Visibility = block ? Visibility.Visible : Visibility.Collapsed;
-        DecodePanel.Visibility = decode ? Visibility.Visible : Visibility.Collapsed;
         BlockActionComboBox.ItemsSource = (System.Collections.IEnumerable)FindResource(GetBlockActionResourceKey(ruleType));
         MethodComboBox.ItemsSource = (System.Collections.IEnumerable)FindResource(tcpBlock ? "TcpProtocolItems" : "RuleMethodItems");
         MethodLabelTextBlock.Text = tcpBlock ? "协议" : "请求方法";
@@ -97,8 +95,6 @@ public partial class RuleEditorWindow : Window
         ValueTextBox.Visibility = Visibility.Collapsed;
         MappingTargetLabelTextBlock.Visibility = mapping ? Visibility.Visible : Visibility.Collapsed;
         MappingTargetPanel.Visibility = mapping ? Visibility.Visible : Visibility.Collapsed;
-        DecodeScriptLabelTextBlock.Visibility = decode ? Visibility.Visible : Visibility.Collapsed;
-        DecodeScriptTextBox.Visibility = decode ? Visibility.Visible : Visibility.Collapsed;
         if (mapping && DataContext is RequestMappingRuleItem mappingRule)
         {
             AttachMappingRule(mappingRule);
@@ -124,7 +120,7 @@ public partial class RuleEditorWindow : Window
         };
     }
 
-    private void ConfigureRuleLayout(bool block, bool rewrite, bool mapping, bool decode, bool hideMethod)
+    private void ConfigureRuleLayout(bool block, bool rewrite, bool mapping, bool hideMethod)
     {
         SetEditorRows(42, 42, 42, 42, 50, 42, 0, 0, 0, 84, 0, 0, 0);
         EditorScrollViewer.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
@@ -158,10 +154,6 @@ public partial class RuleEditorWindow : Window
             return;
         }
 
-        if (decode)
-        {
-            SetEditorRows(42, 42, 42, 42, 50, 42, 0, 84, 0, 84, 0, 0, 0);
-        }
     }
 
     private void SetEditorRows(params double[] heights)
