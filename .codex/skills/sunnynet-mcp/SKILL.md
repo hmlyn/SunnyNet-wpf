@@ -35,6 +35,7 @@ Ask for explicit confirmation before:
 - `request_modify_header`, `response_modify_header`
 - `request_resend`, `request_block`, `request_release_all`
 - `breakpoint_clear`, `replace_rules_clear`
+- `request_clear_by_rule`, `request_rules_enable`, `request_rules_remove`
 
 Favorites and notes are low-risk, but still follow the user's exact target session numbers.
 
@@ -62,6 +63,7 @@ Return the important fields: `index`, `method`, `url`, `statusCode`, `length`, `
 - Add favorite: `request_favorite_add` with `index` or `theology`
 - Remove favorite: `request_favorite_remove` with `index` or `theology`
 - Set or clear notes: `request_notes_set`; pass empty `notes` to clear.
+- Mark rows: `request_tag_set`; clear marks: `request_tag_clear`.
 
 ### Search and highlight traffic
 
@@ -76,7 +78,8 @@ Use `breakpoint_add` for URL regex breakpoints, then `breakpoint_list` to verify
 
 For intercepted sessions, inspect the current session before modifying or releasing. If the user wants to edit upstream/downstream data, prefer body/header modify tools only after they clearly specify the change.
 
+For WPF rule center rules, prefer `request_rules_list`, `request_rules_enable`, `request_rules_remove`, and `request_rule_hits_list`. The older `replace_rules_*` and `breakpoint_*` tools are compatibility APIs.
+
 ## Detailed Tool Reference
 
 For the complete tool list and parameters, read `references/tools.md`.
-

@@ -86,11 +86,14 @@
 | `request_stats` | 获取请求统计 | 无 |
 | `request_delete` | 删除指定请求 | `theologies` |
 | `request_clear` | 清空请求列表 | 无 |
+| `request_clear_by_rule` | 按主界面清除规则删除会话 | `rule` |
 | `request_save_all` | 保存全部抓包记录 | `path` |
 | `request_import` | 导入 `.syn` 记录 | `path` |
 | `request_favorite_add` | 收藏指定会话 | `theology` 或 `index` |
 | `request_favorite_remove` | 取消收藏指定会话 | `theology` 或 `index` |
 | `request_notes_set` | 设置备注，空字符串表示清除 | `theology` 或 `index`、`notes` |
+| `request_tag_set` | 设置会话标记颜色，支持批量 | `theology`/`index`/`theologies`/`indexes`、`color` |
+| `request_tag_clear` | 清除会话标记颜色，支持批量 | `theology`/`index`/`theologies`/`indexes` |
 
 ### 单会话详情 / 修改 / 重发
 
@@ -105,6 +108,27 @@
 | `request_block` | 手动阻断请求 | `theology` 或 `index` |
 | `request_release_all` | 放行所有断点中的请求 | 无 |
 | `request_get_response_body_decoded` | 获取自动解码后的响应体 | `theology` 或 `index` |
+
+### 请求规则中心
+
+| 工具 | 说明 | 关键参数 |
+|---|---|---|
+| `request_rules_list` | 列出请求规则中心规则 | `type` |
+| `request_rules_enable` | 启用或禁用规则 | `type`、`hash`、`enabled` |
+| `request_rules_remove` | 删除规则 | `type`、`hash` |
+| `request_rule_hits_list` | 列出规则命中记录 | `theology` 或 `index`、`ruleType`、`limit`、`offset` |
+
+`type` 支持：
+
+- `all`
+- `http_block`
+- `websocket_block`
+- `tcp_block`
+- `udp_block`
+- `rewrite`
+- `mapping`
+
+旧 `replace_rules_*` 和 `breakpoint_*` 工具保留兼容，但新规则中心优先使用 `request_rules_*`。
 
 ### 搜索 / 高亮
 
@@ -176,6 +200,16 @@
 | `sendTime` | 发起时间 |
 | `recTime` | 接收时间 |
 | `way` | 协议类型 |
+| `host` | Host |
+| `query` | Query |
+| `length` | 响应长度 |
+| `type` | 响应类型 |
+| `process` | 进程信息 |
+| `tagColor` | 会话标记颜色 |
+| `hasTagColor` | 是否存在标记颜色 |
+| `breakMode` | 断点/拦截状态 |
+| `ruleHitCount` | 命中规则数量 |
+| `ruleHitSummary` | 命中规则摘要 |
 | `notes` | 备注 |
 | `isFavorite` | 收藏状态 |
 

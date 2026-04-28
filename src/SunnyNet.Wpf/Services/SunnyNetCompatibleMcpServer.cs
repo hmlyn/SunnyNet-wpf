@@ -484,6 +484,19 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
             Tool("request_delete", "删除指定的请求记录", Schema(
                 ArrayProperty("theologies", "integer", "要删除的请求 ID 列表")), ToolRequestDeleteAsync, "theologies"),
             Tool("request_clear", "清空全部已捕获的请求列表", NoParamsSchema(), ToolRequestClearAsync),
+            Tool("request_clear_by_rule", "按内置清除规则删除会话", Schema(
+                EnumProperty("rule", "string", new[] { "all", "resources", "no_response", "failed", "redirect", "unfavorite", "untagged", "current_filter" }, "清除规则", "resources")), ToolRequestClearByRuleAsync, "rule"),
+            Tool("request_tag_set", "给指定会话设置标记颜色", Schema(
+                Property("theology", "integer", "请求唯一 ID"),
+                Property("index", "integer", "界面会话序号"),
+                ArrayProperty("theologies", "integer", "请求唯一 ID 列表"),
+                ArrayProperty("indexes", "integer", "界面会话序号列表"),
+                Property("color", "string", "标记颜色，例如 #FF6A00；特殊值 __strike__ 表示划线标记")), ToolRequestTagSetAsync, "color"),
+            Tool("request_tag_clear", "清除指定会话的标记颜色", Schema(
+                Property("theology", "integer", "请求唯一 ID"),
+                Property("index", "integer", "界面会话序号"),
+                ArrayProperty("theologies", "integer", "请求唯一 ID 列表"),
+                ArrayProperty("indexes", "integer", "界面会话序号列表")), ToolRequestTagClearAsync),
 
             Tool("request_resend", "重发指定的 HTTP 请求", Schema(
                 ArrayProperty("theologies", "integer", "要重发的请求 ID 列表")), ToolRequestResendAsync, "theologies"),
@@ -500,6 +513,22 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
                 EnumProperty("type", "string", new[] { "UTF8", "GBK", "Hex" }, "搜索类型", "UTF8"),
                 Property("color", "string", "高亮颜色")), ToolRequestHighlightSearchAsync, "keyword"),
             Tool("request_highlight_clear", "清除所有搜索高亮标记", NoParamsSchema(), ToolRequestHighlightClearAsync),
+
+            Tool("request_rules_list", "列出请求规则中心规则", Schema(
+                EnumProperty("type", "string", new[] { "all", "http_block", "websocket_block", "tcp_block", "udp_block", "rewrite", "mapping" }, "规则类型", "all")), ToolRequestRulesListAsync),
+            Tool("request_rules_enable", "启用或禁用请求规则中心规则", Schema(
+                EnumProperty("type", "string", new[] { "all", "http_block", "websocket_block", "tcp_block", "udp_block", "rewrite", "mapping" }, "规则类型", "all"),
+                Property("hash", "string", "规则 Hash"),
+                Property("enabled", "boolean", "是否启用")), ToolRequestRulesEnableAsync, "hash", "enabled"),
+            Tool("request_rules_remove", "删除请求规则中心规则", Schema(
+                EnumProperty("type", "string", new[] { "all", "http_block", "websocket_block", "tcp_block", "udp_block", "rewrite", "mapping" }, "规则类型", "all"),
+                Property("hash", "string", "规则 Hash")), ToolRequestRulesRemoveAsync, "hash"),
+            Tool("request_rule_hits_list", "列出请求规则命中记录", Schema(
+                Property("theology", "integer", "请求唯一 ID"),
+                Property("index", "integer", "界面会话序号"),
+                Property("ruleType", "string", "规则类型关键词，例如 请求重写/HTTP屏蔽"),
+                Property("limit", "integer", "返回最大数量"),
+                Property("offset", "integer", "偏移量")), ToolRequestRuleHitsListAsync),
 
             Tool("socket_data_list", "获取 WebSocket/TCP/UDP 连接的数据包列表", Schema(
                 Property("theology", "integer", "连接唯一 ID"),
@@ -1129,7 +1158,11 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
             index = entry.Index,
             theology = entry.Theology,
             method = GetString(payload, "Method", entry.Method),
+            displayMethod = entry.DisplayMethod,
+            state = entry.State,
             url = GetString(payload, "URL", entry.Url),
+            host = entry.Host,
+            query = entry.Query,
             proto = GetString(payload, "Proto", "HTTP/1.1"),
             request = new
             {
@@ -1145,11 +1178,29 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
                 bodyBase64 = responseBodyB64,
                 error = GetBool(response, "Error")
             },
+            length = entry.ResponseLength,
+            type = entry.ResponseType,
             clientIP = entry.ClientAddress,
             pid = entry.Process,
+            process = entry.Process,
             sendTime = entry.SendTime,
             recTime = entry.ReceiveTime,
             way = GetSessionWay(entry),
+            icon = entry.Icon,
+            tagColor = entry.TagColor,
+            hasTagColor = entry.HasTagColor,
+            breakMode = entry.BreakMode,
+            ruleHits = entry.RuleHits.Select(static hit => new
+            {
+                hit.Time,
+                hit.RuleType,
+                hit.RuleHash,
+                hit.RuleName,
+                hit.Action,
+                hit.Direction,
+                hit.URL,
+                hit.Summary
+            }).ToArray(),
             notes = entry.Notes,
             isFavorite = entry.IsFavorite
         };
@@ -1479,6 +1530,46 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
         };
     }
 
+    private async Task<object> ToolRequestClearByRuleAsync(JsonElement args)
+    {
+        string ruleText = RequireString(args, "rule");
+        SessionClearRule rule = ParseSessionClearRule(ruleText);
+        int count = await _viewModel.DeleteSessionEntriesByRuleAsync(rule);
+        return new
+        {
+            success = true,
+            rule = NormalizeSessionClearRule(rule),
+            count,
+            message = count > 0 ? $"已清除 {count} 条会话" : "没有符合清除条件的会话"
+        };
+    }
+
+    private async Task<object> ToolRequestTagSetAsync(JsonElement args)
+    {
+        string color = RequireString(args, "color").Trim();
+        CaptureEntry[] entries = ResolveSessionEntries(args);
+        await _viewModel.MarkSessionEntriesAsync(entries, color);
+        return new
+        {
+            success = true,
+            color,
+            count = entries.Length,
+            requests = entries.Select(ToRequestInfo).ToArray()
+        };
+    }
+
+    private async Task<object> ToolRequestTagClearAsync(JsonElement args)
+    {
+        CaptureEntry[] entries = ResolveSessionEntries(args);
+        await _viewModel.MarkSessionEntriesAsync(entries, "");
+        return new
+        {
+            success = true,
+            count = entries.Length,
+            requests = entries.Select(ToRequestInfo).ToArray()
+        };
+    }
+
     private async Task<object> ToolRequestResendAsync(JsonElement args)
     {
         int[] theologies = RequireIntArray(args, "theologies");
@@ -1719,6 +1810,113 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
         };
     }
 
+    private async Task<object> ToolRequestRulesListAsync(JsonElement args)
+    {
+        await Task.CompletedTask;
+        string type = NormalizeRuleType(GetString(args, "type", "all"));
+        McpRuleRef[] rules = GetRuleRefs(type).ToArray();
+        return new
+        {
+            success = true,
+            type,
+            total = rules.Length,
+            rules = rules.Select(static item => ToRuleInfo(item.Type, item.Title, item.Rule)).ToArray()
+        };
+    }
+
+    private async Task<object> ToolRequestRulesEnableAsync(JsonElement args)
+    {
+        string type = NormalizeRuleType(GetString(args, "type", "all"));
+        string hash = RequireString(args, "hash");
+        if (!HasProperty(args, "enabled"))
+        {
+            throw new InvalidOperationException("缺少参数: enabled");
+        }
+
+        bool enabled = GetBool(args, "enabled");
+        McpRuleRef ruleRef = RequireRuleRef(type, hash);
+        ruleRef.Rule.Enabled = enabled;
+        bool saved = await _viewModel.ApplyRuleCenterConfigAsync(showNotification: false);
+        if (!saved)
+        {
+            throw new InvalidOperationException("请求规则配置保存失败。");
+        }
+
+        return new
+        {
+            success = true,
+            rule = ToRuleInfo(ruleRef.Type, ruleRef.Title, ruleRef.Rule)
+        };
+    }
+
+    private async Task<object> ToolRequestRulesRemoveAsync(JsonElement args)
+    {
+        string type = NormalizeRuleType(GetString(args, "type", "all"));
+        string hash = RequireString(args, "hash");
+        McpRuleRef ruleRef = RequireRuleRef(type, hash);
+        bool removed = RemoveRuleRef(ruleRef);
+        if (!removed)
+        {
+            throw new InvalidOperationException($"请求规则 {hash} 删除失败。");
+        }
+
+        bool saved = await _viewModel.ApplyRuleCenterConfigAsync(showNotification: false);
+        if (!saved)
+        {
+            throw new InvalidOperationException("请求规则配置保存失败。");
+        }
+
+        return new
+        {
+            success = true,
+            removed = ToRuleInfo(ruleRef.Type, ruleRef.Title, ruleRef.Rule)
+        };
+    }
+
+    private async Task<object> ToolRequestRuleHitsListAsync(JsonElement args)
+    {
+        await Task.CompletedTask;
+        int limit = Math.Max(1, GetInt(args, "limit", 100));
+        int offset = Math.Max(0, GetInt(args, "offset", 0));
+        string ruleType = GetString(args, "ruleType");
+        IEnumerable<CaptureEntry> entries = HasProperty(args, "index") || HasProperty(args, "theology")
+            ? new[] { RequireSessionEntry(args) }
+            : _viewModel.GetSessionSnapshot();
+
+        object[] hits = entries
+            .Where(static entry => entry.RuleHits.Count > 0)
+            .OrderByDescending(static entry => entry.Theology)
+            .SelectMany(entry => entry.RuleHits
+                .Where(hit => string.IsNullOrWhiteSpace(ruleType) || (hit.RuleType ?? "").Contains(ruleType, StringComparison.OrdinalIgnoreCase))
+                .Reverse<TrafficRuleHitItem>()
+                .Select(hit => new
+                {
+                    index = entry.Index,
+                    theology = entry.Theology,
+                    method = entry.Method,
+                    url = entry.Url,
+                    time = hit.Time,
+                    ruleType = hit.RuleType,
+                    ruleHash = hit.RuleHash,
+                    ruleName = hit.RuleName,
+                    action = hit.Action,
+                    direction = hit.Direction,
+                    summary = hit.Summary,
+                    hitUrl = hit.URL
+                }))
+            .Cast<object>()
+            .ToArray();
+
+        return new
+        {
+            success = true,
+            total = hits.Length,
+            offset,
+            limit,
+            hits = hits.Skip(offset).Take(limit).ToArray()
+        };
+    }
+
     private async Task<object> ToolSocketDataListAsync(JsonElement args)
     {
         CaptureEntry entry = RequireSessionEntry(args);
@@ -1878,8 +2076,13 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
                 recNum,
                 packetCount = packets.Length,
                 pid = entry.Process,
+                process = entry.Process,
                 clientIP = entry.ClientAddress,
                 sendTime = entry.SendTime,
+                tagColor = entry.TagColor,
+                hasTagColor = entry.HasTagColor,
+                breakMode = entry.BreakMode,
+                ruleHitCount = entry.RuleHits.Count,
                 notes = entry.Notes,
                 isFavorite = entry.IsFavorite
             });
@@ -2018,6 +2221,63 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
         settings.ShowFavoritesOnly = _viewModel.ShowFavoritesOnly;
         settings.FavoriteSessionKeys = _viewModel.GetFavoriteKeys().ToList();
         UiLayoutSettingsStore.Save(settings);
+    }
+
+    private CaptureEntry[] ResolveSessionEntries(JsonElement args)
+    {
+        Dictionary<int, CaptureEntry> entries = new();
+        if (HasProperty(args, "index"))
+        {
+            int index = RequireInt(args, "index");
+            CaptureEntry? entry = _viewModel.GetSessionSnapshot().FirstOrDefault(item => item.Index == index);
+            if (entry is null)
+            {
+                throw new InvalidOperationException($"请求序号 {index} 不存在");
+            }
+
+            entries[entry.Theology] = entry;
+        }
+
+        if (HasProperty(args, "theology"))
+        {
+            int theology = RequireInt(args, "theology");
+            CaptureEntry? entry = _viewModel.FindSessionEntry(theology);
+            if (entry is null)
+            {
+                throw new InvalidOperationException($"请求 {theology} 不存在");
+            }
+
+            entries[entry.Theology] = entry;
+        }
+
+        foreach (int index in ReadIntArray(args, "indexes"))
+        {
+            CaptureEntry? entry = _viewModel.GetSessionSnapshot().FirstOrDefault(item => item.Index == index);
+            if (entry is null)
+            {
+                throw new InvalidOperationException($"请求序号 {index} 不存在");
+            }
+
+            entries[entry.Theology] = entry;
+        }
+
+        foreach (int theology in ReadIntArray(args, "theologies"))
+        {
+            CaptureEntry? entry = _viewModel.FindSessionEntry(theology);
+            if (entry is null)
+            {
+                throw new InvalidOperationException($"请求 {theology} 不存在");
+            }
+
+            entries[entry.Theology] = entry;
+        }
+
+        if (entries.Count == 0)
+        {
+            throw new InvalidOperationException("缺少会话定位参数: index/theology/indexes/theologies");
+        }
+
+        return entries.Values.ToArray();
     }
 
     private CaptureEntry RequireSessionEntry(JsonElement args)
@@ -2291,6 +2551,33 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
         return values;
     }
 
+    private static int[] ReadIntArray(JsonElement element, string propertyName)
+    {
+        JsonElement property = GetProperty(element, propertyName);
+        if (property.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<int>();
+        }
+
+        return property.EnumerateArray()
+            .Select(static item =>
+            {
+                if (item.ValueKind == JsonValueKind.Number && item.TryGetInt32(out int intValue))
+                {
+                    return intValue;
+                }
+
+                if (item.ValueKind == JsonValueKind.String && int.TryParse(item.GetString(), out int stringValue))
+                {
+                    return stringValue;
+                }
+
+                return 0;
+            })
+            .Where(static item => item > 0)
+            .ToArray();
+    }
+
     private static object ToRequestInfo(CaptureEntry entry)
     {
         return new
@@ -2298,13 +2585,27 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
             index = entry.Index,
             theology = entry.Theology,
             method = entry.Method,
+            displayMethod = entry.DisplayMethod,
+            state = entry.State,
             url = entry.Url,
+            host = entry.Host,
+            query = entry.Query,
             statusCode = ExtractStatusCode(entry.State),
+            length = entry.ResponseLength,
+            type = entry.ResponseType,
             clientIP = entry.ClientAddress,
             pid = entry.Process,
+            process = entry.Process,
             sendTime = entry.SendTime,
             recTime = entry.ReceiveTime,
             way = GetSessionWay(entry),
+            icon = entry.Icon,
+            tagColor = entry.TagColor,
+            hasTagColor = entry.HasTagColor,
+            breakMode = entry.BreakMode,
+            ruleHitCount = entry.RuleHits.Count,
+            hasRuleHits = entry.HasRuleHits,
+            ruleHitSummary = entry.RuleHitSummary,
             notes = entry.Notes,
             isFavorite = entry.IsFavorite
         };
@@ -2349,6 +2650,187 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
             "tcp" => way == "tcp",
             "udp" => way == "udp",
             _ => true
+        };
+    }
+
+    private static SessionClearRule ParseSessionClearRule(string rule)
+    {
+        return rule.Trim().ToLowerInvariant() switch
+        {
+            "all" or "全部" => SessionClearRule.All,
+            "resources" or "resource" or "资源" => SessionClearRule.Resources,
+            "no_response" or "noresponse" or "无响应" => SessionClearRule.NoResponse,
+            "failed" or "fail" or "失败" => SessionClearRule.Failed,
+            "redirect" or "redirects" or "重定向" => SessionClearRule.Redirect,
+            "unfavorite" or "not_favorite" or "未收藏" => SessionClearRule.Unfavorite,
+            "untagged" or "no_tag" or "未标记" => SessionClearRule.Untagged,
+            "current_filter" or "currentfilter" or "当前筛选" => SessionClearRule.CurrentFilter,
+            _ => throw new InvalidOperationException($"未知清除规则: {rule}")
+        };
+    }
+
+    private static string NormalizeSessionClearRule(SessionClearRule rule)
+    {
+        return rule switch
+        {
+            SessionClearRule.All => "all",
+            SessionClearRule.Resources => "resources",
+            SessionClearRule.NoResponse => "no_response",
+            SessionClearRule.Failed => "failed",
+            SessionClearRule.Redirect => "redirect",
+            SessionClearRule.Unfavorite => "unfavorite",
+            SessionClearRule.Untagged => "untagged",
+            SessionClearRule.CurrentFilter => "current_filter",
+            _ => "all"
+        };
+    }
+
+    private IEnumerable<McpRuleRef> GetRuleRefs(string type)
+    {
+        string normalizedType = NormalizeRuleType(type);
+        if (normalizedType is "all" or "http_block")
+        {
+            foreach (RequestBlockRuleItem item in _viewModel.RequestBlockRules)
+            {
+                yield return new McpRuleRef("http_block", "HTTP屏蔽", item);
+            }
+        }
+
+        if (normalizedType is "all" or "websocket_block")
+        {
+            foreach (WebSocketBlockRuleItem item in _viewModel.WebSocketBlockRules)
+            {
+                yield return new McpRuleRef("websocket_block", "WebSocket屏蔽", item);
+            }
+        }
+
+        if (normalizedType is "all" or "tcp_block")
+        {
+            foreach (TcpBlockRuleItem item in _viewModel.TcpBlockRules)
+            {
+                yield return new McpRuleRef("tcp_block", "TCP屏蔽", item);
+            }
+        }
+
+        if (normalizedType is "all" or "udp_block")
+        {
+            foreach (UdpBlockRuleItem item in _viewModel.UdpBlockRules)
+            {
+                yield return new McpRuleRef("udp_block", "UDP屏蔽", item);
+            }
+        }
+
+        if (normalizedType is "all" or "rewrite")
+        {
+            foreach (RequestRewriteRuleItem item in _viewModel.RequestRewriteRules)
+            {
+                item.EnsureOperations();
+                yield return new McpRuleRef("rewrite", "请求重写", item);
+            }
+        }
+
+        if (normalizedType is "all" or "mapping")
+        {
+            foreach (RequestMappingRuleItem item in _viewModel.RequestMappingRules)
+            {
+                yield return new McpRuleRef("mapping", "请求映射", item);
+            }
+        }
+    }
+
+    private McpRuleRef RequireRuleRef(string type, string hash)
+    {
+        McpRuleRef[] matches = GetRuleRefs(type)
+            .Where(item => string.Equals(item.Rule.Hash, hash, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        return matches.Length switch
+        {
+            1 => matches[0],
+            0 => throw new InvalidOperationException($"请求规则 {hash} 不存在"),
+            _ => throw new InvalidOperationException($"请求规则 {hash} 存在多个匹配，请指定 type")
+        };
+    }
+
+    private bool RemoveRuleRef(McpRuleRef ruleRef)
+    {
+        return ruleRef.Rule switch
+        {
+            RequestBlockRuleItem item => _viewModel.RequestBlockRules.Remove(item),
+            WebSocketBlockRuleItem item => _viewModel.WebSocketBlockRules.Remove(item),
+            TcpBlockRuleItem item => _viewModel.TcpBlockRules.Remove(item),
+            UdpBlockRuleItem item => _viewModel.UdpBlockRules.Remove(item),
+            RequestRewriteRuleItem item => _viewModel.RequestRewriteRules.Remove(item),
+            RequestMappingRuleItem item => _viewModel.RequestMappingRules.Remove(item),
+            _ => false
+        };
+    }
+
+    private static string NormalizeRuleType(string? type)
+    {
+        return string.IsNullOrWhiteSpace(type)
+            ? "all"
+            : type.Trim().ToLowerInvariant() switch
+            {
+                "all" or "全部" => "all",
+                "http" or "http_block" or "http屏蔽" => "http_block",
+                "ws" or "websocket" or "websocket_block" or "websocket屏蔽" => "websocket_block",
+                "tcp" or "tcp_block" or "tcp屏蔽" => "tcp_block",
+                "udp" or "udp_block" or "udp屏蔽" => "udp_block",
+                "rewrite" or "request_rewrite" or "请求重写" => "rewrite",
+                "mapping" or "request_mapping" or "请求映射" => "mapping",
+                string value => throw new InvalidOperationException($"未知请求规则类型: {value}")
+            };
+    }
+
+    private static object ToRuleInfo(string type, string title, TrafficRuleItemBase rule)
+    {
+        object? detail = rule switch
+        {
+            RequestBlockRuleItem item => new { item.Action },
+            WebSocketBlockRuleItem item => new { item.Action },
+            TcpBlockRuleItem item => new { item.Action },
+            UdpBlockRuleItem item => new { item.Action },
+            RequestMappingRuleItem item => new
+            {
+                item.MappingType,
+                item.SourceContent,
+                item.TargetContent,
+                item.ValueType,
+                item.LegacyReplaceRule,
+                item.DisplayValueType
+            },
+            RequestRewriteRuleItem item => new
+            {
+                item.Direction,
+                item.OperationsJson,
+                Operations = item.Operations.Select(static operation => new
+                {
+                    operation.Target,
+                    operation.Operation,
+                    operation.Key,
+                    operation.Value,
+                    operation.ValueType
+                }).ToArray()
+            },
+            _ => null
+        };
+
+        return new
+        {
+            type,
+            title,
+            rule.Hash,
+            enabled = rule.Enabled,
+            rule.Name,
+            rule.Method,
+            rule.UrlMatchType,
+            rule.UrlPattern,
+            rule.Priority,
+            rule.Note,
+            rule.State,
+            rule.MatchSummary,
+            rule.Summary,
+            detail
         };
     }
 
@@ -2730,6 +3212,8 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
         Func<JsonElement, Task<object>> Handler);
 
     private sealed record HeaderPair(string Name, string Value);
+
+    private sealed record McpRuleRef(string Type, string Title, TrafficRuleItemBase Rule);
 
     private sealed class JsonRpcRequest
     {

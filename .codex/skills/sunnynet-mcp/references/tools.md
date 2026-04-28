@@ -28,8 +28,12 @@ This is a compact reference for the current SunnyNet WPF MCP implementation. Ful
 - `request_favorite_add(index|theology)`
 - `request_favorite_remove(index|theology)`
 - `request_notes_set(index|theology, notes)`
+- `request_tag_set(index|theology|indexes|theologies, color)`
+- `request_tag_clear(index|theology|indexes|theologies)`
 
 Empty `notes` clears the note.
+
+`color` accepts normal WPF color strings such as `#FF6A00`; `__strike__` marks a strikethrough row.
 
 ## Session Mutation
 
@@ -42,10 +46,13 @@ Empty `notes` clears the note.
 - `request_release_all()`
 - `request_delete(theologies)`
 - `request_clear()`
+- `request_clear_by_rule(rule)`
 - `request_save_all(path)`
 - `request_import(path)`
 
 Use these only after the user explicitly asks.
+
+`request_clear_by_rule` supports `all`, `resources`, `no_response`, `failed`, `redirect`, `unfavorite`, `untagged`, `current_filter`.
 
 ## Long Connections
 
@@ -70,11 +77,18 @@ Use these only after the user explicitly asks.
 ## Rules and Settings
 
 - `config_get()`
+- `request_rules_list(type)`
+- `request_rules_enable(type, hash, enabled)`
+- `request_rules_remove(type, hash)`
+- `request_rule_hits_list(index|theology, ruleType, limit, offset)`
 - `hosts_list()`, `hosts_add(source, target)`, `hosts_remove(index)`
 - `replace_rules_list()`, `replace_rules_add(type, source, target)`, `replace_rules_remove(hash|index)`, `replace_rules_clear()`
 - `breakpoint_add(url_pattern)`, `breakpoint_list()`, `breakpoint_remove(index)`, `breakpoint_clear()`
 - `process_list()`, `process_add_name(name)`, `process_remove_name(name)`
 - `cert_install()`, `cert_export(path)`
+
+Rule `type`: `all`, `http_block`, `websocket_block`, `tcp_block`, `udp_block`, `rewrite`, `mapping`.
+`replace_rules_*` and `breakpoint_*` are compatibility APIs; prefer `request_rules_*` for the WPF rule center.
 
 Replace rule `type`: `Base64`, `HEX`, `String(UTF8)`, `String(GBK)`, `响应文件`.
 
@@ -92,6 +106,15 @@ Session list/detail results usually include:
 - `sendTime`
 - `recTime`
 - `way`
+- `host`
+- `query`
+- `length`
+- `type`
+- `process`
+- `tagColor`
+- `hasTagColor`
+- `breakMode`
+- `ruleHitCount`
+- `ruleHitSummary`
 - `notes`
 - `isFavorite`
-
