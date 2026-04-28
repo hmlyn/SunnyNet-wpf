@@ -27,6 +27,8 @@ public sealed class CaptureEntry : ViewModelBase
     private static readonly Brush InfoRowBackgroundBrush = CreateFrozenBrush("#F4F8FF");
     private static readonly Brush RuleHitRowBackgroundBrush = CreateFrozenBrush("#E7F7FF");
     private static readonly Brush RuleHitAccentBrush = CreateFrozenBrush("#0088A8");
+    private static readonly Brush BlockRuleHitRowBackgroundBrush = CreateFrozenBrush("#FFF0DD");
+    private static readonly Brush BlockRuleHitStatusBrush = CreateFrozenBrush("#C2410C");
     private static readonly IReadOnlyDictionary<string, ImageSource> SessionIconImages = CreateSessionIconImages();
     private int _index;
     private int _theology;
@@ -227,15 +229,23 @@ public sealed class CaptureEntry : ViewModelBase
         : CreateFrozenBrush(TagColor);
 
     [JsonIgnore]
-    public Brush RowAccentBrush => HasTagColor && !IsStrikeMarked ? TagAccentBrush : HasRuleHits ? RuleHitAccentBrush : Brushes.Transparent;
+    public Brush RowAccentBrush => HasTagColor && !IsStrikeMarked
+        ? TagAccentBrush
+        : HasBlockRuleHits
+            ? Brushes.Transparent
+            : HasRuleHits
+                ? RuleHitAccentBrush
+                : Brushes.Transparent;
 
     [JsonIgnore]
     public Brush UrlForeground => HasTagColor && !IsStrikeMarked
         ? CreateReadableTagForeground(TagColor)
+        : HasBlockRuleHits
+            ? BlockRuleHitStatusBrush
         : CreateFrozenBrush("#1F2D3D");
 
     [JsonIgnore]
-    public FontWeight UrlFontWeight => HasTagColor && !IsStrikeMarked ? FontWeights.SemiBold : FontWeights.Normal;
+    public FontWeight UrlFontWeight => HasTagColor && !IsStrikeMarked || HasBlockRuleHits ? FontWeights.SemiBold : FontWeights.Normal;
 
     [JsonIgnore]
     public TextDecorationCollection? RowTextDecorations => IsStrikeMarked ? TextDecorations.Strikethrough : null;
@@ -271,12 +281,19 @@ public sealed class CaptureEntry : ViewModelBase
     public bool HasRuleHits => RuleHits.Count > 0;
 
     [JsonIgnore]
+    public bool HasBlockRuleHits => RuleHits.Any(IsBlockRuleHit);
+
+    [JsonIgnore]
     public string RuleHitSummary => HasRuleHits
         ? string.Join(Environment.NewLine, RuleHits.TakeLast(4).Select(static hit => $"{hit.Time} {hit.Summary} {hit.RuleName}".Trim()))
         : "";
 
     [JsonIgnore]
-    public string RuleHitBadgeText => HasRuleHits ? $"规则×{RuleHits.Count}" : "";
+    public string RuleHitBadgeText => HasBlockRuleHits
+        ? $"屏蔽×{RuleHits.Count(IsBlockRuleHit)}"
+        : HasRuleHits
+            ? $"规则×{RuleHits.Count}"
+            : "";
 
     [JsonIgnore]
     public Brush StatusBrush => GetStatusBrush();
@@ -489,10 +506,18 @@ public sealed class CaptureEntry : ViewModelBase
     private void NotifyRuleHitVisualsChanged()
     {
         OnPropertyChanged(nameof(HasRuleHits));
+        OnPropertyChanged(nameof(HasBlockRuleHits));
         OnPropertyChanged(nameof(RuleHitSummary));
         OnPropertyChanged(nameof(RuleHitBadgeText));
         OnPropertyChanged(nameof(RowAccentBrush));
         OnPropertyChanged(nameof(RowBackground));
+        OnPropertyChanged(nameof(UrlForeground));
+        OnPropertyChanged(nameof(UrlFontWeight));
+        OnPropertyChanged(nameof(StatusBrush));
+        OnPropertyChanged(nameof(StatusIconToolTip));
+        OnPropertyChanged(nameof(SessionIconGlyph));
+        OnPropertyChanged(nameof(SessionIconToolTip));
+        OnPropertyChanged(nameof(SessionIconImage));
     }
 
     private Brush GetStatusBrush()
@@ -500,6 +525,11 @@ public sealed class CaptureEntry : ViewModelBase
         if (IsIntercepted)
         {
             return InterceptStatusBrush;
+        }
+
+        if (HasBlockRuleHits)
+        {
+            return BlockRuleHitStatusBrush;
         }
 
         if (IsErrorState())
@@ -546,6 +576,11 @@ public sealed class CaptureEntry : ViewModelBase
         if (IsIntercepted)
         {
             return InterceptRowBackgroundBrush;
+        }
+
+        if (HasBlockRuleHits)
+        {
+            return BlockRuleHitRowBackgroundBrush;
         }
 
         if (HasRuleHits)
@@ -599,6 +634,11 @@ public sealed class CaptureEntry : ViewModelBase
             return BreakMode == 2 ? "已拦截下行响应" : "已拦截上行请求";
         }
 
+        if (HasBlockRuleHits)
+        {
+            return RuleHitSummary;
+        }
+
         int statusCode = ExtractStatusCode(State);
         if (statusCode > 0)
         {
@@ -615,6 +655,11 @@ public sealed class CaptureEntry : ViewModelBase
             return BreakMode == 2
                 ? new SessionIconVisual("↓", "响应断点：已拦截下行响应")
                 : new SessionIconVisual("↑", "请求断点：已拦截上行请求");
+        }
+
+        if (HasBlockRuleHits)
+        {
+            return new SessionIconVisual("RB", string.IsNullOrWhiteSpace(RuleHitSummary) ? "屏蔽规则命中" : RuleHitSummary);
         }
 
         if (Icon.Equals("websocket_close", StringComparison.OrdinalIgnoreCase)
@@ -859,6 +904,7 @@ public sealed class CaptureEntry : ViewModelBase
         {
             ["↑"] = CreateArrowIcon("#F97316", true),
             ["↓"] = CreateArrowIcon("#F97316", false),
+            ["RB"] = CreateRuleBlockIcon(),
             ["WS"] = CreateWebSocketIcon(),
             ["×"] = CreateCloseIcon(),
             ["!"] = CreateErrorIcon(),
@@ -921,6 +967,13 @@ public sealed class CaptureEntry : ViewModelBase
             CreatePathDrawing("M5.2,9.7 C3.9,9.7 2.9,8.7 2.9,7.4 C2.9,6.1 3.9,5.1 5.2,5.1 L7.1,5.1", null, "#2563EB", 1.35),
             CreatePathDrawing("M8.9,10.9 L10.8,10.9 C12.1,10.9 13.1,9.9 13.1,8.6 C13.1,7.3 12.1,6.3 10.8,6.3 L8.9,6.3", null, "#2563EB", 1.35),
             CreatePathDrawing("M6.4,8 L9.6,8", null, "#2563EB", 1.35));
+    }
+
+    private static ImageSource CreateRuleBlockIcon()
+    {
+        return CreateIconImage(
+            CreatePathDrawing("M6,1.6 L10,1.6 L14.4,6 L14.4,10 L10,14.4 L6,14.4 L1.6,10 L1.6,6 Z", "#FFF1E8", "#F05A24", 1.0),
+            CreatePathDrawing("M5.1,5.1 L10.9,10.9 M10.9,5.1 L5.1,10.9", null, "#C2410C", 1.65));
     }
 
     private static ImageSource CreateCloseIcon()
@@ -1158,6 +1211,13 @@ public sealed class CaptureEntry : ViewModelBase
     private static double GetRelativeLuminance(System.Windows.Media.Color color)
     {
         return ((0.2126 * color.R) + (0.7152 * color.G) + (0.0722 * color.B)) / 255;
+    }
+
+    private static bool IsBlockRuleHit(TrafficRuleHitItem hit)
+    {
+        return hit.RuleType.Contains("屏蔽", StringComparison.OrdinalIgnoreCase)
+            || hit.Action.Contains("断开", StringComparison.OrdinalIgnoreCase)
+            || hit.Action.Contains("丢弃", StringComparison.OrdinalIgnoreCase);
     }
 
     private readonly record struct SessionIconVisual(string Glyph, string ToolTip);
