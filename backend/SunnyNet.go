@@ -853,6 +853,33 @@ func TcpCallback(Conn *SunnyNet.TcpConn) {
 				Conn.RemoteAddr = hm
 			}
 			h.URL = Conn.LocalAddr + "->" + Conn.RemoteAddr
+			if block, ok := ApplyTcpBlock(Conn.Theology, Conn.Type, h.Method, h.URL); ok {
+				h.SendTime = time.Now().Format("15:04:05.000")
+				h.RecTime = h.SendTime
+				_tmp := &ListInfo{
+					MessageId: -1,
+					URL:       h.URL,
+					HOST:      Conn.RemoteAddr,
+					ClientIP:  Conn.LocalAddr,
+					PID:       CommAnd.GetPidName(Conn.Pid),
+					Method:    h.Method,
+					Theology:  Conn.Theology,
+					State:     "已阻断",
+					Len:       "0/0",
+					Type:      h.Method,
+					SendTime:  h.SendTime,
+					RecTime:   h.RecTime,
+					Ico:       "error",
+					Break:     0,
+				}
+				h.PID = _tmp.PID
+				h.ClientIP = Conn.LocalAddr
+				AddInsertList(_tmp)
+				if block.Close || block.Drop {
+					Conn.DropMessage()
+				}
+				return
+			}
 			Conn.RemoteAddr = HostsRulesAddress(Conn.RemoteAddr)
 			Conn.SetConnectionIP(Conn.RemoteAddr)
 			return
@@ -896,6 +923,15 @@ func TcpCallback(Conn *SunnyNet.TcpConn) {
 		AddInsertList(_tmp)
 		h.PID = _tmp.PID
 		h.ClientIP = Conn.LocalAddr
+		if block, ok := ApplyTcpBlock(Conn.Theology, Conn.Type, h.Method, h.URL); ok {
+			if block.Drop {
+				Conn.DropMessage()
+			}
+			if block.Close {
+				Conn.Close()
+			}
+			return
+		}
 		//客户端发送\接收
 		{
 			if Conn.Type == public.SunnyNetMsgTypeTCPClientSend {
@@ -910,6 +946,7 @@ func TcpCallback(Conn *SunnyNet.TcpConn) {
 		}
 		{
 			if !Break {
+				Conn.DropMessage()
 				return
 			}
 			h.TcpConn = Conn
@@ -1022,6 +1059,7 @@ func UdpCallback(Conn *SunnyNet.UDPConn) {
 			}
 			{
 				if !Break {
+					Conn.Data = make([]byte, 0)
 					return
 				}
 				if Conn.Type == public.SunnyNetUDPTypeSend {
@@ -1059,6 +1097,12 @@ func UdpCallback(Conn *SunnyNet.UDPConn) {
 		h.PID = _tmp.PID
 		h.ClientIP = Conn.LocalAddress
 		AddInsertList(_tmp)
+		if block, ok := ApplyUdpBlock(Theology, Conn.Type, h.URL); ok {
+			if block.Drop {
+				Conn.Data = make([]byte, 0)
+			}
+			return
+		}
 		Body := Conn.Data
 		if len(Body) < 1 {
 			return

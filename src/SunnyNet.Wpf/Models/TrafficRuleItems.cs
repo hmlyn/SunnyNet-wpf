@@ -117,6 +117,32 @@ public sealed class WebSocketBlockRuleItem : TrafficRuleItemBase
     public override string Summary => Action;
 }
 
+public sealed class TcpBlockRuleItem : TrafficRuleItemBase
+{
+    private string _action = "断开连接";
+
+    public string Action
+    {
+        get => _action;
+        set => SetRuleProperty(ref _action, string.IsNullOrWhiteSpace(value) ? "断开连接" : value);
+    }
+
+    public override string Summary => Action;
+}
+
+public sealed class UdpBlockRuleItem : TrafficRuleItemBase
+{
+    private string _action = "丢弃上行包";
+
+    public string Action
+    {
+        get => _action;
+        set => SetRuleProperty(ref _action, string.IsNullOrWhiteSpace(value) ? "丢弃上行包" : value);
+    }
+
+    public override string Summary => Action;
+}
+
 public sealed class RequestRewriteRuleItem : TrafficRuleItemBase
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = false };

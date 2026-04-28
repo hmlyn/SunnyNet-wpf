@@ -61,6 +61,21 @@ func (k *TcpConn) SetBody(data []byte) bool {
 	return true
 }
 
+// DropMessage 丢弃当前 TCP 连接或当前 TCP 数据包，不再继续转发。
+func (k *TcpConn) DropMessage() bool {
+	if k.c == nil {
+		return false
+	}
+	if k.Type != public.SunnyNetMsgTypeTCPAboutToConnect &&
+		k.Type != public.SunnyNetMsgTypeTCPClientReceive &&
+		k.Type != public.SunnyNetMsgTypeTCPClientSend {
+		return false
+	}
+	k.c.Drop = true
+	k.c.Data.Reset()
+	return true
+}
+
 // Close 关闭TCP连接
 func (k *TcpConn) Close() bool {
 	if k.Type == public.SunnyNetMsgTypeTCPAboutToConnect {

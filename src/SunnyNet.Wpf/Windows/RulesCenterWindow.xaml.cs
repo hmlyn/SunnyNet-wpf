@@ -17,6 +17,8 @@ public partial class RulesCenterWindow : Window
     {
         ["HTTP屏蔽"] = new RulePageInfo("HTTP屏蔽", "仅作用于 HTTP/HTTPS：命中后可断开请求或断开响应。"),
         ["WebSocket屏蔽"] = new RulePageInfo("WebSocket屏蔽", "仅作用于 WebSocket：命中后可断开连接或按方向丢弃帧。"),
+        ["TCP屏蔽"] = new RulePageInfo("TCP屏蔽", "仅作用于 TCP/TLS-TCP：命中后可断开连接或按方向丢弃数据包。"),
+        ["UDP屏蔽"] = new RulePageInfo("UDP屏蔽", "仅作用于 UDP：命中后可按方向丢弃数据包。"),
         ["请求重写"] = new RulePageInfo("请求重写", "命中规则后修改请求或响应的结构化内容。"),
         ["请求映射"] = new RulePageInfo("请求映射", "把命中的请求映射到本地文件、固定内容或新的远程地址。"),
         ["请求解密"] = new RulePageInfo("请求解密", "命中规则后生成请求或响应的明文展示副本，不改原始数据。")
@@ -46,13 +48,17 @@ public partial class RulesCenterWindow : Window
 
         bool blockSelected = key == "HTTP屏蔽";
         bool webSocketBlockSelected = key == "WebSocket屏蔽";
+        bool tcpBlockSelected = key == "TCP屏蔽";
+        bool udpBlockSelected = key == "UDP屏蔽";
         bool rewriteSelected = key == "请求重写";
         bool mappingSelected = key == "请求映射";
         bool decodeSelected = key == "请求解密";
-        bool implemented = blockSelected || webSocketBlockSelected || rewriteSelected || mappingSelected || decodeSelected;
+        bool implemented = blockSelected || webSocketBlockSelected || tcpBlockSelected || udpBlockSelected || rewriteSelected || mappingSelected || decodeSelected;
 
         BlockRulesGrid.Visibility = blockSelected ? Visibility.Visible : Visibility.Collapsed;
         WebSocketBlockRulesGrid.Visibility = webSocketBlockSelected ? Visibility.Visible : Visibility.Collapsed;
+        TcpBlockRulesGrid.Visibility = tcpBlockSelected ? Visibility.Visible : Visibility.Collapsed;
+        UdpBlockRulesGrid.Visibility = udpBlockSelected ? Visibility.Visible : Visibility.Collapsed;
         RewriteRulesGrid.Visibility = rewriteSelected ? Visibility.Visible : Visibility.Collapsed;
         MappingRulesGrid.Visibility = mappingSelected ? Visibility.Visible : Visibility.Collapsed;
         DecodeRulesGrid.Visibility = decodeSelected ? Visibility.Visible : Visibility.Collapsed;
@@ -80,6 +86,24 @@ public partial class RulesCenterWindow : Window
             if (WebSocketBlockRulesGrid.SelectedItem is null && _viewModel.WebSocketBlockRules.Count > 0)
             {
                 WebSocketBlockRulesGrid.SelectedIndex = 0;
+            }
+            return;
+        }
+
+        if (_currentPage == "TCP屏蔽")
+        {
+            if (TcpBlockRulesGrid.SelectedItem is null && _viewModel.TcpBlockRules.Count > 0)
+            {
+                TcpBlockRulesGrid.SelectedIndex = 0;
+            }
+            return;
+        }
+
+        if (_currentPage == "UDP屏蔽")
+        {
+            if (UdpBlockRulesGrid.SelectedItem is null && _viewModel.UdpBlockRules.Count > 0)
+            {
+                UdpBlockRulesGrid.SelectedIndex = 0;
             }
             return;
         }
@@ -115,6 +139,8 @@ public partial class RulesCenterWindow : Window
         {
             "HTTP屏蔽" => _viewModel.RequestBlockRules.Count,
             "WebSocket屏蔽" => _viewModel.WebSocketBlockRules.Count,
+            "TCP屏蔽" => _viewModel.TcpBlockRules.Count,
+            "UDP屏蔽" => _viewModel.UdpBlockRules.Count,
             "请求重写" => _viewModel.RequestRewriteRules.Count,
             "请求映射" => _viewModel.RequestMappingRules.Count,
             "请求解密" => _viewModel.RequestDecodeRules.Count,
@@ -131,6 +157,12 @@ public partial class RulesCenterWindow : Window
                 break;
             case "WebSocket屏蔽":
                 await AddWebSocketBlockRuleAsync();
+                break;
+            case "TCP屏蔽":
+                await AddTcpBlockRuleAsync();
+                break;
+            case "UDP屏蔽":
+                await AddUdpBlockRuleAsync();
                 break;
             case "请求重写":
                 await AddRewriteRuleAsync();
@@ -183,6 +215,12 @@ public partial class RulesCenterWindow : Window
                 break;
             case "WebSocket屏蔽" when WebSocketBlockRulesGrid.SelectedItem is WebSocketBlockRuleItem webSocketBlockRule:
                 _viewModel.WebSocketBlockRules.Remove(webSocketBlockRule);
+                break;
+            case "TCP屏蔽" when TcpBlockRulesGrid.SelectedItem is TcpBlockRuleItem tcpBlockRule:
+                _viewModel.TcpBlockRules.Remove(tcpBlockRule);
+                break;
+            case "UDP屏蔽" when UdpBlockRulesGrid.SelectedItem is UdpBlockRuleItem udpBlockRule:
+                _viewModel.UdpBlockRules.Remove(udpBlockRule);
                 break;
             case "请求重写" when RewriteRulesGrid.SelectedItem is RequestRewriteRuleItem rewriteRule:
                 _viewModel.RequestRewriteRules.Remove(rewriteRule);
@@ -252,6 +290,52 @@ public partial class RulesCenterWindow : Window
         WebSocketBlockRulesGrid.SelectedItem = item;
         await SaveRulesAsync();
         RuleStatusTextBlock.Text = $"{_viewModel.WebSocketBlockRules.Count} 条";
+    }
+
+    private async Task AddTcpBlockRuleAsync()
+    {
+        TcpBlockRuleItem item = new()
+        {
+            Name = "新TCP屏蔽",
+            Method = "ANY",
+            UrlMatchType = "通配",
+            UrlPattern = "",
+            Action = "断开连接",
+            State = "未保存"
+        };
+
+        if (ShowRuleEditor("TCP屏蔽", item) != true)
+        {
+            return;
+        }
+
+        _viewModel.TcpBlockRules.Add(item);
+        TcpBlockRulesGrid.SelectedItem = item;
+        await SaveRulesAsync();
+        RuleStatusTextBlock.Text = $"{_viewModel.TcpBlockRules.Count} 条";
+    }
+
+    private async Task AddUdpBlockRuleAsync()
+    {
+        UdpBlockRuleItem item = new()
+        {
+            Name = "新UDP屏蔽",
+            Method = "UDP",
+            UrlMatchType = "通配",
+            UrlPattern = "",
+            Action = "丢弃上行包",
+            State = "未保存"
+        };
+
+        if (ShowRuleEditor("UDP屏蔽", item) != true)
+        {
+            return;
+        }
+
+        _viewModel.UdpBlockRules.Add(item);
+        UdpBlockRulesGrid.SelectedItem = item;
+        await SaveRulesAsync();
+        RuleStatusTextBlock.Text = $"{_viewModel.UdpBlockRules.Count} 条";
     }
 
     private async Task AddRewriteRuleAsync()
@@ -361,6 +445,32 @@ public partial class RulesCenterWindow : Window
                 RuleStatusTextBlock.Text = $"{_viewModel.WebSocketBlockRules.Count} 条";
                 break;
             }
+            case "TCP屏蔽" when TcpBlockRulesGrid.SelectedItem is TcpBlockRuleItem tcpBlockRule:
+            {
+                TcpBlockRuleItem editing = CloneTcpBlockRule(tcpBlockRule);
+                if (ShowRuleEditor("TCP屏蔽", editing) != true)
+                {
+                    return;
+                }
+
+                ApplyTcpBlockRule(tcpBlockRule, editing);
+                await SaveRulesAsync();
+                RuleStatusTextBlock.Text = $"{_viewModel.TcpBlockRules.Count} 条";
+                break;
+            }
+            case "UDP屏蔽" when UdpBlockRulesGrid.SelectedItem is UdpBlockRuleItem udpBlockRule:
+            {
+                UdpBlockRuleItem editing = CloneUdpBlockRule(udpBlockRule);
+                if (ShowRuleEditor("UDP屏蔽", editing) != true)
+                {
+                    return;
+                }
+
+                ApplyUdpBlockRule(udpBlockRule, editing);
+                await SaveRulesAsync();
+                RuleStatusTextBlock.Text = $"{_viewModel.UdpBlockRules.Count} 条";
+                break;
+            }
             case "请求重写" when RewriteRulesGrid.SelectedItem is RequestRewriteRuleItem rewriteRule:
             {
                 RequestRewriteRuleItem editing = CloneRewriteRule(rewriteRule);
@@ -409,6 +519,8 @@ public partial class RulesCenterWindow : Window
         {
             "HTTP屏蔽" => BlockRulesGrid.SelectedItem as TrafficRuleItemBase,
             "WebSocket屏蔽" => WebSocketBlockRulesGrid.SelectedItem as TrafficRuleItemBase,
+            "TCP屏蔽" => TcpBlockRulesGrid.SelectedItem as TrafficRuleItemBase,
+            "UDP屏蔽" => UdpBlockRulesGrid.SelectedItem as TrafficRuleItemBase,
             "请求重写" => RewriteRulesGrid.SelectedItem as TrafficRuleItemBase,
             "请求映射" => MappingRulesGrid.SelectedItem as TrafficRuleItemBase,
             "请求解密" => DecodeRulesGrid.SelectedItem as TrafficRuleItemBase,
@@ -448,6 +560,23 @@ public partial class RulesCenterWindow : Window
                 webSocketBlockRule,
                 _viewModel.WebSocketBlockRules,
                 "WebSocket屏蔽");
+        }
+
+        if (rule is TcpBlockRuleItem tcpBlockRule)
+        {
+            return ValidateUniqueBlockRule(
+                tcpBlockRule,
+                _viewModel.TcpBlockRules,
+                "TCP屏蔽");
+        }
+
+        if (rule is UdpBlockRuleItem udpBlockRule)
+        {
+            udpBlockRule.Method = "UDP";
+            return ValidateUniqueBlockRule(
+                udpBlockRule,
+                _viewModel.UdpBlockRules,
+                "UDP屏蔽");
         }
 
         return null;
@@ -554,6 +683,35 @@ public partial class RulesCenterWindow : Window
     {
         ApplyCommonRuleFields(target, source);
         target.Method = "ANY";
+        target.Action = source.Action;
+    }
+
+    private static TcpBlockRuleItem CloneTcpBlockRule(TcpBlockRuleItem source)
+    {
+        TcpBlockRuleItem clone = new();
+        ApplyTcpBlockRule(clone, source);
+        clone.State = source.State;
+        return clone;
+    }
+
+    private static void ApplyTcpBlockRule(TcpBlockRuleItem target, TcpBlockRuleItem source)
+    {
+        ApplyCommonRuleFields(target, source);
+        target.Action = source.Action;
+    }
+
+    private static UdpBlockRuleItem CloneUdpBlockRule(UdpBlockRuleItem source)
+    {
+        UdpBlockRuleItem clone = new();
+        ApplyUdpBlockRule(clone, source);
+        clone.State = source.State;
+        return clone;
+    }
+
+    private static void ApplyUdpBlockRule(UdpBlockRuleItem target, UdpBlockRuleItem source)
+    {
+        ApplyCommonRuleFields(target, source);
+        target.Method = "UDP";
         target.Action = source.Action;
     }
 

@@ -728,6 +728,8 @@ type ConfigInterceptRule struct {
 type ConfigRuleCenter struct {
 	BlockRules          []ConfigRequestBlockRule   `json:"BlockRules"`
 	WebSocketBlockRules []ConfigWebSocketBlockRule `json:"WebSocketBlockRules"`
+	TcpBlockRules       []ConfigTcpBlockRule       `json:"TcpBlockRules"`
+	UdpBlockRules       []ConfigUdpBlockRule       `json:"UdpBlockRules"`
 	RewriteRules        []ConfigRequestRewriteRule `json:"RewriteRules"`
 	MappingRules        []ConfigRequestMappingRule `json:"MappingRules"`
 	DecodeRules         []ConfigRequestDecodeRule  `json:"DecodeRules"`
@@ -747,6 +749,14 @@ type ConfigRequestBlockRule struct {
 	Action string `json:"Action"`
 }
 type ConfigWebSocketBlockRule struct {
+	ConfigTrafficRuleBase
+	Action string `json:"Action"`
+}
+type ConfigTcpBlockRule struct {
+	ConfigTrafficRuleBase
+	Action string `json:"Action"`
+}
+type ConfigUdpBlockRule struct {
 	ConfigTrafficRuleBase
 	Action string `json:"Action"`
 }
@@ -862,6 +872,12 @@ func (c *UserConfig) loadDefaultValue() {
 	}
 	if c.RuleCenter.WebSocketBlockRules == nil {
 		c.RuleCenter.WebSocketBlockRules = make([]ConfigWebSocketBlockRule, 0)
+	}
+	if c.RuleCenter.TcpBlockRules == nil {
+		c.RuleCenter.TcpBlockRules = make([]ConfigTcpBlockRule, 0)
+	}
+	if c.RuleCenter.UdpBlockRules == nil {
+		c.RuleCenter.UdpBlockRules = make([]ConfigUdpBlockRule, 0)
 	}
 	if c.RuleCenter.RewriteRules == nil {
 		c.RuleCenter.RewriteRules = make([]ConfigRequestRewriteRule, 0)

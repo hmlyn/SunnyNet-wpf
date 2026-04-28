@@ -260,6 +260,8 @@
                                     <ContextMenu>
                                         <MenuItem Header="HTTP屏蔽" Click="RequestBlockRules_Click" />
                                         <MenuItem Header="WebSocket屏蔽" Click="WebSocketBlockRules_Click" />
+                                        <MenuItem Header="TCP屏蔽" Click="TcpBlockRules_Click" />
+                                        <MenuItem Header="UDP屏蔽" Click="UdpBlockRules_Click" />
                                         <MenuItem Header="请求重写" Click="RequestRewriteRules_Click" />
                                         <MenuItem Header="请求映射" Click="RequestMappingRules_Click" />
                                         <MenuItem Header="请求解密" Click="RequestDecodeRules_Click" />

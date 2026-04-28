@@ -33,9 +33,11 @@ public partial class RuleEditorWindow : Window
         bool rewrite = ruleType == "请求重写";
         bool mapping = ruleType == "请求映射";
         bool webSocketBlock = ruleType == "WebSocket屏蔽";
-        bool block = (ruleType is "HTTP屏蔽" or "请求屏蔽") || webSocketBlock;
+        bool tcpBlock = ruleType == "TCP屏蔽";
+        bool udpBlock = ruleType == "UDP屏蔽";
+        bool block = (ruleType is "HTTP屏蔽" or "请求屏蔽") || webSocketBlock || tcpBlock || udpBlock;
         bool decode = ruleType == "请求解密";
-        ConfigureRuleLayout(block, rewrite, mapping, decode, webSocketBlock);
+        ConfigureRuleLayout(block, rewrite, mapping, decode, webSocketBlock || udpBlock);
 
         if (rewrite && DataContext is RequestRewriteRuleItem rewriteRule)
         {
@@ -52,10 +54,19 @@ public partial class RuleEditorWindow : Window
         MappingTypePanel.Visibility = mapping ? Visibility.Visible : Visibility.Collapsed;
         BlockActionPanel.Visibility = block ? Visibility.Visible : Visibility.Collapsed;
         DecodePanel.Visibility = decode ? Visibility.Visible : Visibility.Collapsed;
-        BlockActionComboBox.ItemsSource = (System.Collections.IEnumerable)FindResource(webSocketBlock ? "WebSocketBlockActionItems" : "BlockActionItems");
+        BlockActionComboBox.ItemsSource = (System.Collections.IEnumerable)FindResource(GetBlockActionResourceKey(ruleType));
+        MethodComboBox.ItemsSource = (System.Collections.IEnumerable)FindResource(tcpBlock ? "TcpProtocolItems" : "RuleMethodItems");
+        MethodLabelTextBlock.Text = tcpBlock ? "协议" : "请求方法";
+        UrlLabelTextBlock.Text = tcpBlock || udpBlock ? "地址" : "Url";
+        MethodLabelTextBlock.Visibility = udpBlock || webSocketBlock ? Visibility.Collapsed : Visibility.Visible;
+        MethodComboBox.Visibility = udpBlock || webSocketBlock ? Visibility.Collapsed : Visibility.Visible;
         if (webSocketBlock && DataContext is WebSocketBlockRuleItem webSocketBlockRule)
         {
             webSocketBlockRule.Method = "ANY";
+        }
+        if (udpBlock && DataContext is UdpBlockRuleItem udpBlockRule)
+        {
+            udpBlockRule.Method = "UDP";
         }
 
         KeyLabelTextBlock.Visibility = Visibility.Collapsed;
@@ -71,7 +82,18 @@ public partial class RuleEditorWindow : Window
         Grid.SetRow(NoteTextBox, block ? 6 : 9);
     }
 
-    private void ConfigureRuleLayout(bool block, bool rewrite, bool mapping, bool decode, bool webSocketBlock)
+    private static string GetBlockActionResourceKey(string ruleType)
+    {
+        return ruleType switch
+        {
+            "WebSocket屏蔽" => "WebSocketBlockActionItems",
+            "TCP屏蔽" => "TcpBlockActionItems",
+            "UDP屏蔽" => "UdpBlockActionItems",
+            _ => "BlockActionItems"
+        };
+    }
+
+    private void ConfigureRuleLayout(bool block, bool rewrite, bool mapping, bool decode, bool hideMethod)
     {
         SetEditorRows(42, 42, 42, 42, 50, 42, 0, 0, 0, 84, 0, 0, 0);
         EditorScrollViewer.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
@@ -80,10 +102,10 @@ public partial class RuleEditorWindow : Window
 
         if (block)
         {
-            SetEditorRows(42, 42, 42, webSocketBlock ? 0 : 42, 50, 42, 84, 0, 0, 0, 0, 0, 0);
+            SetEditorRows(42, 42, 42, hideMethod ? 0 : 42, 50, 42, 84, 0, 0, 0, 0, 0, 0);
             EditorScrollViewer.VerticalScrollBarVisibility = ScrollBarVisibility.Disabled;
-            Height = webSocketBlock ? 468 : 500;
-            MinHeight = webSocketBlock ? 468 : 500;
+            Height = hideMethod ? 468 : 500;
+            MinHeight = hideMethod ? 468 : 500;
             return;
         }
 
@@ -261,6 +283,16 @@ public partial class RuleEditorWindow : Window
             NormalizeWebSocketBlockRule(webSocketBlockRule);
         }
 
+        if (DataContext is TcpBlockRuleItem tcpBlockRule)
+        {
+            NormalizeTcpBlockRule(tcpBlockRule);
+        }
+
+        if (DataContext is UdpBlockRuleItem udpBlockRule)
+        {
+            NormalizeUdpBlockRule(udpBlockRule);
+        }
+
         string? validationMessage = _validateRule?.Invoke(DataContext);
         if (!string.IsNullOrWhiteSpace(validationMessage))
         {
@@ -287,6 +319,25 @@ public partial class RuleEditorWindow : Window
             "丢弃下行帧" => "丢弃下行帧",
             _ => "断开连接"
         };
+    }
+
+    private static void NormalizeTcpBlockRule(TcpBlockRuleItem rule)
+    {
+        rule.UrlPattern = rule.UrlPattern.Trim();
+        rule.Method = string.IsNullOrWhiteSpace(rule.Method) ? "ANY" : rule.Method.Trim();
+        rule.Action = rule.Action?.Trim() switch
+        {
+            "丢弃上行包" => "丢弃上行包",
+            "丢弃下行包" => "丢弃下行包",
+            _ => "断开连接"
+        };
+    }
+
+    private static void NormalizeUdpBlockRule(UdpBlockRuleItem rule)
+    {
+        rule.Method = "UDP";
+        rule.UrlPattern = rule.UrlPattern.Trim();
+        rule.Action = rule.Action?.Trim() == "丢弃下行包" ? "丢弃下行包" : "丢弃上行包";
     }
 
     private void ShowRuleAlert(string message)

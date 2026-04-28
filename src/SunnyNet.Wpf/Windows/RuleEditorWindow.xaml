@@ -24,6 +24,13 @@
             <sys:String>TRACE</sys:String>
         </x:Array>
 
+        <x:Array x:Key="TcpProtocolItems" Type="{x:Type sys:String}">
+            <sys:String>ANY</sys:String>
+            <sys:String>TCP</sys:String>
+            <sys:String>TLS-TCP</sys:String>
+            <sys:String>TCP-MUST</sys:String>
+        </x:Array>
+
         <x:Array x:Key="UrlMatchTypeItems" Type="{x:Type sys:String}">
             <sys:String>通配</sys:String>
             <sys:String>包含</sys:String>
@@ -85,6 +92,17 @@
             <sys:String>断开连接</sys:String>
             <sys:String>丢弃上行帧</sys:String>
             <sys:String>丢弃下行帧</sys:String>
+        </x:Array>
+
+        <x:Array x:Key="TcpBlockActionItems" Type="{x:Type sys:String}">
+            <sys:String>断开连接</sys:String>
+            <sys:String>丢弃上行包</sys:String>
+            <sys:String>丢弃下行包</sys:String>
+        </x:Array>
+
+        <x:Array x:Key="UdpBlockActionItems" Type="{x:Type sys:String}">
+            <sys:String>丢弃上行包</sys:String>
+            <sys:String>丢弃下行包</sys:String>
         </x:Array>
 
         <Style x:Key="EditorLabelTextStyle" TargetType="{x:Type TextBlock}">
@@ -156,14 +174,15 @@
                          Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource EditorTextBoxStyle}" />
 
-                <TextBlock Grid.Row="1" Style="{StaticResource EditorLabelTextStyle}" Text="Url" />
+                <TextBlock x:Name="UrlLabelTextBlock" Grid.Row="1" Style="{StaticResource EditorLabelTextStyle}" Text="Url" />
                 <TextBox Grid.Row="1"
                          Grid.Column="1"
                          Text="{Binding UrlPattern, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource EditorTextBoxStyle}" />
 
-                <TextBlock Grid.Row="3" Style="{StaticResource EditorLabelTextStyle}" Text="请求方法" />
-                <ComboBox Grid.Row="3"
+                <TextBlock x:Name="MethodLabelTextBlock" Grid.Row="3" Style="{StaticResource EditorLabelTextStyle}" Text="请求方法" />
+                <ComboBox x:Name="MethodComboBox"
+                          Grid.Row="3"
                           Grid.Column="1"
                           Width="200"
                           HorizontalAlignment="Left"

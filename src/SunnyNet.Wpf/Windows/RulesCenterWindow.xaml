@@ -260,6 +260,45 @@
                 </DataGrid.Columns>
                 </DataGrid>
 
+                <DataGrid x:Name="TcpBlockRulesGrid"
+                      ItemsSource="{Binding TcpBlockRules}"
+                      MouseDoubleClick="RulesGrid_MouseDoubleClick"
+                      SelectionChanged="RulesGrid_SelectionChanged"
+                      Style="{StaticResource RulesDataGridStyle}"
+                      Visibility="Collapsed">
+                <DataGrid.Columns>
+                    <DataGridTemplateColumn HeaderTemplate="{StaticResource RuleEnableHeaderTemplate}"
+                                            CellTemplate="{StaticResource RuleEnableCellTemplate}"
+                                            CellStyle="{StaticResource RuleEnableCellStyle}"
+                                            Width="42" />
+                    <DataGridTextColumn Header="别名" Binding="{Binding Name}" Width="140" />
+                    <DataGridTextColumn Header="协议" Binding="{Binding Method}" Width="86" />
+                    <DataGridTextColumn Header="匹配" Binding="{Binding UrlMatchType}" Width="72" />
+                    <DataGridTextColumn Header="地址" Binding="{Binding UrlPattern}" Width="360" />
+                    <DataGridTextColumn Header="动作" Binding="{Binding Action}" Width="120" />
+                    <DataGridTextColumn Header="备注" Binding="{Binding Note}" Width="180" />
+                </DataGrid.Columns>
+                </DataGrid>
+
+                <DataGrid x:Name="UdpBlockRulesGrid"
+                      ItemsSource="{Binding UdpBlockRules}"
+                      MouseDoubleClick="RulesGrid_MouseDoubleClick"
+                      SelectionChanged="RulesGrid_SelectionChanged"
+                      Style="{StaticResource RulesDataGridStyle}"
+                      Visibility="Collapsed">
+                <DataGrid.Columns>
+                    <DataGridTemplateColumn HeaderTemplate="{StaticResource RuleEnableHeaderTemplate}"
+                                            CellTemplate="{StaticResource RuleEnableCellTemplate}"
+                                            CellStyle="{StaticResource RuleEnableCellStyle}"
+                                            Width="42" />
+                    <DataGridTextColumn Header="别名" Binding="{Binding Name}" Width="140" />
+                    <DataGridTextColumn Header="匹配" Binding="{Binding UrlMatchType}" Width="72" />
+                    <DataGridTextColumn Header="地址" Binding="{Binding UrlPattern}" Width="380" />
+                    <DataGridTextColumn Header="动作" Binding="{Binding Action}" Width="120" />
+                    <DataGridTextColumn Header="备注" Binding="{Binding Note}" Width="180" />
+                </DataGrid.Columns>
+                </DataGrid>
+
                 <DataGrid x:Name="RewriteRulesGrid"
                       ItemsSource="{Binding RequestRewriteRules}"
                       MouseDoubleClick="RulesGrid_MouseDoubleClick"

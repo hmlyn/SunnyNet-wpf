@@ -169,6 +169,11 @@ type WebSocketBlockResult struct {
 	Drop  bool
 }
 
+type SocketBlockResult struct {
+	Close bool
+	Drop  bool
+}
+
 func ApplyRequestBlock(theology int, method string, u *url.URL) (*RequestBlockResult, bool) {
 	if matchRequestBlockRule(theology, method, u, "断开请求", "请求") {
 		return &RequestBlockResult{Close: true}, true
@@ -299,6 +304,150 @@ func webSocketDirectionText(wsType int) string {
 		return "断开"
 	default:
 		return "WebSocket"
+	}
+}
+
+func ApplyTcpBlock(theology int, tcpType int, protocol string, rawURL string) (*SocketBlockResult, bool) {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		return nil, false
+	}
+
+	_TmpLock.Lock()
+	rules := append([]ConfigTcpBlockRule(nil), GlobalConfig.RuleCenter.TcpBlockRules...)
+	_TmpLock.Unlock()
+	if len(rules) == 0 {
+		return nil, false
+	}
+
+	sort.SliceStable(rules, func(i, j int) bool {
+		return rules[i].Priority < rules[j].Priority
+	})
+
+	for _, rule := range rules {
+		if !rule.Enable {
+			continue
+		}
+		action := normalizeTcpBlockAction(rule.Action)
+		if !tcpBlockActionMatches(action, tcpType) {
+			continue
+		}
+		if !mappingMethodMatches(rule.Method, protocol) || !mappingURLMatches(rule.UrlMatchType, rule.UrlPattern, rawURL) {
+			continue
+		}
+
+		direction := tcpDirectionText(tcpType)
+		recordTrafficRuleHit(theology, "TCP屏蔽", rule.ConfigTrafficRuleBase, action, direction, rawURL)
+		return &SocketBlockResult{
+			Close: action == "断开连接",
+			Drop:  action == "丢弃上行包" || action == "丢弃下行包",
+		}, true
+	}
+
+	return nil, false
+}
+
+func ApplyUdpBlock(theology int, udpType int8, rawURL string) (*SocketBlockResult, bool) {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		return nil, false
+	}
+
+	_TmpLock.Lock()
+	rules := append([]ConfigUdpBlockRule(nil), GlobalConfig.RuleCenter.UdpBlockRules...)
+	_TmpLock.Unlock()
+	if len(rules) == 0 {
+		return nil, false
+	}
+
+	sort.SliceStable(rules, func(i, j int) bool {
+		return rules[i].Priority < rules[j].Priority
+	})
+
+	for _, rule := range rules {
+		if !rule.Enable {
+			continue
+		}
+		action := normalizeUdpBlockAction(rule.Action)
+		if !udpBlockActionMatches(action, udpType) {
+			continue
+		}
+		if !mappingMethodMatches(rule.Method, "UDP") || !mappingURLMatches(rule.UrlMatchType, rule.UrlPattern, rawURL) {
+			continue
+		}
+
+		direction := udpDirectionText(udpType)
+		recordTrafficRuleHit(theology, "UDP屏蔽", rule.ConfigTrafficRuleBase, action, direction, rawURL)
+		return &SocketBlockResult{Drop: true}, true
+	}
+
+	return nil, false
+}
+
+func normalizeTcpBlockAction(action string) string {
+	switch strings.TrimSpace(action) {
+	case "丢弃上行包":
+		return "丢弃上行包"
+	case "丢弃下行包":
+		return "丢弃下行包"
+	default:
+		return "断开连接"
+	}
+}
+
+func normalizeUdpBlockAction(action string) string {
+	if strings.TrimSpace(action) == "丢弃下行包" {
+		return "丢弃下行包"
+	}
+	return "丢弃上行包"
+}
+
+func tcpBlockActionMatches(action string, tcpType int) bool {
+	switch action {
+	case "丢弃上行包":
+		return tcpType == public.SunnyNetMsgTypeTCPClientSend
+	case "丢弃下行包":
+		return tcpType == public.SunnyNetMsgTypeTCPClientReceive
+	default:
+		return tcpType == public.SunnyNetMsgTypeTCPAboutToConnect ||
+			tcpType == public.SunnyNetMsgTypeTCPConnectOK ||
+			tcpType == public.SunnyNetMsgTypeTCPClientSend ||
+			tcpType == public.SunnyNetMsgTypeTCPClientReceive
+	}
+}
+
+func udpBlockActionMatches(action string, udpType int8) bool {
+	if action == "丢弃下行包" {
+		return udpType == public.SunnyNetUDPTypeReceive
+	}
+	return udpType == public.SunnyNetUDPTypeSend
+}
+
+func tcpDirectionText(tcpType int) string {
+	switch tcpType {
+	case public.SunnyNetMsgTypeTCPClientSend:
+		return "上行"
+	case public.SunnyNetMsgTypeTCPClientReceive:
+		return "下行"
+	case public.SunnyNetMsgTypeTCPAboutToConnect, public.SunnyNetMsgTypeTCPConnectOK:
+		return "连接"
+	case public.SunnyNetMsgTypeTCPClose:
+		return "断开"
+	default:
+		return "TCP"
+	}
+}
+
+func udpDirectionText(udpType int8) string {
+	switch udpType {
+	case public.SunnyNetUDPTypeSend:
+		return "上行"
+	case public.SunnyNetUDPTypeReceive:
+		return "下行"
+	case public.SunnyNetUDPTypeClosed:
+		return "断开"
+	default:
+		return "UDP"
 	}
 }
 

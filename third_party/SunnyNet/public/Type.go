@@ -32,6 +32,7 @@ type WebsocketMsg struct {
 
 type TcpMsg struct {
 	Data    bytes.Buffer
+	Drop    bool
 	TcpIp   string //TCP相关
 	TcpUser string //TCP相关
 	TcpPass string //TCP相关

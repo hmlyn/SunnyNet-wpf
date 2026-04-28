@@ -536,6 +536,16 @@ public partial class MainWindow : Window
         OpenRulesCenter("WebSocket屏蔽");
     }
 
+    private void TcpBlockRules_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        OpenRulesCenter("TCP屏蔽");
+    }
+
+    private void UdpBlockRules_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        OpenRulesCenter("UDP屏蔽");
+    }
+
     private void RequestRewriteRules_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         OpenRulesCenter("请求重写");

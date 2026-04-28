@@ -573,6 +573,10 @@ func (s *ProxyRequest) MustTcpProcessing(aheadData []byte, Tag string) {
 	as := &public.TcpMsg{}
 	as.Data.WriteString(Tag)
 	s.CallbackTCPRequest(public.SunnyNetMsgTypeTCPAboutToConnect, as)
+	if as.Drop {
+		_ = s.Conn.Close()
+		return
+	}
 	if Tag != as.Data.String() {
 		s.Target.Parse(as.Data.String(), 0)
 	}
@@ -662,8 +666,13 @@ func (s *ProxyRequest) MustTcpProcessing(aheadData []byte, Tag string) {
 		s.CallbackTCPRequest(public.SunnyNetMsgTypeTCPConnectOK, nil)
 		if len(aheadData) > 0 {
 			as.Data.Reset()
+			as.Drop = false
 			as.Data.Write(aheadData)
 			s.CallbackTCPRequest(public.SunnyNetMsgTypeTCPClientSend, as)
+			if as.Drop {
+				as.Data.Reset()
+				return
+			}
 			_, _ = RemoteTCP.Write(as.Data.Bytes())
 			if as != nil {
 				as.Data.Reset()
@@ -1725,9 +1734,10 @@ func (s *ProxyRequest) SocketForward(dst bufio.Writer, src *public.ReadWriteObje
 		nr, er := src.Read(buf[0:]) // io.ReadAtLeast(src, buf[0:], 1)
 		if nr > 0 {
 			as.Data.Reset()
+			as.Drop = false
 			as.Data.Write(buf[0:nr])
 			s.CallbackTCPRequest(MsgType, as)
-			if as.Data.Len() < 1 {
+			if as.Drop || as.Data.Len() < 1 {
 				continue
 			}
 			TCP.L.Lock()

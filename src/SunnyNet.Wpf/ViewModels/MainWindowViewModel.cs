@@ -145,6 +145,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     public ObservableCollection<InterceptRuleItem> InterceptRuleItems { get; } = new();
     public ObservableCollection<RequestBlockRuleItem> RequestBlockRules { get; } = new();
     public ObservableCollection<WebSocketBlockRuleItem> WebSocketBlockRules { get; } = new();
+    public ObservableCollection<TcpBlockRuleItem> TcpBlockRules { get; } = new();
+    public ObservableCollection<UdpBlockRuleItem> UdpBlockRules { get; } = new();
     public ObservableCollection<RequestRewriteRuleItem> RequestRewriteRules { get; } = new();
     public ObservableCollection<RequestMappingRuleItem> RequestMappingRules { get; } = new();
     public ObservableCollection<RequestDecodeRuleItem> RequestDecodeRules { get; } = new();
@@ -1004,6 +1006,16 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         }
 
         foreach (WebSocketBlockRuleItem item in WebSocketBlockRules)
+        {
+            item.State = state;
+        }
+
+        foreach (TcpBlockRuleItem item in TcpBlockRules)
+        {
+            item.State = state;
+        }
+
+        foreach (UdpBlockRuleItem item in UdpBlockRules)
         {
             item.State = state;
         }
@@ -2317,6 +2329,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     {
         List<RequestBlockRuleItem> blockRules = new();
         List<WebSocketBlockRuleItem> webSocketBlockRules = new();
+        List<TcpBlockRuleItem> tcpBlockRules = new();
+        List<UdpBlockRuleItem> udpBlockRules = new();
         List<RequestRewriteRuleItem> rewriteRules = new();
         List<RequestMappingRuleItem> mappingRules = new();
         List<RequestDecodeRuleItem> decodeRules = new();
@@ -2343,6 +2357,28 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
                 ApplyCommonTrafficRuleFields(rule, item);
                 rule.Method = "ANY";
                 webSocketBlockRules.Add(rule);
+            }
+
+            foreach (JsonElement item in EnumerateArrayProperty(element, "TcpBlockRules"))
+            {
+                TcpBlockRuleItem rule = new()
+                {
+                    Action = NormalizeTcpBlockAction(GetString(item, "Action", "断开连接"))
+                };
+                ApplyCommonTrafficRuleFields(rule, item);
+                tcpBlockRules.Add(rule);
+            }
+
+            foreach (JsonElement item in EnumerateArrayProperty(element, "UdpBlockRules"))
+            {
+                UdpBlockRuleItem rule = new()
+                {
+                    Action = NormalizeUdpBlockAction(GetString(item, "Action", "丢弃上行包")),
+                    Method = "UDP"
+                };
+                ApplyCommonTrafficRuleFields(rule, item);
+                rule.Method = "UDP";
+                udpBlockRules.Add(rule);
             }
 
             foreach (JsonElement item in EnumerateArrayProperty(element, "RewriteRules"))
@@ -2396,6 +2432,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
         ReplaceRows(RequestBlockRules, blockRules);
         ReplaceRows(WebSocketBlockRules, webSocketBlockRules);
+        ReplaceRows(TcpBlockRules, tcpBlockRules);
+        ReplaceRows(UdpBlockRules, udpBlockRules);
         ReplaceRows(RequestRewriteRules, rewriteRules);
         ReplaceRows(RequestMappingRules, mappingRules);
         ReplaceRows(RequestDecodeRules, decodeRules);
@@ -2456,6 +2494,21 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             "丢弃下行帧" => "丢弃下行帧",
             _ => "断开连接"
         };
+    }
+
+    private static string NormalizeTcpBlockAction(string action)
+    {
+        return action?.Trim() switch
+        {
+            "丢弃上行包" => "丢弃上行包",
+            "丢弃下行包" => "丢弃下行包",
+            _ => "断开连接"
+        };
+    }
+
+    private static string NormalizeUdpBlockAction(string action)
+    {
+        return action?.Trim() == "丢弃下行包" ? "丢弃下行包" : "丢弃上行包";
     }
 
     private static IEnumerable<JsonElement> EnumerateArrayProperty(JsonElement element, string propertyName)
@@ -3138,6 +3191,28 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
                     Enable = item.Enabled,
                     item.Name,
                     Method = "ANY",
+                    item.UrlMatchType,
+                    item.UrlPattern,
+                    item.Note,
+                    item.Action
+                }),
+                TcpBlockRules = TcpBlockRules.Select(static item => new
+                {
+                    item.Hash,
+                    Enable = item.Enabled,
+                    item.Name,
+                    item.Method,
+                    item.UrlMatchType,
+                    item.UrlPattern,
+                    item.Note,
+                    item.Action
+                }),
+                UdpBlockRules = UdpBlockRules.Select(static item => new
+                {
+                    item.Hash,
+                    Enable = item.Enabled,
+                    item.Name,
+                    Method = "UDP",
                     item.UrlMatchType,
                     item.UrlPattern,
                     item.Note,
