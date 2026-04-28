@@ -119,11 +119,13 @@ func (s *ProxyRequest) CallbackBeforeRequest() {
 
 // CallbackBeforeResponse HTTP请求完成处理回调
 func (s *ProxyRequest) CallbackBeforeResponse() {
+	s.CloseResponse = false
 	pid, _ := strconv.Atoi(s.Pid)
 	if s.HttpCall < 10 {
 		if s.HttpGoCall != nil {
 			m := &HttpConn{Theology: s.Theology, MessageId: NewMessageId(), PID: pid, SunnyContext: s.Global.SunnyContext, Type: public.HttpResponseOK, Request: s.Request, Response: s.Response, err: "", ClientIP: s.Conn.RemoteAddr().String()}
 			s.HttpGoCall(m)
+			s.CloseResponse = m.closeResponse
 		}
 		return
 	}

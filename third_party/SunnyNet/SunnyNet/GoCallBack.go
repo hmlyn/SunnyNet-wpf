@@ -200,6 +200,18 @@ func (k *WsConn) SetMessageBody(data []byte) bool {
 	return true
 }
 
+// DropMessage 丢弃当前 WebSocket 帧，不再转发到对端。
+func (k *WsConn) DropMessage() bool {
+	if k.Type != public.WebsocketUserSend && k.Type != public.WebsocketServerSend {
+		return false
+	}
+	k.c.Sync.Lock()
+	defer k.c.Sync.Unlock()
+	k.c.Drop = true
+	k.c.Data.Reset()
+	return true
+}
+
 // SendToServer 主动向Websocket服务器发送消息
 func (k *WsConn) SendToServer(MessageType int, data []byte) bool {
 	k.c.Sync.Lock()
@@ -240,27 +252,32 @@ func (k *WsConn) Close() bool {
 }
 
 type HttpConn struct {
-	SunnyContext int
-	Theology     int //唯一ID
-	MessageId    int //消息ID,仅标识消息ID,不能用于API函数
-	PID          int
-	Type         int              //请求类型 例如 public.HttpSendRequest  public.Http....
-	ClientIP     string           //来源IP地址,请求从哪里来
-	Request      *http.Request    //请求体
-	Response     *http.Response   //响应体
-	err          string           //错误信息
-	proxy        *GoWinHttp.Proxy //代理信息
-	closeRequest bool             //直接关闭客户端HTTP连接，不返回HTTP响应
+	SunnyContext  int
+	Theology      int //唯一ID
+	MessageId     int //消息ID,仅标识消息ID,不能用于API函数
+	PID           int
+	Type          int              //请求类型 例如 public.HttpSendRequest  public.Http....
+	ClientIP      string           //来源IP地址,请求从哪里来
+	Request       *http.Request    //请求体
+	Response      *http.Response   //响应体
+	err           string           //错误信息
+	proxy         *GoWinHttp.Proxy //代理信息
+	closeRequest  bool             //直接关闭客户端HTTP连接，不返回HTTP响应
+	closeResponse bool             //响应阶段直接关闭客户端HTTP连接，不返回HTTP响应
 }
 
-// Close 关闭HTTP客户端连接,仅支持在发起请求时使用
+// Close 关闭HTTP客户端连接，支持请求阶段和响应阶段
 func (h *HttpConn) Close() bool {
-	if h.Type != public.HttpSendRequest {
-		return false
+	if h.Type == public.HttpSendRequest {
+		h.closeRequest = true
+		h.Response = nil
+		return true
 	}
-	h.closeRequest = true
-	h.Response = nil
-	return true
+	if h.Type == public.HttpResponseOK {
+		h.closeResponse = true
+		return true
+	}
+	return false
 }
 
 // StopRequest 阻止请求,仅支持在发起请求时使用

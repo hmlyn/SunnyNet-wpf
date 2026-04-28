@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"github.com/andybalholm/brotli"
+	"github.com/qtgolang/SunnyNet/public"
 	"github.com/qtgolang/SunnyNet/src/encoding/hex"
 	"github.com/qtgolang/SunnyNet/src/protobuf/JSON"
 	"github.com/traefik/yaegi/interp"
@@ -160,18 +161,76 @@ func ReplaceURL(theology int, method string, u *url.URL) (*url.URL, []byte) {
 }
 
 type RequestBlockResult struct {
-	Response *http.Response
-	Close    bool
+	Close bool
+}
+
+type WebSocketBlockResult struct {
+	Close bool
+	Drop  bool
 }
 
 func ApplyRequestBlock(theology int, method string, u *url.URL) (*RequestBlockResult, bool) {
+	if matchRequestBlockRule(theology, method, u, "断开请求", "请求") {
+		return &RequestBlockResult{Close: true}, true
+	}
+
+	return nil, false
+}
+
+func ApplyResponseBlock(theology int, method string, u *url.URL) bool {
+	return matchRequestBlockRule(theology, method, u, "断开响应", "响应")
+}
+
+func matchRequestBlockRule(theology int, method string, u *url.URL, expectedAction string, direction string) bool {
+	if u == nil {
+		return false
+	}
+
+	requestURL := u.String()
+	_TmpLock.Lock()
+	rules := append([]ConfigRequestBlockRule(nil), GlobalConfig.RuleCenter.BlockRules...)
+	_TmpLock.Unlock()
+	if len(rules) == 0 {
+		return false
+	}
+
+	sort.SliceStable(rules, func(i, j int) bool {
+		return rules[i].Priority < rules[j].Priority
+	})
+
+	for _, rule := range rules {
+		if !rule.Enable {
+			continue
+		}
+		action := normalizeRequestBlockAction(rule.Action)
+		if action != expectedAction {
+			continue
+		}
+		if !mappingMethodMatches(rule.Method, method) || !mappingURLMatches(rule.UrlMatchType, rule.UrlPattern, requestURL) {
+			continue
+		}
+		recordTrafficRuleHit(theology, "HTTP屏蔽", rule.ConfigTrafficRuleBase, action, direction, requestURL)
+		return true
+	}
+
+	return false
+}
+
+func normalizeRequestBlockAction(action string) string {
+	if strings.TrimSpace(action) == "断开响应" {
+		return "断开响应"
+	}
+	return "断开请求"
+}
+
+func ApplyWebSocketBlock(theology int, wsType int, method string, u *url.URL) (*WebSocketBlockResult, bool) {
 	if u == nil {
 		return nil, false
 	}
 
 	requestURL := u.String()
 	_TmpLock.Lock()
-	rules := append([]ConfigRequestBlockRule(nil), GlobalConfig.RuleCenter.BlockRules...)
+	rules := append([]ConfigWebSocketBlockRule(nil), GlobalConfig.RuleCenter.WebSocketBlockRules...)
 	_TmpLock.Unlock()
 	if len(rules) == 0 {
 		return nil, false
@@ -185,80 +244,62 @@ func ApplyRequestBlock(theology int, method string, u *url.URL) (*RequestBlockRe
 		if !rule.Enable {
 			continue
 		}
+		action := normalizeWebSocketBlockAction(rule.Action)
+		if !webSocketBlockActionMatches(action, wsType) {
+			continue
+		}
 		if !mappingMethodMatches(rule.Method, method) || !mappingURLMatches(rule.UrlMatchType, rule.UrlPattern, requestURL) {
 			continue
 		}
-		recordTrafficRuleHit(theology, "请求屏蔽", rule.ConfigTrafficRuleBase, rule.Action, "请求", requestURL)
-		if strings.TrimSpace(rule.Action) == "断开连接" {
-			return &RequestBlockResult{Close: true}, true
-		}
-		return &RequestBlockResult{Response: buildBlockedResponse(rule)}, true
+
+		direction := webSocketDirectionText(wsType)
+		recordTrafficRuleHit(theology, "WebSocket屏蔽", rule.ConfigTrafficRuleBase, action, direction, requestURL)
+		return &WebSocketBlockResult{
+			Close: action == "断开连接",
+			Drop:  action == "丢弃上行帧" || action == "丢弃下行帧",
+		}, true
 	}
 
 	return nil, false
 }
 
-func buildBlockedResponse(rule ConfigRequestBlockRule) *http.Response {
-	action := strings.TrimSpace(rule.Action)
-	statusCode := normalizeBlockStatusCode(rule.StatusCode, action)
-	body := make([]byte, 0)
-
-	switch action {
-	case "断开连接":
-		statusCode = 204
-	case "自定义响应内容":
-		if decoded, err := decodeMappingBody(rule.ResponseContent, rule.ResponseValueType); err == nil {
-			body = decoded
-		} else {
-			body = []byte(rule.ResponseContent)
-		}
-	case "自定义状态码", "返回空响应":
+func normalizeWebSocketBlockAction(action string) string {
+	switch strings.TrimSpace(action) {
+	case "丢弃上行帧":
+		return "丢弃上行帧"
+	case "丢弃下行帧":
+		return "丢弃下行帧"
 	default:
-		if strings.TrimSpace(rule.ResponseContent) != "" {
-			if decoded, err := decodeMappingBody(rule.ResponseContent, rule.ResponseValueType); err == nil {
-				body = decoded
-			} else {
-				body = []byte(rule.ResponseContent)
-			}
-		}
+		return "断开连接"
 	}
-
-	response := &http.Response{
-		StatusCode:    statusCode,
-		Status:        buildStatusText(statusCode),
-		Header:        make(http.Header),
-		Body:          io.NopCloser(bytes.NewBuffer(body)),
-		ContentLength: int64(len(body)),
-	}
-	response.Header.Set("Server", "SunnyRequestBlock")
-	response.Header.Set("Accept-Ranges", "bytes")
-	response.Header.Set("Connection", "Close")
-	response.Header.Set("Content-Length", strconv.Itoa(len(body)))
-	if strings.HasPrefix(strings.TrimSpace(rule.ResponseValueType), "String(") {
-		response.Header.Set("Content-Type", "text/plain; charset=utf-8")
-	}
-	return response
 }
 
-func normalizeBlockStatusCode(statusCode int, action string) int {
-	if strings.TrimSpace(action) == "返回空响应" {
-		return 200
+func webSocketBlockActionMatches(action string, wsType int) bool {
+	switch action {
+	case "丢弃上行帧":
+		return wsType == public.WebsocketUserSend
+	case "丢弃下行帧":
+		return wsType == public.WebsocketServerSend
+	default:
+		return wsType == public.WebsocketConnectionOK ||
+			wsType == public.WebsocketUserSend ||
+			wsType == public.WebsocketServerSend
 	}
-	if statusCode >= 100 && statusCode <= 599 {
-		return statusCode
-	}
-	if strings.TrimSpace(action) == "自定义响应内容" {
-		return 200
-	}
-	return 403
 }
 
-func buildStatusText(statusCode int) string {
-	statusText := http.StatusText(statusCode)
-	if statusText == "" {
-		return strconv.Itoa(statusCode)
+func webSocketDirectionText(wsType int) string {
+	switch wsType {
+	case public.WebsocketUserSend:
+		return "上行"
+	case public.WebsocketServerSend:
+		return "下行"
+	case public.WebsocketConnectionOK:
+		return "连接"
+	case public.WebsocketDisconnect:
+		return "断开"
+	default:
+		return "WebSocket"
 	}
-	return strconv.Itoa(statusCode) + " " + statusText
 }
 
 func ApplyRequestMapping(theology int, method string, u *url.URL) (*url.URL, []byte, bool) {

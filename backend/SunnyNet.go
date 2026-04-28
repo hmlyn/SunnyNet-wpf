@@ -282,8 +282,6 @@ func HttpCallback(Conn *SunnyNet.HttpConn) {
 			if block, ok := ApplyRequestBlock(Conn.Theology, Conn.Request.Method, Conn.Request.URL); ok {
 				if block.Close {
 					Conn.Close()
-				} else {
-					Conn.Response = block.Response
 				}
 			} else {
 				u, b := ReplaceURL(Conn.Theology, Conn.Request.Method, Conn.Request.URL)
@@ -400,6 +398,9 @@ func HttpCallback(Conn *SunnyNet.HttpConn) {
 				Conn.Response.Header.Set("Content-Length", strconv.Itoa(len(Body)))
 			}
 			Conn.Response.Body = io.NopCloser(bytes.NewBuffer(Body))
+			if ApplyResponseBlock(Conn.Theology, Conn.Request.Method, Conn.Request.URL) {
+				Conn.Close()
+			}
 		}
 		if !(GetWorkingState()) && Conn.Type == public.HttpSendRequest {
 			//执行发起请求脚本
@@ -686,6 +687,17 @@ func WSCallback(Conn *SunnyNet.WsConn) {
 	if h == nil {
 		return
 	}
+	if Conn.Request != nil && Conn.Request.URL != nil {
+		if block, ok := ApplyWebSocketBlock(Conn.Theology, Conn.Type, "ANY", Conn.Request.URL); ok {
+			if block.Drop {
+				Conn.DropMessage()
+			}
+			if block.Close {
+				Conn.Close()
+			}
+			return
+		}
+	}
 	if Conn.Type == public.WebsocketConnectionOK {
 		h.WsConn = Conn
 		h.Way = "Websocket"
@@ -730,6 +742,7 @@ func WSCallback(Conn *SunnyNet.WsConn) {
 		}
 		AddInsertList(_tmp)
 		if !Break {
+			Conn.DropMessage()
 			return
 		}
 		if Conn.Type == public.WebsocketUserSend {

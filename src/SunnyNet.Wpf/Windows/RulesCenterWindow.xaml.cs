@@ -1,7 +1,7 @@
-using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
-using Microsoft.Win32;
+using System.Windows.Threading;
 using SunnyNet.Wpf.Models;
 using SunnyNet.Wpf.ViewModels;
 
@@ -11,10 +11,12 @@ public partial class RulesCenterWindow : Window
 {
     private readonly MainWindowViewModel _viewModel;
     private readonly string _initialPage;
+    private readonly DispatcherTimer _alertTimer = new() { Interval = TimeSpan.FromSeconds(2.8) };
     private string _currentPage = "请求重写";
     private readonly Dictionary<string, RulePageInfo> _pages = new()
     {
-        ["请求屏蔽"] = new RulePageInfo("请求屏蔽", "命中规则后直接返回本地响应，不再访问目标服务器。"),
+        ["HTTP屏蔽"] = new RulePageInfo("HTTP屏蔽", "仅作用于 HTTP/HTTPS：命中后可断开请求或断开响应。"),
+        ["WebSocket屏蔽"] = new RulePageInfo("WebSocket屏蔽", "仅作用于 WebSocket：命中后可断开连接或按方向丢弃帧。"),
         ["请求重写"] = new RulePageInfo("请求重写", "命中规则后修改请求或响应的结构化内容。"),
         ["请求映射"] = new RulePageInfo("请求映射", "把命中的请求映射到本地文件、固定内容或新的远程地址。"),
         ["请求解密"] = new RulePageInfo("请求解密", "命中规则后生成请求或响应的明文展示副本，不改原始数据。")
@@ -23,9 +25,11 @@ public partial class RulesCenterWindow : Window
     public RulesCenterWindow(MainWindowViewModel viewModel, string initialPage = "请求重写")
     {
         _viewModel = viewModel;
+        initialPage = NormalizeRulePageKey(initialPage);
         _initialPage = _pages.ContainsKey(initialPage) ? initialPage : "请求重写";
         InitializeComponent();
         DataContext = viewModel;
+        _alertTimer.Tick += AlertTimer_Tick;
         Loaded += (_, _) => ApplyPage(_initialPage);
     }
 
@@ -40,34 +44,42 @@ public partial class RulesCenterWindow : Window
         Title = page.Title;
         RuleStatusTextBlock.Text = $"{GetRuleCount(key)} 条";
 
-        bool blockSelected = key == "请求屏蔽";
+        bool blockSelected = key == "HTTP屏蔽";
+        bool webSocketBlockSelected = key == "WebSocket屏蔽";
         bool rewriteSelected = key == "请求重写";
         bool mappingSelected = key == "请求映射";
         bool decodeSelected = key == "请求解密";
-        bool implemented = blockSelected || rewriteSelected || mappingSelected || decodeSelected;
+        bool implemented = blockSelected || webSocketBlockSelected || rewriteSelected || mappingSelected || decodeSelected;
 
         BlockRulesGrid.Visibility = blockSelected ? Visibility.Visible : Visibility.Collapsed;
+        WebSocketBlockRulesGrid.Visibility = webSocketBlockSelected ? Visibility.Visible : Visibility.Collapsed;
         RewriteRulesGrid.Visibility = rewriteSelected ? Visibility.Visible : Visibility.Collapsed;
         MappingRulesGrid.Visibility = mappingSelected ? Visibility.Visible : Visibility.Collapsed;
         DecodeRulesGrid.Visibility = decodeSelected ? Visibility.Visible : Visibility.Collapsed;
         PlaceholderListPanel.Visibility = implemented ? Visibility.Collapsed : Visibility.Visible;
         PlaceholderTextBlock.Text = page.Placeholder;
 
-        AddRuleButton.IsEnabled = implemented;
-        RemoveRuleButton.IsEnabled = implemented;
-        EditRuleButton.IsEnabled = implemented;
-        ToggleRuleButton.IsEnabled = implemented;
-
         SelectFirstRuleIfNeeded();
+        AddRuleButton.IsEnabled = implemented;
+        UpdateRuleActionButtons();
     }
 
     private void SelectFirstRuleIfNeeded()
     {
-        if (_currentPage == "请求屏蔽")
+        if (_currentPage == "HTTP屏蔽")
         {
             if (BlockRulesGrid.SelectedItem is null && _viewModel.RequestBlockRules.Count > 0)
             {
                 BlockRulesGrid.SelectedIndex = 0;
+            }
+            return;
+        }
+
+        if (_currentPage == "WebSocket屏蔽")
+        {
+            if (WebSocketBlockRulesGrid.SelectedItem is null && _viewModel.WebSocketBlockRules.Count > 0)
+            {
+                WebSocketBlockRulesGrid.SelectedIndex = 0;
             }
             return;
         }
@@ -101,7 +113,8 @@ public partial class RulesCenterWindow : Window
     {
         return key switch
         {
-            "请求屏蔽" => _viewModel.RequestBlockRules.Count,
+            "HTTP屏蔽" => _viewModel.RequestBlockRules.Count,
+            "WebSocket屏蔽" => _viewModel.WebSocketBlockRules.Count,
             "请求重写" => _viewModel.RequestRewriteRules.Count,
             "请求映射" => _viewModel.RequestMappingRules.Count,
             "请求解密" => _viewModel.RequestDecodeRules.Count,
@@ -109,17 +122,15 @@ public partial class RulesCenterWindow : Window
         };
     }
 
-    private void Close_Click(object sender, RoutedEventArgs routedEventArgs)
-    {
-        Close();
-    }
-
     private async void AddCurrentRule_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         switch (_currentPage)
         {
-            case "请求屏蔽":
+            case "HTTP屏蔽":
                 await AddBlockRuleAsync();
+                break;
+            case "WebSocket屏蔽":
+                await AddWebSocketBlockRuleAsync();
                 break;
             case "请求重写":
                 await AddRewriteRuleAsync();
@@ -135,20 +146,43 @@ public partial class RulesCenterWindow : Window
 
     private async void EditSelectedRule_Click(object sender, RoutedEventArgs routedEventArgs)
     {
+        if (GetSelectedRule() is null)
+        {
+            return;
+        }
+
         await EditSelectedRuleAsync();
     }
 
     private async void RulesGrid_MouseDoubleClick(object sender, MouseButtonEventArgs mouseButtonEventArgs)
     {
+        if (GetSelectedRule() is null)
+        {
+            return;
+        }
+
         await EditSelectedRuleAsync();
+    }
+
+    private void RulesGrid_SelectionChanged(object sender, SelectionChangedEventArgs selectionChangedEventArgs)
+    {
+        UpdateRuleActionButtons();
     }
 
     private async void RemoveSelectedRule_Click(object sender, RoutedEventArgs routedEventArgs)
     {
+        if (GetSelectedRule() is null)
+        {
+            return;
+        }
+
         switch (_currentPage)
         {
-            case "请求屏蔽" when BlockRulesGrid.SelectedItem is RequestBlockRuleItem blockRule:
+            case "HTTP屏蔽" when BlockRulesGrid.SelectedItem is RequestBlockRuleItem blockRule:
                 _viewModel.RequestBlockRules.Remove(blockRule);
+                break;
+            case "WebSocket屏蔽" when WebSocketBlockRulesGrid.SelectedItem is WebSocketBlockRuleItem webSocketBlockRule:
+                _viewModel.WebSocketBlockRules.Remove(webSocketBlockRule);
                 break;
             case "请求重写" when RewriteRulesGrid.SelectedItem is RequestRewriteRuleItem rewriteRule:
                 _viewModel.RequestRewriteRules.Remove(rewriteRule);
@@ -166,88 +200,27 @@ public partial class RulesCenterWindow : Window
         await SaveRulesAsync();
         RuleStatusTextBlock.Text = $"{GetRuleCount(_currentPage)} 条";
         SelectFirstRuleIfNeeded();
+        UpdateRuleActionButtons();
     }
 
-    private async void ToggleSelectedRule_Click(object sender, RoutedEventArgs routedEventArgs)
+    private async void RuleEnableCheckBox_Click(object sender, RoutedEventArgs routedEventArgs)
     {
-        if (GetSelectedRule() is not TrafficRuleItemBase rule)
-        {
-            return;
-        }
-
-        rule.Enabled = !rule.Enabled;
-        await SaveRulesAsync();
-    }
-
-    private async void ImportRules_Click(object sender, RoutedEventArgs routedEventArgs)
-    {
-        OpenFileDialog dialog = new()
-        {
-            Title = "导入规则中心配置",
-            Filter = "规则配置 (*.json)|*.json|所有文件 (*.*)|*.*"
-        };
-
-        if (dialog.ShowDialog(this) != true)
-        {
-            return;
-        }
-
-        try
-        {
-            string json = await File.ReadAllTextAsync(dialog.FileName);
-            await _viewModel.ImportRuleCenterConfigJsonAsync(json);
-            ApplyPage(_currentPage);
-        }
-        catch (Exception exception)
-        {
-            MessageBox.Show(this, exception.Message, "导入规则", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
-
-    private async void ExportRules_Click(object sender, RoutedEventArgs routedEventArgs)
-    {
-        SaveFileDialog dialog = new()
-        {
-            Title = "导出规则中心配置",
-            Filter = "规则配置 (*.json)|*.json|所有文件 (*.*)|*.*",
-            FileName = $"SunnyNet-Rules-{DateTime.Now:yyyyMMdd-HHmmss}.json"
-        };
-
-        if (dialog.ShowDialog(this) != true)
-        {
-            return;
-        }
-
-        try
-        {
-            await File.WriteAllTextAsync(dialog.FileName, _viewModel.ExportRuleCenterConfigJson());
-        }
-        catch (Exception exception)
-        {
-            MessageBox.Show(this, exception.Message, "导出规则", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
-
-    private void ClearRuleLogs_Click(object sender, RoutedEventArgs routedEventArgs)
-    {
-        _viewModel.RuleHitLogs.Clear();
+        await SaveRulesAsync(showNotification: false);
     }
 
     private async Task AddBlockRuleAsync()
     {
         RequestBlockRuleItem item = new()
         {
-            Name = "新请求屏蔽",
+            Name = "新HTTP屏蔽",
             Method = "ANY",
             UrlMatchType = "通配",
             UrlPattern = "",
-            Action = "返回空响应",
-            StatusCode = 403,
-            ResponseValueType = "String(UTF8)",
+            Action = "断开请求",
             State = "未保存"
         };
 
-        if (ShowRuleEditor("请求屏蔽", item) != true)
+        if (ShowRuleEditor("HTTP屏蔽", item) != true)
         {
             return;
         }
@@ -256,6 +229,29 @@ public partial class RulesCenterWindow : Window
         BlockRulesGrid.SelectedItem = item;
         await SaveRulesAsync();
         RuleStatusTextBlock.Text = $"{_viewModel.RequestBlockRules.Count} 条";
+    }
+
+    private async Task AddWebSocketBlockRuleAsync()
+    {
+        WebSocketBlockRuleItem item = new()
+        {
+            Name = "新WebSocket屏蔽",
+            Method = "ANY",
+            UrlMatchType = "通配",
+            UrlPattern = "",
+            Action = "断开连接",
+            State = "未保存"
+        };
+
+        if (ShowRuleEditor("WebSocket屏蔽", item) != true)
+        {
+            return;
+        }
+
+        _viewModel.WebSocketBlockRules.Add(item);
+        WebSocketBlockRulesGrid.SelectedItem = item;
+        await SaveRulesAsync();
+        RuleStatusTextBlock.Text = $"{_viewModel.WebSocketBlockRules.Count} 条";
     }
 
     private async Task AddRewriteRuleAsync()
@@ -339,10 +335,10 @@ public partial class RulesCenterWindow : Window
     {
         switch (_currentPage)
         {
-            case "请求屏蔽" when BlockRulesGrid.SelectedItem is RequestBlockRuleItem blockRule:
+            case "HTTP屏蔽" when BlockRulesGrid.SelectedItem is RequestBlockRuleItem blockRule:
             {
                 RequestBlockRuleItem editing = CloneBlockRule(blockRule);
-                if (ShowRuleEditor("请求屏蔽", editing) != true)
+                if (ShowRuleEditor("HTTP屏蔽", editing) != true)
                 {
                     return;
                 }
@@ -350,6 +346,19 @@ public partial class RulesCenterWindow : Window
                 ApplyBlockRule(blockRule, editing);
                 await SaveRulesAsync();
                 RuleStatusTextBlock.Text = $"{_viewModel.RequestBlockRules.Count} 条";
+                break;
+            }
+            case "WebSocket屏蔽" when WebSocketBlockRulesGrid.SelectedItem is WebSocketBlockRuleItem webSocketBlockRule:
+            {
+                WebSocketBlockRuleItem editing = CloneWebSocketBlockRule(webSocketBlockRule);
+                if (ShowRuleEditor("WebSocket屏蔽", editing) != true)
+                {
+                    return;
+                }
+
+                ApplyWebSocketBlockRule(webSocketBlockRule, editing);
+                await SaveRulesAsync();
+                RuleStatusTextBlock.Text = $"{_viewModel.WebSocketBlockRules.Count} 条";
                 break;
             }
             case "请求重写" when RewriteRulesGrid.SelectedItem is RequestRewriteRuleItem rewriteRule:
@@ -398,7 +407,8 @@ public partial class RulesCenterWindow : Window
     {
         return _currentPage switch
         {
-            "请求屏蔽" => BlockRulesGrid.SelectedItem as TrafficRuleItemBase,
+            "HTTP屏蔽" => BlockRulesGrid.SelectedItem as TrafficRuleItemBase,
+            "WebSocket屏蔽" => WebSocketBlockRulesGrid.SelectedItem as TrafficRuleItemBase,
             "请求重写" => RewriteRulesGrid.SelectedItem as TrafficRuleItemBase,
             "请求映射" => MappingRulesGrid.SelectedItem as TrafficRuleItemBase,
             "请求解密" => DecodeRulesGrid.SelectedItem as TrafficRuleItemBase,
@@ -406,24 +416,116 @@ public partial class RulesCenterWindow : Window
         };
     }
 
+    private void UpdateRuleActionButtons()
+    {
+        bool hasSelection = GetSelectedRule() is not null;
+        RemoveRuleButton.IsEnabled = hasSelection;
+        EditRuleButton.IsEnabled = hasSelection;
+    }
+
     private bool? ShowRuleEditor(string ruleType, object rule)
     {
-        return new RuleEditorWindow(ruleType, rule)
+        return new RuleEditorWindow(ruleType, rule, ValidateRuleBeforeSave)
         {
             Owner = this
         }.ShowDialog();
     }
 
-    private async Task SaveRulesAsync()
+    private string? ValidateRuleBeforeSave(object rule)
+    {
+        if (rule is RequestBlockRuleItem blockRule)
+        {
+            return ValidateUniqueBlockRule(
+                blockRule,
+                _viewModel.RequestBlockRules,
+                "HTTP屏蔽");
+        }
+
+        if (rule is WebSocketBlockRuleItem webSocketBlockRule)
+        {
+            webSocketBlockRule.Method = "ANY";
+            return ValidateUniqueBlockRule(
+                webSocketBlockRule,
+                _viewModel.WebSocketBlockRules,
+                "WebSocket屏蔽");
+        }
+
+        return null;
+    }
+
+    private static string? ValidateUniqueBlockRule<T>(T rule, IEnumerable<T> rules, string ruleType)
+        where T : TrafficRuleItemBase
+    {
+        if (rule is null)
+        {
+            return null;
+        }
+
+        string url = NormalizeRuleText(rule.UrlPattern);
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return "Url 不能为空。";
+        }
+
+        string method = NormalizeRuleText(rule.Method);
+        string matchType = NormalizeRuleText(rule.UrlMatchType);
+        T? duplicate = rules.FirstOrDefault(existing =>
+            !string.Equals(existing.Hash, rule.Hash, StringComparison.Ordinal)
+            && string.Equals(NormalizeRuleText(existing.UrlPattern), url, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(NormalizeRuleText(existing.Method), method, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(NormalizeRuleText(existing.UrlMatchType), matchType, StringComparison.Ordinal));
+
+        if (duplicate is not null)
+        {
+            return $"已存在相同 Url 的 {ruleType}规则：{duplicate.Name}";
+        }
+
+        return null;
+    }
+
+    private static string NormalizeRuleText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "" : value.Trim();
+    }
+
+    private static string NormalizeRulePageKey(string? value)
+    {
+        return value == "请求屏蔽" ? "HTTP屏蔽" : value ?? "";
+    }
+
+    private async Task SaveRulesAsync(bool showNotification = false)
     {
         try
         {
-            await _viewModel.ApplyRuleCenterConfigAsync();
+            bool saved = await _viewModel.ApplyRuleCenterConfigAsync(showNotification);
+            if (!saved)
+            {
+                ShowRuleAlert("规则中心配置保存失败。");
+            }
         }
         catch (Exception exception)
         {
-            MessageBox.Show(this, exception.Message, "规则中心", MessageBoxButton.OK, MessageBoxImage.Error);
+            ShowRuleAlert(exception.Message);
         }
+    }
+
+    private void ShowRuleAlert(string message)
+    {
+        RuleAlertTextBlock.Text = message;
+        RuleAlertBorder.Visibility = Visibility.Visible;
+        _alertTimer.Stop();
+        _alertTimer.Start();
+    }
+
+    private void HideRuleAlert()
+    {
+        _alertTimer.Stop();
+        RuleAlertBorder.Visibility = Visibility.Collapsed;
+    }
+
+    private void AlertTimer_Tick(object? sender, EventArgs eventArgs)
+    {
+        HideRuleAlert();
     }
 
     private static RequestBlockRuleItem CloneBlockRule(RequestBlockRuleItem source)
@@ -438,9 +540,21 @@ public partial class RulesCenterWindow : Window
     {
         ApplyCommonRuleFields(target, source);
         target.Action = source.Action;
-        target.StatusCode = source.StatusCode;
-        target.ResponseValueType = source.ResponseValueType;
-        target.ResponseContent = source.ResponseContent;
+    }
+
+    private static WebSocketBlockRuleItem CloneWebSocketBlockRule(WebSocketBlockRuleItem source)
+    {
+        WebSocketBlockRuleItem clone = new();
+        ApplyWebSocketBlockRule(clone, source);
+        clone.State = source.State;
+        return clone;
+    }
+
+    private static void ApplyWebSocketBlockRule(WebSocketBlockRuleItem target, WebSocketBlockRuleItem source)
+    {
+        ApplyCommonRuleFields(target, source);
+        target.Method = "ANY";
+        target.Action = source.Action;
     }
 
     private static RequestRewriteRuleItem CloneRewriteRule(RequestRewriteRuleItem source)

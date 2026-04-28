@@ -144,10 +144,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     public ObservableCollection<ReplaceRuleItem> ReplaceRuleItems { get; } = new();
     public ObservableCollection<InterceptRuleItem> InterceptRuleItems { get; } = new();
     public ObservableCollection<RequestBlockRuleItem> RequestBlockRules { get; } = new();
+    public ObservableCollection<WebSocketBlockRuleItem> WebSocketBlockRules { get; } = new();
     public ObservableCollection<RequestRewriteRuleItem> RequestRewriteRules { get; } = new();
     public ObservableCollection<RequestMappingRuleItem> RequestMappingRules { get; } = new();
     public ObservableCollection<RequestDecodeRuleItem> RequestDecodeRules { get; } = new();
-    public ObservableCollection<TrafficRuleHitItem> RuleHitLogs { get; } = new();
     public ObservableCollection<RequestCertificateRuleItem> RequestCertificateItems { get; } = new();
     public ObservableCollection<ProcessCaptureNameItem> ProcessCaptureNames { get; } = new();
     public ObservableCollection<RunningProcessItem> RunningProcesses { get; } = new();
@@ -988,7 +988,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         NotificationRequested?.Invoke(ok ? "提示" : "错误", ok ? "拦截规则已保存。" : "拦截规则保存失败，请检查规则。");
     }
 
-    public async Task ApplyRuleCenterConfigAsync()
+    public async Task<bool> ApplyRuleCenterConfigAsync(bool showNotification = false)
     {
         string json = SyncRuleCenterRulesText();
         JsonElement? result = await _backend.InvokeAsync("保存规则中心配置", new
@@ -999,6 +999,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         bool ok = result is { ValueKind: JsonValueKind.True };
         string state = ok ? "已保存" : "保存失败";
         foreach (RequestBlockRuleItem item in RequestBlockRules)
+        {
+            item.State = state;
+        }
+
+        foreach (WebSocketBlockRuleItem item in WebSocketBlockRules)
         {
             item.State = state;
         }
@@ -1019,19 +1024,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         }
 
         StatusRight = ok ? "规则中心配置已保存" : "规则中心配置保存失败";
-        NotificationRequested?.Invoke(ok ? "提示" : "错误", ok ? "规则中心配置已保存。" : "规则中心配置保存失败。");
-    }
+        if (showNotification)
+        {
+            NotificationRequested?.Invoke(ok ? "提示" : "错误", ok ? "规则中心配置已保存。" : "规则中心配置保存失败。");
+        }
 
-    public string ExportRuleCenterConfigJson()
-    {
-        return SyncRuleCenterRulesText();
-    }
-
-    public async Task ImportRuleCenterConfigJsonAsync(string json)
-    {
-        using JsonDocument document = JsonDocument.Parse(json);
-        ApplyRuleCenterConfig(document.RootElement);
-        await ApplyRuleCenterConfigAsync();
+        return ok;
     }
 
     public async Task RestoreDefaultScriptAsync()
@@ -2043,12 +2041,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             hit.Time = DateTime.Now.ToString("HH:mm:ss.fff");
         }
 
-        RuleHitLogs.Insert(0, hit);
-        while (RuleHitLogs.Count > 500)
-        {
-            RuleHitLogs.RemoveAt(RuleHitLogs.Count - 1);
-        }
-
         if (_sessionMap.TryGetValue(hit.Theology, out CaptureEntry? entry))
         {
             entry.AddRuleHit(hit);
@@ -2324,6 +2316,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     private void ApplyRuleCenterConfig(JsonElement element)
     {
         List<RequestBlockRuleItem> blockRules = new();
+        List<WebSocketBlockRuleItem> webSocketBlockRules = new();
         List<RequestRewriteRuleItem> rewriteRules = new();
         List<RequestMappingRuleItem> mappingRules = new();
         List<RequestDecodeRuleItem> decodeRules = new();
@@ -2334,13 +2327,22 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             {
                 RequestBlockRuleItem rule = new()
                 {
-                    Action = GetString(item, "Action", "返回空响应"),
-                    StatusCode = GetInt(item, "StatusCode", 403),
-                    ResponseValueType = GetString(item, "ResponseValueType", "String(UTF8)"),
-                    ResponseContent = GetString(item, "ResponseContent")
+                    Action = NormalizeRequestBlockAction(GetString(item, "Action", "断开请求"))
                 };
                 ApplyCommonTrafficRuleFields(rule, item);
                 blockRules.Add(rule);
+            }
+
+            foreach (JsonElement item in EnumerateArrayProperty(element, "WebSocketBlockRules"))
+            {
+                WebSocketBlockRuleItem rule = new()
+                {
+                    Action = NormalizeWebSocketBlockAction(GetString(item, "Action", "断开连接")),
+                    Method = "ANY"
+                };
+                ApplyCommonTrafficRuleFields(rule, item);
+                rule.Method = "ANY";
+                webSocketBlockRules.Add(rule);
             }
 
             foreach (JsonElement item in EnumerateArrayProperty(element, "RewriteRules"))
@@ -2393,6 +2395,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         }
 
         ReplaceRows(RequestBlockRules, blockRules);
+        ReplaceRows(WebSocketBlockRules, webSocketBlockRules);
         ReplaceRows(RequestRewriteRules, rewriteRules);
         ReplaceRows(RequestMappingRules, mappingRules);
         ReplaceRows(RequestDecodeRules, decodeRules);
@@ -2438,6 +2441,21 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         rule.Priority = GetInt(item, "Priority", 100);
         rule.Note = GetString(item, "Note");
         rule.State = "已保存";
+    }
+
+    private static string NormalizeRequestBlockAction(string action)
+    {
+        return action?.Trim() == "断开响应" ? "断开响应" : "断开请求";
+    }
+
+    private static string NormalizeWebSocketBlockAction(string action)
+    {
+        return action?.Trim() switch
+        {
+            "丢弃上行帧" => "丢弃上行帧",
+            "丢弃下行帧" => "丢弃下行帧",
+            _ => "断开连接"
+        };
     }
 
     private static IEnumerable<JsonElement> EnumerateArrayProperty(JsonElement element, string propertyName)
@@ -3111,12 +3129,19 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
                     item.Method,
                     item.UrlMatchType,
                     item.UrlPattern,
-                    item.Priority,
                     item.Note,
-                    item.Action,
-                    item.StatusCode,
-                    item.ResponseValueType,
-                    item.ResponseContent
+                    item.Action
+                }),
+                WebSocketBlockRules = WebSocketBlockRules.Select(static item => new
+                {
+                    item.Hash,
+                    Enable = item.Enabled,
+                    item.Name,
+                    Method = "ANY",
+                    item.UrlMatchType,
+                    item.UrlPattern,
+                    item.Note,
+                    item.Action
                 }),
                 RewriteRules = RequestRewriteRules.Select(static item => new
                 {
@@ -3126,7 +3151,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
                     item.Method,
                     item.UrlMatchType,
                     item.UrlPattern,
-                    item.Priority,
                     item.Note,
                     item.Direction,
                     item.Target,
@@ -3144,7 +3168,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
                     item.Method,
                     item.UrlMatchType,
                     item.UrlPattern,
-                    item.Priority,
                     item.Note,
                     item.MappingType,
                     item.SourceContent,
@@ -3160,7 +3183,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
                     item.Method,
                     item.UrlMatchType,
                     item.UrlPattern,
-                    item.Priority,
                     item.Note,
                     item.Direction,
                     item.DecoderType,

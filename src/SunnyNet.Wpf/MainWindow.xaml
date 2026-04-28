@@ -251,16 +251,28 @@
 
                             <Border Width="1" Margin="10,6" Background="{StaticResource DividerBrush}" />
 
-                            <Button Margin="0,0,0,0" Style="{StaticResource ToolbarButtonStyle}" Click="SettingsProcess_Click" ToolTip="进程驱动">
+                            <Button x:Name="RulesMenuButton"
+                                    Margin="0,0,0,0"
+                                    Style="{StaticResource ToolbarButtonStyle}"
+                                    Click="RulesMenuButton_Click"
+                                    ToolTip="请求规则">
+                                <Button.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="HTTP屏蔽" Click="RequestBlockRules_Click" />
+                                        <MenuItem Header="WebSocket屏蔽" Click="WebSocketBlockRules_Click" />
+                                        <MenuItem Header="请求重写" Click="RequestRewriteRules_Click" />
+                                        <MenuItem Header="请求映射" Click="RequestMappingRules_Click" />
+                                        <MenuItem Header="请求解密" Click="RequestDecodeRules_Click" />
+                                    </ContextMenu>
+                                </Button.ContextMenu>
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE7F8;" />
-                                    <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="进程驱动" />
-                                </StackPanel>
-                            </Button>
-                            <Button Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}" Click="SettingsScript_Click" ToolTip="脚本编辑">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE70F;" />
-                                    <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="脚本编辑" />
+                                    <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE9D9;" />
+                                    <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="请求规则" />
+                                    <TextBlock Margin="4,1,0,0"
+                                               VerticalAlignment="Center"
+                                               FontFamily="Segoe UI Symbol"
+                                               FontSize="9"
+                                               Text="▼" />
                                 </StackPanel>
                             </Button>
                             <ToggleButton x:Name="AutoScrollToolbarButton"
@@ -299,24 +311,6 @@
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE8F1;" />
                                     <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="请求构造器" />
-                                </StackPanel>
-                            </Button>
-                            <Button x:Name="RulesMenuButton"
-                                    Margin="6,0,0,0"
-                                    Style="{StaticResource ToolbarButtonStyle}"
-                                    Click="RulesMenuButton_Click"
-                                    ToolTip="规则中心">
-                                <Button.ContextMenu>
-                                    <ContextMenu>
-                                        <MenuItem Header="请求屏蔽" Click="RequestBlockRules_Click" />
-                                        <MenuItem Header="请求重写" Click="RequestRewriteRules_Click" />
-                                        <MenuItem Header="请求映射" Click="RequestMappingRules_Click" />
-                                        <MenuItem Header="请求解密" Click="RequestDecodeRules_Click" />
-                                    </ContextMenu>
-                                </Button.ContextMenu>
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE9D9;" />
-                                    <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="规则" />
                                 </StackPanel>
                             </Button>
                             <Button Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}" Click="CertificateGuide_Click" ToolTip="证书安装教程">

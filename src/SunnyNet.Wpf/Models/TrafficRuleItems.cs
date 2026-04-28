@@ -93,38 +93,28 @@ public abstract class TrafficRuleItemBase : ViewModelBase
 
 public sealed class RequestBlockRuleItem : TrafficRuleItemBase
 {
-    private string _action = "返回空响应";
-    private int _statusCode = 403;
-    private string _responseValueType = "String(UTF8)";
-    private string _responseContent = "";
+    private string _action = "断开请求";
 
     public string Action
     {
         get => _action;
-        set => SetRuleProperty(ref _action, string.IsNullOrWhiteSpace(value) ? "返回空响应" : value);
+        set => SetRuleProperty(ref _action, string.IsNullOrWhiteSpace(value) ? "断开请求" : value);
     }
 
-    public int StatusCode
+    public override string Summary => Action;
+}
+
+public sealed class WebSocketBlockRuleItem : TrafficRuleItemBase
+{
+    private string _action = "断开连接";
+
+    public string Action
     {
-        get => _statusCode;
-        set => SetRuleProperty(ref _statusCode, value);
+        get => _action;
+        set => SetRuleProperty(ref _action, string.IsNullOrWhiteSpace(value) ? "断开连接" : value);
     }
 
-    public string ResponseValueType
-    {
-        get => _responseValueType;
-        set => SetRuleProperty(ref _responseValueType, string.IsNullOrWhiteSpace(value) ? "String(UTF8)" : value);
-    }
-
-    public string ResponseContent
-    {
-        get => _responseContent;
-        set => SetRuleProperty(ref _responseContent, value ?? "");
-    }
-
-    public override string Summary => Action == "自定义状态码"
-        ? $"{Action} · {StatusCode}"
-        : Action;
+    public override string Summary => Action;
 }
 
 public sealed class RequestRewriteRuleItem : TrafficRuleItemBase

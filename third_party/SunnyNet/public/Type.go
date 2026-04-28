@@ -22,6 +22,7 @@ type WebsocketMsg struct {
 	Server  *websocket.Conn
 	Client  *websocket.Conn
 	Mt      int
+	Drop    bool
 	Sync    *sync.Mutex
 	tcp     net.Conn //TCP相关
 	TcpIp   string   //TCP相关

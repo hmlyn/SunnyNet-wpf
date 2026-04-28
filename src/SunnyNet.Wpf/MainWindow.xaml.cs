@@ -528,7 +528,12 @@ public partial class MainWindow : Window
 
     private void RequestBlockRules_Click(object sender, RoutedEventArgs routedEventArgs)
     {
-        OpenRulesCenter("请求屏蔽");
+        OpenRulesCenter("HTTP屏蔽");
+    }
+
+    private void WebSocketBlockRules_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        OpenRulesCenter("WebSocket屏蔽");
     }
 
     private void RequestRewriteRules_Click(object sender, RoutedEventArgs routedEventArgs)

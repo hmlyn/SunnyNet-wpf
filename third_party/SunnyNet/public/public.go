@@ -1032,7 +1032,11 @@ func CopyBuffer(dst *ReadWriteObject, src io.Reader, dstConn net.Conn, srcConn *
 		if er != nil {
 			if buff.Len() >= 0 {
 
-				_body := Doe(SetBodyValue(buff.Bytes(), nil))
+				bodyValue := SetBodyValue(buff.Bytes(), nil)
+				if bodyValue == nil {
+					return
+				}
+				_body := Doe(bodyValue)
 				_head := SetReqHeadsValue(strconv.Itoa(len(_body)))
 				_ = dstConn.SetDeadline(time.Now().Add(5 * time.Second))
 				_, _ = dst.Write(_head)

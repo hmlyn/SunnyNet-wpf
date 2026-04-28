@@ -77,10 +77,14 @@
         </x:Array>
 
         <x:Array x:Key="BlockActionItems" Type="{x:Type sys:String}">
-            <sys:String>返回空响应</sys:String>
-            <sys:String>自定义状态码</sys:String>
-            <sys:String>自定义响应内容</sys:String>
+            <sys:String>断开请求</sys:String>
+            <sys:String>断开响应</sys:String>
+        </x:Array>
+
+        <x:Array x:Key="WebSocketBlockActionItems" Type="{x:Type sys:String}">
             <sys:String>断开连接</sys:String>
+            <sys:String>丢弃上行帧</sys:String>
+            <sys:String>丢弃下行帧</sys:String>
         </x:Array>
 
         <Style x:Key="EditorLabelTextStyle" TargetType="{x:Type TextBlock}">
@@ -90,7 +94,9 @@
         </Style>
 
         <Style x:Key="EditorTextBoxStyle" TargetType="{x:Type TextBox}" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Width" Value="420" />
             <Setter Property="Height" Value="32" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
             <Setter Property="Padding" Value="10,5" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -118,7 +124,8 @@
                    Foreground="{StaticResource TextPrimaryBrush}"
                    Text="规则设置" />
 
-        <ScrollViewer Grid.Row="1"
+        <ScrollViewer x:Name="EditorScrollViewer"
+                      Grid.Row="1"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto">
             <Grid>
@@ -128,19 +135,19 @@
                 </Grid.ColumnDefinitions>
 
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="42" />
-                    <RowDefinition Height="42" />
-                    <RowDefinition Height="42" />
-                    <RowDefinition Height="42" />
-                    <RowDefinition Height="42" />
-                    <RowDefinition Height="42" />
-                    <RowDefinition Height="42" />
-                    <RowDefinition Height="170" />
-                    <RowDefinition Height="42" />
-                    <RowDefinition Height="42" />
-                    <RowDefinition Height="84" />
-                    <RowDefinition Height="42" />
-                    <RowDefinition Height="42" />
+                    <RowDefinition x:Name="EditorRow0" Height="42" />
+                    <RowDefinition x:Name="EditorRow1" Height="42" />
+                    <RowDefinition x:Name="EditorRow2" Height="42" />
+                    <RowDefinition x:Name="EditorRow3" Height="50" />
+                    <RowDefinition x:Name="EditorRow4" Height="42" />
+                    <RowDefinition x:Name="EditorRow5" Height="42" />
+                    <RowDefinition x:Name="EditorRow6" Height="42" />
+                    <RowDefinition x:Name="EditorRow7" Height="170" />
+                    <RowDefinition x:Name="EditorRow8" Height="42" />
+                    <RowDefinition x:Name="EditorRow9" Height="84" />
+                    <RowDefinition x:Name="EditorRow10" Height="0" />
+                    <RowDefinition x:Name="EditorRow11" Height="0" />
+                    <RowDefinition x:Name="EditorRow12" Height="0" />
                 </Grid.RowDefinitions>
 
                 <TextBlock Style="{StaticResource EditorLabelTextStyle}" Text="别名" />
@@ -149,24 +156,11 @@
                          Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource EditorTextBoxStyle}" />
 
-                <TextBlock Grid.Row="1" Style="{StaticResource EditorLabelTextStyle}" Text="可选地址 (Url)" />
+                <TextBlock Grid.Row="1" Style="{StaticResource EditorLabelTextStyle}" Text="Url" />
                 <TextBox Grid.Row="1"
                          Grid.Column="1"
                          Text="{Binding UrlPattern, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource EditorTextBoxStyle}" />
-
-                <TextBlock Grid.Row="2" Style="{StaticResource EditorLabelTextStyle}" Text="启用规则" />
-                <StackPanel Grid.Row="2"
-                            Grid.Column="1"
-                            VerticalAlignment="Center"
-                            Orientation="Horizontal">
-                    <CheckBox VerticalAlignment="Center"
-                              IsChecked="{Binding Enabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                    <TextBlock Margin="8,0,0,0"
-                               VerticalAlignment="Center"
-                               Foreground="{StaticResource TextSecondaryBrush}"
-                               Text="On" />
-                </StackPanel>
 
                 <TextBlock Grid.Row="3" Style="{StaticResource EditorLabelTextStyle}" Text="请求方法" />
                 <ComboBox Grid.Row="3"
@@ -178,16 +172,39 @@
                           Style="{StaticResource EditorComboBoxStyle}" />
 
                 <TextBlock Grid.Row="4" Style="{StaticResource EditorLabelTextStyle}" Text="URL匹配策略" />
-                <ComboBox Grid.Row="4"
-                          Grid.Column="1"
-                          Width="200"
-                          HorizontalAlignment="Left"
-                          ItemsSource="{StaticResource UrlMatchTypeItems}"
-                          SelectedItem="{Binding UrlMatchType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                          Style="{StaticResource EditorComboBoxStyle}" />
+                <StackPanel Grid.Row="4"
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal">
+                    <ComboBox x:Name="UrlMatchTypeComboBox"
+                              Width="200"
+                              ItemsSource="{StaticResource UrlMatchTypeItems}"
+                              SelectedItem="{Binding UrlMatchType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                              SelectionChanged="UrlMatchTypeComboBox_SelectionChanged"
+                              Style="{StaticResource EditorComboBoxStyle}" />
+                    <TextBlock x:Name="UrlMatchHintTextBlock"
+                               Margin="12,0,0,0"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Text="示例：*.example.com/api/*" />
+                </StackPanel>
+
+                <TextBlock Grid.Row="5" Style="{StaticResource EditorLabelTextStyle}" Text="启用规则" />
+                <StackPanel Grid.Row="5"
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal">
+                    <CheckBox VerticalAlignment="Center"
+                              IsChecked="{Binding Enabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Margin="8,0,0,0"
+                               VerticalAlignment="Center"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Text="On" />
+                </StackPanel>
 
                 <Grid x:Name="RewritePanel"
-                      Grid.Row="5"
+                      Grid.Row="2"
                       Grid.ColumnSpan="2">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="118" />
@@ -207,7 +224,7 @@
                 </Grid>
 
                 <Grid x:Name="BlockActionPanel"
-                      Grid.Row="5"
+                      Grid.Row="2"
                       Grid.ColumnSpan="2"
                       Visibility="Collapsed">
                     <Grid.ColumnDefinitions>
@@ -218,16 +235,11 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Style="{StaticResource EditorLabelTextStyle}" Text="屏蔽动作" />
-                    <ComboBox Grid.Column="1"
+                    <ComboBox x:Name="BlockActionComboBox"
+                              Grid.Column="1"
                               ItemsSource="{StaticResource BlockActionItems}"
                               SelectedItem="{Binding Action, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                               Style="{StaticResource EditorComboBoxStyle}" />
-                    <TextBlock Grid.Column="3" Style="{StaticResource EditorLabelTextStyle}" Text="状态码" />
-                    <TextBox Grid.Column="4"
-                             Width="110"
-                             HorizontalAlignment="Left"
-                             Text="{Binding StatusCode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                             Style="{StaticResource EditorTextBoxStyle}" />
                 </Grid>
 
                 <Grid x:Name="RewriteOperationPanel"
@@ -307,26 +319,8 @@
                     </DataGrid>
                 </Grid>
 
-                <Grid x:Name="BlockResponseTypePanel"
-                      Grid.Row="6"
-                      Grid.ColumnSpan="2"
-                      Visibility="Collapsed">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="118" />
-                        <ColumnDefinition Width="200" />
-                        <ColumnDefinition Width="24" />
-                        <ColumnDefinition Width="88" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Style="{StaticResource EditorLabelTextStyle}" Text="响应格式" />
-                    <ComboBox Grid.Column="1"
-                              ItemsSource="{StaticResource MappingValueTypeItems}"
-                              SelectedItem="{Binding ResponseValueType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                              Style="{StaticResource EditorComboBoxStyle}" />
-                </Grid>
-
                 <Grid x:Name="MappingTypePanel"
-                      Grid.Row="5"
+                      Grid.Row="2"
                       Grid.ColumnSpan="2"
                       Visibility="Collapsed">
                     <Grid.ColumnDefinitions>
@@ -349,7 +343,7 @@
                 </Grid>
 
                 <Grid x:Name="DecodePanel"
-                      Grid.Row="5"
+                      Grid.Row="2"
                       Grid.ColumnSpan="2"
                       Visibility="Collapsed">
                     <Grid.ColumnDefinitions>
@@ -404,24 +398,6 @@
                             Padding="10,5" />
                 </Grid>
 
-                <TextBlock x:Name="BlockResponseLabelTextBlock"
-                           Grid.Row="7"
-                           VerticalAlignment="Top"
-                           Margin="0,7,0,0"
-                           Style="{StaticResource EditorLabelTextStyle}"
-                           Text="响应内容"
-                           Visibility="Collapsed" />
-                <TextBox x:Name="BlockResponseTextBox"
-                         Grid.Row="7"
-                         Grid.Column="1"
-                         Height="72"
-                         AcceptsReturn="True"
-                         TextWrapping="Wrap"
-                         VerticalScrollBarVisibility="Auto"
-                         Text="{Binding ResponseContent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                         Style="{StaticResource EditorTextBoxStyle}"
-                         Visibility="Collapsed" />
-
                 <TextBlock x:Name="DecodeScriptLabelTextBlock"
                            Grid.Row="7"
                            VerticalAlignment="Top"
@@ -451,20 +427,14 @@
                          Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource EditorTextBoxStyle}" />
 
-                <TextBlock Grid.Row="9" Style="{StaticResource EditorLabelTextStyle}" Text="排序" />
-                <TextBox Grid.Row="9"
-                         Grid.Column="1"
-                         Width="110"
-                         HorizontalAlignment="Left"
-                         Text="{Binding Priority, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                         Style="{StaticResource EditorTextBoxStyle}" />
-
-                <TextBlock Grid.Row="10"
+                <TextBlock x:Name="NoteLabelTextBlock"
+                           Grid.Row="10"
                            VerticalAlignment="Top"
                            Margin="0,8,0,0"
                            Style="{StaticResource EditorLabelTextStyle}"
-                           Text="备注备忘" />
-                <TextBox Grid.Row="10"
+                           Text="备注" />
+                <TextBox x:Name="NoteTextBox"
+                         Grid.Row="10"
                          Grid.Column="1"
                          Height="72"
                          AcceptsReturn="True"
@@ -488,5 +458,40 @@
                     Click="Cancel_Click"
                     Content="取消" />
         </StackPanel>
+
+        <Border x:Name="RuleAlertBorder"
+                Grid.RowSpan="3"
+                Panel.ZIndex="10"
+                Width="320"
+                Margin="0,10,0,0"
+                Padding="14,10"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top"
+                Background="#FEF0F0"
+                BorderBrush="#FDE2E2"
+                BorderThickness="1"
+                CornerRadius="4"
+                Visibility="Collapsed">
+            <StackPanel Orientation="Horizontal">
+                <Border Width="14"
+                        Height="14"
+                        VerticalAlignment="Center"
+                        Background="#F56C6C"
+                        CornerRadius="7">
+                    <TextBlock HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontSize="8"
+                               FontWeight="Bold"
+                               Foreground="White"
+                               Text="×" />
+                </Border>
+                <TextBlock x:Name="RuleAlertTextBlock"
+                           Margin="10,0,0,0"
+                           VerticalAlignment="Center"
+                           FontSize="13"
+                           Foreground="#F56C6C"
+                           TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+        </Border>
     </Grid>
 </Window>

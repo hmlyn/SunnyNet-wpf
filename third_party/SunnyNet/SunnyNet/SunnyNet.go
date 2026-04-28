@@ -162,21 +162,22 @@ type ProxyRequest struct {
 	Pid       string                  //s5连接过来的pid
 	Global    *Sunny                  //继承全局中间件信息
 	//WinHttp   *GoWinHttp.WinHttp      //WinHTTP请求对象
-	WinHttp      *GoWinHttp.WinHttp   //WinHTTP请求对象
-	Request      *http.Request        //要发送的请求体
-	Response     *http.Response       //HTTP响应体
-	TCP          public.TCP           //TCP收发数据
-	Websocket    *public.WebsocketMsg //Websocket会话
-	Proxy        *GoWinHttp.Proxy     //设置指定代理
-	HttpCall     int                  //http 请求回调地址
-	TcpCall      int                  //TCP请求回调地址
-	wsCall       int                  //ws回调地址
-	HttpGoCall   func(Conn *HttpConn) //http 请求回调地址
-	TcpGoCall    func(Conn *TcpConn)  //TCP请求回调地址
-	wsGoCall     func(Conn *WsConn)   //ws回调地址
-	NoRepairHttp bool                 //不要纠正Http
-	CloseRequest bool                 //HTTP回调要求直接关闭客户端连接
-	Lock         sync.Mutex
+	WinHttp       *GoWinHttp.WinHttp   //WinHTTP请求对象
+	Request       *http.Request        //要发送的请求体
+	Response      *http.Response       //HTTP响应体
+	TCP           public.TCP           //TCP收发数据
+	Websocket     *public.WebsocketMsg //Websocket会话
+	Proxy         *GoWinHttp.Proxy     //设置指定代理
+	HttpCall      int                  //http 请求回调地址
+	TcpCall       int                  //TCP请求回调地址
+	wsCall        int                  //ws回调地址
+	HttpGoCall    func(Conn *HttpConn) //http 请求回调地址
+	TcpGoCall     func(Conn *TcpConn)  //TCP请求回调地址
+	wsGoCall      func(Conn *WsConn)   //ws回调地址
+	NoRepairHttp  bool                 //不要纠正Http
+	CloseRequest  bool                 //HTTP回调要求直接关闭客户端连接
+	CloseResponse bool                 //HTTP响应回调要求直接关闭客户端连接
+	Lock          sync.Mutex
 }
 
 var sUser = make(map[int]string)
@@ -1381,6 +1382,7 @@ func (s *ProxyRequest) handleWss() bool {
 					messageIdLock.Unlock()
 				}
 				as.Data.Reset()
+				as.Drop = false
 				mt, message, err := Server.ReadMessage()
 				if err != nil {
 					as.Data.Reset()
@@ -1390,8 +1392,15 @@ func (s *ProxyRequest) handleWss() bool {
 				as.Mt = mt
 				s.CallbackWssRequest(public.WebsocketServerSend, Method, Url, as, MessageId)
 				sc.Lock()
-				err = Client.WriteMessage(as.Mt, as.Data.Bytes())
+				drop := as.Drop
+				if !drop {
+					err = Client.WriteMessage(as.Mt, as.Data.Bytes())
+				}
 				sc.Unlock()
+				if drop {
+					as.Data.Reset()
+					continue
+				}
 				if err != nil {
 					as.Data.Reset()
 					break
@@ -1427,6 +1436,7 @@ func (s *ProxyRequest) handleWss() bool {
 				messageIdLock.Unlock()
 			}
 			as.Data.Reset()
+			as.Drop = false
 			mt, message1, err := Client.ReadMessage()
 			as.Data.Write(message1)
 			as.Mt = mt
@@ -1437,8 +1447,15 @@ func (s *ProxyRequest) handleWss() bool {
 			}
 			s.CallbackWssRequest(public.WebsocketUserSend, Method, Url, as, MessageId)
 			sc.Lock()
-			err = Server.WriteMessage(as.Mt, as.Data.Bytes())
+			drop := as.Drop
+			if !drop {
+				err = Server.WriteMessage(as.Mt, as.Data.Bytes())
+			}
 			sc.Unlock()
+			if drop {
+				as.Data.Reset()
+				continue
+			}
 			if err != nil {
 				as.Data.Reset()
 				s.CallbackWssRequest(public.WebsocketDisconnect, Method, Url, as, MessageId)
@@ -1572,6 +1589,15 @@ func (s *ProxyRequest) CompleteRequest(req *http.Request) {
 		s.Response.Body = ioutil.NopCloser(bytes.NewBuffer(bs))
 		//通知回调，已经请求完成
 		s.CallbackBeforeResponse()
+		if s.CloseResponse {
+			if s.Conn != nil {
+				_ = s.Conn.Close()
+			}
+			if s.WinHttp != nil && s.WinHttp.WinPool != nil && s.WinHttp.WinPool.Conn != nil {
+				_ = s.WinHttp.WinPool.Conn.Close()
+			}
+			return nil
+		}
 		b, _ := s.ReadAll(s.Response.Body)
 		if s.Response.Body != nil {
 			_ = s.Response.Body.Close()
