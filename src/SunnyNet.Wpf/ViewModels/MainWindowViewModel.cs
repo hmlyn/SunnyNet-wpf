@@ -1407,7 +1407,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     {
         if (string.IsNullOrWhiteSpace(path))
         {
-            return (false, "", Array.Empty<string>(), "请选择 Protobuf 描述目录或 .pb 文件。");
+            return (false, "", Array.Empty<string>(), "请选择 Protobuf 描述目录或 .proto/.pb/.desc/.protoset 文件。");
         }
 
         JsonElement? result = await _backend.InvokeAsync("protobufImportSchema", new

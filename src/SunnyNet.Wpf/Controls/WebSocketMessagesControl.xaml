@@ -75,6 +75,47 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="WebSocketFlowDirectionIconBorderStyle" TargetType="Border">
+            <Setter Property="Width" Value="16" />
+            <Setter Property="Height" Value="16" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+
+        <Style x:Key="WebSocketFlowDirectionIconPathStyle" TargetType="Path">
+            <Setter Property="Width" Value="11" />
+            <Setter Property="Height" Value="11" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Stretch" Value="Uniform" />
+            <Setter Property="Stroke" Value="{StaticResource AccentBrush}" />
+            <Setter Property="StrokeThickness" Value="1.65" />
+            <Setter Property="StrokeStartLineCap" Value="Round" />
+            <Setter Property="StrokeEndLineCap" Value="Round" />
+            <Setter Property="StrokeLineJoin" Value="Round" />
+            <Setter Property="Data" Value="M8,3.4 L8,12.6 M4.8,9.4 L8,12.6 L11.2,9.4" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Icon}" Value="上行">
+                    <Setter Property="Stroke" Value="#23A66D" />
+                    <Setter Property="Data" Value="M8,12.6 L8,3.4 M4.8,6.6 L8,3.4 L11.2,6.6" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Icon}" Value="下行">
+                    <Setter Property="Stroke" Value="#2F7CF6" />
+                    <Setter Property="Data" Value="M8,3.4 L8,12.6 M4.8,9.4 L8,12.6 L11.2,9.4" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Icon}" Value="websocket_connect">
+                    <Setter Property="Stroke" Value="#7B4DE0" />
+                    <Setter Property="Data" Value="M5.2,8 C5.2,6.4 6.4,5.2 8,5.2 C9.6,5.2 10.8,6.4 10.8,8 C10.8,9.6 9.6,10.8 8,10.8 C6.4,10.8 5.2,9.6 5.2,8" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Icon}" Value="websocket_close">
+                    <Setter Property="Stroke" Value="#D92D20" />
+                    <Setter Property="Data" Value="M5.2,5.2 L10.8,10.8 M10.8,5.2 L5.2,10.8" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="WebSocketFlowTypeTextStyle" TargetType="TextBlock" BasedOn="{StaticResource WebSocketFlowCellTextStyle}">
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
@@ -482,7 +523,7 @@
                     Background="{StaticResource SurfaceBrush}"
                     BorderBrush="{StaticResource DividerBrush}"
                     BorderThickness="1"
-                    CornerRadius="10">
+                    CornerRadius="8">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -568,7 +609,7 @@
 
                         <ListBox x:Name="FramesList"
                                  Grid.Row="1"
-                                 Margin="8,0,8,8"
+                                 Margin="8,0,8,0"
                                  Background="Transparent"
                                  BorderThickness="0"
                                  ItemContainerStyle="{StaticResource WebSocketFrameItemStyle}"
@@ -628,9 +669,11 @@
                                             <TextBlock Grid.Column="1"
                                                        Style="{StaticResource WebSocketFlowMonoCellTextStyle}"
                                                        Text="{Binding TimeLabel}" />
-                                            <TextBlock Grid.Column="2"
-                                                       Style="{StaticResource WebSocketFlowDirectionTextStyle}"
-                                                       Text="{Binding DirectionLabel}" />
+                                            <Border Grid.Column="2"
+                                                    Style="{StaticResource WebSocketFlowDirectionIconBorderStyle}"
+                                                    ToolTip="{Binding DirectionLabel}">
+                                                <Path Style="{StaticResource WebSocketFlowDirectionIconPathStyle}" />
+                                            </Border>
                                             <TextBlock Grid.Column="3"
                                                        Style="{StaticResource WebSocketFlowTypeTextStyle}"
                                                        Text="{Binding FlowTypeLabel}" />
@@ -655,9 +698,9 @@
 
                         <Border x:Name="FramesEmptyPanel"
                                 Grid.RowSpan="2"
-                                Margin="8,0,8,8"
-                                Background="#F8FAFD"
-                                CornerRadius="10"
+                                Margin="8,0,8,0"
+                                Background="Transparent"
+                                CornerRadius="0"
                                 IsHitTestVisible="False">
                             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <TextBlock HorizontalAlignment="Center"
@@ -866,22 +909,15 @@
                                                Margin="0,6,0,0" />
                                 </StackPanel>
 
-                                <Border Margin="0,10,0,0"
-                                        Padding="10,8"
-                                        Background="#F8FAFD"
-                                        BorderBrush="#E8EEF6"
-                                        BorderThickness="1"
-                                        CornerRadius="8">
-                                    <StackPanel>
-                                        <TextBlock x:Name="FilterStateTextBlock"
-                                                   Style="{StaticResource CaptionTextStyle}"
-                                                   Text="当前显示全部消息" />
-                                        <TextBlock x:Name="SearchHintTextBlock"
-                                                   Margin="0,4,0,0"
-                                                   Style="{StaticResource CaptionTextStyle}"
-                                                   Text="Enter 记录搜索，Esc 关闭面板" />
-                                    </StackPanel>
-                                </Border>
+                                <StackPanel Margin="0,8,0,0">
+                                    <TextBlock x:Name="FilterStateTextBlock"
+                                               Style="{StaticResource CaptionTextStyle}"
+                                               Text="当前显示全部消息" />
+                                    <TextBlock x:Name="SearchHintTextBlock"
+                                               Margin="0,3,0,0"
+                                               Style="{StaticResource CaptionTextStyle}"
+                                               Text="Enter 记录搜索，Esc 关闭面板" />
+                                </StackPanel>
 
                                 <DockPanel Margin="0,10,0,0" LastChildFill="False">
                                     <TextBlock VerticalAlignment="Center"
@@ -908,7 +944,7 @@
                     Background="{StaticResource SurfaceBrush}"
                     BorderBrush="{StaticResource DividerBrush}"
                     BorderThickness="1"
-                    CornerRadius="10">
+                    CornerRadius="8">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -1104,12 +1140,11 @@
 
                         <Border x:Name="PayloadContentPanel"
                                 Grid.Row="1"
-                                Margin="8,6,8,6"
-                                Padding="6"
-                                Background="{StaticResource SurfaceBrush}"
-                                BorderBrush="{StaticResource DividerBrush}"
-                                BorderThickness="1"
-                                CornerRadius="8">
+                                Margin="0"
+                                Padding="0"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                CornerRadius="0">
                             <Grid MinHeight="0">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
@@ -1155,23 +1190,167 @@
                                         </controls:HttpSyntaxTextBox>
                                         <controls:JsonTreeViewControl x:Name="PayloadJsonViewer" Visibility="Collapsed" />
                                         <Grid x:Name="PayloadProtobufPanel" Visibility="Collapsed">
-                                            <controls:JsonTreeViewControl x:Name="PayloadProtobufViewer" />
-                                            <Border x:Name="PayloadProtobufEmptyPanel"
-                                                    Background="#F8FAFD"
-                                                    IsHitTestVisible="False">
-                                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                    <TextBlock HorizontalAlignment="Center"
-                                                               FontFamily="Segoe MDL2 Assets"
-                                                               FontSize="22"
-                                                               Foreground="{StaticResource TextSecondaryBrush}"
-                                                               Text="&#xE943;" />
-                                                    <TextBlock x:Name="PayloadProtobufStatusTextBlock"
-                                                               Margin="0,8,0,0"
-                                                               HorizontalAlignment="Center"
-                                                               Style="{StaticResource CaptionTextStyle}"
-                                                               Text="可在下方导入结构并解析当前载荷" />
-                                                </StackPanel>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="*" />
+                                            </Grid.RowDefinitions>
+
+                                            <Border x:Name="ProtobufToolsPanel"
+                                                    Margin="0,0,0,5"
+                                                    Padding="0"
+                                                    Background="Transparent"
+                                                    BorderThickness="0">
+                                                <Grid>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto" />
+                                                        <RowDefinition Height="Auto" />
+                                                        <RowDefinition Height="Auto" />
+                                                    </Grid.RowDefinitions>
+
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="34" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="4" />
+                                                            <ColumnDefinition Width="28" />
+                                                            <ColumnDefinition Width="6" />
+                                                            <ColumnDefinition Width="72" />
+                                                            <ColumnDefinition Width="4" />
+                                                            <ColumnDefinition Width="42" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock VerticalAlignment="Center"
+                                                                   Style="{StaticResource CaptionTextStyle}"
+                                                                   Text="结构" />
+                                                        <TextBox x:Name="ProtoSchemaPathTextBox"
+                                                                 Grid.Column="1"
+                                                                 MinHeight="26"
+                                                                 Padding="8,2"
+                                                                 ToolTip="支持包含 .proto / .pb / .desc / .protoset 描述文件的目录，也支持选择多个描述文件" />
+                                                        <Button Grid.Column="3"
+                                                                MinHeight="26"
+                                                                Padding="0"
+                                                                Content="…"
+                                                                ToolTip="选择并自动导入 .proto / .pb / .desc / .protoset 描述文件"
+                                                                Click="BrowseProtoSchemaDirectory_Click" />
+                                                        <Button Grid.Column="5"
+                                                                MinHeight="26"
+                                                                Padding="6,2"
+                                                                Content="解析"
+                                                                ToolTip="解析当前帧"
+                                                                Click="ParseProtobuf_Click" />
+                                                        <Button Grid.Column="7"
+                                                                MinHeight="26"
+                                                                Padding="6,2"
+                                                                Content="清空"
+                                                                Click="ClearProtobuf_Click" />
+                                                    </Grid>
+
+                                                    <Grid Grid.Row="1" Margin="0,4,0,0">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="34" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="4" />
+                                                            <ColumnDefinition Width="34" />
+                                                            <ColumnDefinition Width="76" />
+                                                            <ColumnDefinition Width="4" />
+                                                            <ColumnDefinition Width="26" />
+                                                            <ColumnDefinition Width="4" />
+                                                            <ColumnDefinition Width="26" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock VerticalAlignment="Center"
+                                                                   Style="{StaticResource CaptionTextStyle}"
+                                                                   Text="类型" />
+                                                        <ComboBox x:Name="ProtoMessageTypeComboBox"
+                                                                  Grid.Column="1"
+                                                                  MinHeight="26"
+                                                                  IsEditable="True"
+                                                                  IsTextSearchEnabled="True"
+                                                                  MaxDropDownHeight="260" />
+                                                        <TextBlock Grid.Column="3"
+                                                                   VerticalAlignment="Center"
+                                                                   Style="{StaticResource CaptionTextStyle}"
+                                                                   Text="头部" />
+                                                        <TextBox x:Name="ProtobufSkipTextBox"
+                                                                 Grid.Column="4"
+                                                                 MinHeight="26"
+                                                                 Padding="8,2"
+                                                                 Text="0"
+                                                                 ToolTip="忽略前 N 个自定义包头字节后，再解析剩余 ProtoBuf 消息体"
+                                                                 TextChanged="ProtobufSkipTextBox_TextChanged" />
+                                                        <Button Grid.Column="6"
+                                                                MinHeight="26"
+                                                                Padding="0"
+                                                                Content="-"
+                                                                Tag="-1"
+                                                                ToolTip="头部字节 -1"
+                                                                Click="AdjustProtobufSkip_Click" />
+                                                        <Button Grid.Column="8"
+                                                                MinHeight="26"
+                                                                Padding="0"
+                                                                Content="+"
+                                                                Tag="1"
+                                                                ToolTip="头部字节 +1"
+                                                                Click="AdjustProtobufSkip_Click" />
+                                                    </Grid>
+
+                                                    <Grid Grid.Row="2" Margin="0,4,0,0">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="8" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock x:Name="ProtobufPayloadSummaryTextBlock"
+                                                                   VerticalAlignment="Center"
+                                                                   FontSize="11.5"
+                                                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                                                   Text="载荷 0 Bytes · 头部 0 · 消息体 0"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock x:Name="ProtobufHeaderPreviewTextBlock"
+                                                                   Grid.Column="2"
+                                                                   VerticalAlignment="Center"
+                                                                   FontFamily="Consolas, Microsoft YaHei UI"
+                                                                   FontSize="11"
+                                                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                                                   Text="头部 HEX：无"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock x:Name="ProtobufBodyPreviewTextBlock"
+                                                                   Grid.Column="2"
+                                                                   Visibility="Collapsed"
+                                                                   VerticalAlignment="Center"
+                                                                   FontFamily="Consolas, Microsoft YaHei UI"
+                                                                   FontSize="11"
+                                                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                                                   Text="消息体 HEX：无"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock x:Name="ParserStatusTextBlock"
+                                                                   Grid.Column="0"
+                                                                   Visibility="Collapsed"
+                                                                   Style="{StaticResource CaptionTextStyle}"
+                                                                   Text="可导入 .proto / .pb / .desc / .protoset 结构后选择消息类型解析。"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                    </Grid>
+                                                </Grid>
                                             </Border>
+
+                                            <Grid Grid.Row="1" MinHeight="0">
+                                                <controls:JsonTreeViewControl x:Name="PayloadProtobufViewer" />
+                                                <Border x:Name="PayloadProtobufEmptyPanel"
+                                                        Background="#F8FAFD"
+                                                        IsHitTestVisible="False">
+                                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                        <TextBlock HorizontalAlignment="Center"
+                                                                   FontFamily="Segoe MDL2 Assets"
+                                                                   FontSize="22"
+                                                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                                                   Text="&#xE943;" />
+                                                        <TextBlock x:Name="PayloadProtobufStatusTextBlock"
+                                                                   Margin="0,8,0,0"
+                                                                   HorizontalAlignment="Center"
+                                                                   Style="{StaticResource CaptionTextStyle}"
+                                                                   Text="设置头部字节后，点击上方“解析当前帧”" />
+                                                    </StackPanel>
+                                                </Border>
+                                            </Grid>
                                         </Grid>
                                         <controls:HexViewControl x:Name="PayloadHexViewer"
                                                                  EmptyText="当前消息无二进制内容"
@@ -1183,12 +1362,11 @@
 
                         <Border x:Name="ReplayPanel"
                                 Grid.Row="2"
-                                Margin="8,0,8,6"
-                                Padding="6"
-                                Background="{StaticResource SurfaceAltBrush}"
-                                BorderBrush="{StaticResource DividerBrush}"
-                                BorderThickness="1"
-                                CornerRadius="8">
+                                Margin="0"
+                                Padding="0"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                CornerRadius="0">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
@@ -1322,107 +1500,47 @@
                                             </Grid>
                                         </Border>
                                     </Grid>
-
-                                    <Border x:Name="ProtobufToolsPanel"
-                                            Grid.Column="2"
-                                            Padding="6"
-                                            Background="{StaticResource SurfaceBrush}"
-                                            BorderBrush="{StaticResource DividerBrush}"
-                                            BorderThickness="1"
-                                            CornerRadius="8">
-                                        <Grid>
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto" />
-                                                <RowDefinition Height="Auto" />
-                                                <RowDefinition Height="Auto" />
-                                                <RowDefinition Height="Auto" />
-                                                <RowDefinition Height="Auto" />
-                                            </Grid.RowDefinitions>
-
-                                            <DockPanel LastChildFill="False">
-                                                <TextBlock VerticalAlignment="Center"
-                                                           FontSize="12"
-                                                           FontWeight="SemiBold"
-                                                           Foreground="{StaticResource TextPrimaryBrush}"
-                                                           Text="ProtoBuf" />
-                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                                                    <Button MinHeight="26"
-                                                            Padding="6,2"
-                                                            Content="解析"
-                                                            Click="ParseProtobuf_Click" />
-                                                    <Button Margin="6,0,0,0"
-                                                            MinHeight="26"
-                                                            Padding="6,2"
-                                                            Content="清空"
-                                                            Click="ClearProtobuf_Click" />
-                                                </StackPanel>
-                                            </DockPanel>
-
-                                            <Grid Grid.Row="1" Margin="0,5,0,0">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="6" />
-                                                    <ColumnDefinition Width="28" />
-                                                    <ColumnDefinition Width="6" />
-                                                    <ColumnDefinition Width="46" />
-                                                </Grid.ColumnDefinitions>
-                                                <TextBox x:Name="ProtoSchemaPathTextBox"
-                                                         MinHeight="26"
-                                                         Padding="8,3"
-                                                         ToolTip="支持包含 .proto / .pb 描述文件的目录，也支持单个 .proto / .pb 文件" />
-                                                <Button Grid.Column="2"
-                                                        MinHeight="26"
-                                                        Padding="0"
-                                                        Content="…"
-                                                        ToolTip="选择 .proto / .pb 描述文件"
-                                                        Click="BrowseProtoSchemaDirectory_Click" />
-                                                <Button Grid.Column="4"
-                                                        MinHeight="26"
-                                                        Padding="7,2"
-                                                        Content="导入"
-                                                        Click="ImportProtoSchema_Click" />
-                                            </Grid>
-
-                                            <Grid Grid.Row="2" Margin="0,5,0,0">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="42" />
-                                                    <ColumnDefinition Width="*" />
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock VerticalAlignment="Center"
-                                                           Style="{StaticResource CaptionTextStyle}"
-                                                           Text="类型" />
-                                                <ComboBox x:Name="ProtoMessageTypeComboBox"
-                                                          Grid.Column="1"
-                                                          MinHeight="26"
-                                                          IsEditable="True"
-                                                          IsTextSearchEnabled="True"
-                                                          MaxDropDownHeight="260" />
-                                            </Grid>
-
-                                            <Grid Grid.Row="3" Margin="0,5,0,0">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="42" />
-                                                    <ColumnDefinition Width="*" />
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock VerticalAlignment="Center"
-                                                           Style="{StaticResource CaptionTextStyle}"
-                                                           Text="跳过" />
-                                                <TextBox x:Name="ProtobufSkipTextBox"
-                                                         Grid.Column="1"
-                                                         MinHeight="26"
-                                                         Padding="8,3"
-                                                         Text="0" />
-                                            </Grid>
-
-                                            <TextBlock x:Name="ParserStatusTextBlock"
-                                                       Grid.Row="4"
-                                                       Margin="0,5,0,0"
-                                                       Style="{StaticResource CaptionTextStyle}"
-                                                       Text="可导入 .proto / .pb 结构后选择消息类型解析。"
-                                                       TextTrimming="CharacterEllipsis" />
-                                        </Grid>
-                                    </Border>
                                 </Grid>
+
+                                <Border x:Name="ReplayAlertBorder"
+                                        Grid.RowSpan="2"
+                                        Panel.ZIndex="30"
+                                        MinWidth="230"
+                                        MaxWidth="380"
+                                        Margin="0,2,0,0"
+                                        Padding="12,8"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Top"
+                                        Background="#FEF0F0"
+                                        BorderBrush="#FDE2E2"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        Visibility="Collapsed">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Border x:Name="ReplayAlertIconBorder"
+                                                Width="14"
+                                                Height="14"
+                                                VerticalAlignment="Center"
+                                                Background="#F56C6C"
+                                                CornerRadius="7">
+                                            <TextBlock x:Name="ReplayAlertGlyphTextBlock"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="8"
+                                                       FontWeight="Bold"
+                                                       Foreground="White"
+                                                       Text="×" />
+                                        </Border>
+                                        <TextBlock x:Name="ReplayAlertTextBlock"
+                                                   MaxWidth="330"
+                                                   Margin="10,0,0,0"
+                                                   VerticalAlignment="Center"
+                                                   FontSize="13"
+                                                   Foreground="#F56C6C"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Text="发送失败" />
+                                    </StackPanel>
+                                </Border>
                             </Grid>
                         </Border>
                     </Grid>

@@ -378,6 +378,11 @@ public partial class MainWindow : Window
 
     private void ViewModel_NotificationRequested(string title, string message)
     {
+        if (_viewModel.Detail.IsSocketSession && IsSocketSendNotification(title, message))
+        {
+            return;
+        }
+
         ShowMainAlert(title, message);
     }
 
@@ -495,6 +500,15 @@ public partial class MainWindow : Window
         }
 
         return $"{title}：{message}";
+    }
+
+    private static bool IsSocketSendNotification(string title, string message)
+    {
+        string text = $"{title} {message}";
+        return text.Contains("主动发送WebSocket", StringComparison.Ordinal)
+            || text.Contains("主动发送 TCP", StringComparison.Ordinal)
+            || text.Contains("发送成功", StringComparison.Ordinal)
+            || text.Contains("发送失败", StringComparison.Ordinal);
     }
 
     private static SolidColorBrush CreateSolidBrush(string color)

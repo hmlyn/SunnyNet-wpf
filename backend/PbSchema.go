@@ -36,8 +36,12 @@ func importProtobufSchema(path string) ([]string, string, error) {
 	fileDescriptors := make([]*desc.FileDescriptor, 0, len(source.protoFiles)+len(source.descriptorFiles))
 
 	if len(source.protoFiles) > 0 {
+		importPaths := source.importPaths
+		if len(importPaths) == 0 && source.root != "" {
+			importPaths = []string{source.root}
+		}
 		parser := protoparse.Parser{
-			ImportPaths:           []string{source.root},
+			ImportPaths:           importPaths,
 			InferImportPaths:      true,
 			IncludeSourceCodeInfo: false,
 		}
@@ -163,6 +167,7 @@ type protobufSchemaCacheSnapshot struct {
 
 type protobufSchemaSource struct {
 	root            string
+	importPaths     []string
 	displayPath     string
 	cacheKey        string
 	protoFiles      []string
@@ -173,6 +178,11 @@ func resolveProtobufSchemaSource(path string) (*protobufSchemaSource, error) {
 	cleaned := strings.TrimSpace(path)
 	if cleaned == "" {
 		return nil, errors.New("Protobuf 目录不能为空")
+	}
+
+	paths := splitProtobufSchemaPaths(cleaned)
+	if len(paths) > 1 {
+		return resolveProtobufSchemaFileList(paths)
 	}
 
 	fileInfo, err := os.Stat(cleaned)
@@ -188,6 +198,7 @@ func resolveProtobufSchemaSource(path string) (*protobufSchemaSource, error) {
 		}
 		return &protobufSchemaSource{
 			root:            root,
+			importPaths:     []string{root},
 			displayPath:     root,
 			cacheKey:        root,
 			protoFiles:      protoFiles,
@@ -206,6 +217,7 @@ func resolveProtobufSchemaSource(path string) (*protobufSchemaSource, error) {
 		}
 		return &protobufSchemaSource{
 			root:        root,
+			importPaths: []string{root},
 			displayPath: absolutePath,
 			cacheKey:    absolutePath,
 			protoFiles:  []string{filepath.ToSlash(relativePath)},
@@ -213,13 +225,150 @@ func resolveProtobufSchemaSource(path string) (*protobufSchemaSource, error) {
 	case ".pb", ".desc", ".protoset":
 		return &protobufSchemaSource{
 			root:            root,
+			importPaths:     []string{root},
 			displayPath:     absolutePath,
 			cacheKey:        absolutePath,
 			descriptorFiles: []string{absolutePath},
 		}, nil
 	}
 
-	return nil, errors.New("请选择包含 .proto 或 .pb 描述文件的目录")
+	return nil, errors.New("请选择包含 .proto / .pb / .desc / .protoset 描述文件的目录")
+}
+
+func resolveProtobufSchemaFileList(paths []string) (*protobufSchemaSource, error) {
+	protoAbsoluteFiles := make([]string, 0, len(paths))
+	descriptorFiles := make([]string, 0, len(paths))
+	displayParts := make([]string, 0, len(paths))
+
+	for _, rawPath := range paths {
+		cleaned := filepath.Clean(strings.TrimSpace(rawPath))
+		if cleaned == "" {
+			continue
+		}
+
+		fileInfo, err := os.Stat(cleaned)
+		if err != nil {
+			return nil, fmt.Errorf("Protobuf 路径无效: %w", err)
+		}
+
+		if fileInfo.IsDir() {
+			root := filepath.Clean(cleaned)
+			protoFiles, descriptors, err := collectProtobufSchemaFiles(root)
+			if err != nil {
+				return nil, err
+			}
+			for _, protoFile := range protoFiles {
+				protoAbsoluteFiles = append(protoAbsoluteFiles, filepath.Join(root, filepath.FromSlash(protoFile)))
+			}
+			descriptorFiles = append(descriptorFiles, descriptors...)
+			displayParts = append(displayParts, root)
+			continue
+		}
+
+		extension := strings.ToLower(filepath.Ext(cleaned))
+		switch extension {
+		case ".proto":
+			protoAbsoluteFiles = append(protoAbsoluteFiles, cleaned)
+		case ".pb", ".desc", ".protoset":
+			descriptorFiles = append(descriptorFiles, cleaned)
+		default:
+			return nil, fmt.Errorf("不支持的 Protobuf 描述文件: %s", cleaned)
+		}
+		displayParts = append(displayParts, cleaned)
+	}
+
+	if len(protoAbsoluteFiles) == 0 && len(descriptorFiles) == 0 {
+		return nil, errors.New("未选择 .proto / .pb / .desc / .protoset 描述文件")
+	}
+
+	sort.Strings(protoAbsoluteFiles)
+	sort.Strings(descriptorFiles)
+	sort.Strings(displayParts)
+
+	root := commonDirectory(protoAbsoluteFiles)
+	importPaths := make([]string, 0, 1)
+	protoFiles := make([]string, 0, len(protoAbsoluteFiles))
+	if root != "" {
+		importPaths = append(importPaths, root)
+		for _, protoFile := range protoAbsoluteFiles {
+			relativePath, err := filepath.Rel(root, protoFile)
+			if err != nil {
+				return nil, err
+			}
+			protoFiles = append(protoFiles, filepath.ToSlash(relativePath))
+		}
+	} else {
+		for _, protoFile := range protoAbsoluteFiles {
+			parent := filepath.Dir(protoFile)
+			importPaths = appendUniqueString(importPaths, parent)
+			protoFiles = append(protoFiles, filepath.Base(protoFile))
+		}
+	}
+
+	cacheParts := make([]string, 0, len(protoAbsoluteFiles)+len(descriptorFiles))
+	cacheParts = append(cacheParts, protoAbsoluteFiles...)
+	cacheParts = append(cacheParts, descriptorFiles...)
+	sort.Strings(cacheParts)
+
+	return &protobufSchemaSource{
+		root:            root,
+		importPaths:     importPaths,
+		displayPath:     strings.Join(displayParts, " | "),
+		cacheKey:        strings.Join(cacheParts, "|"),
+		protoFiles:      protoFiles,
+		descriptorFiles: descriptorFiles,
+	}, nil
+}
+
+func splitProtobufSchemaPaths(path string) []string {
+	parts := strings.FieldsFunc(path, func(value rune) bool {
+		return value == '|' || value == '\n' || value == '\r'
+	})
+
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
+}
+
+func commonDirectory(files []string) string {
+	if len(files) == 0 {
+		return ""
+	}
+
+	common := filepath.Clean(filepath.Dir(files[0]))
+	for _, file := range files[1:] {
+		directory := filepath.Clean(filepath.Dir(file))
+		for !isSameOrChildPath(common, directory) {
+			parent := filepath.Dir(common)
+			if parent == common {
+				return ""
+			}
+			common = parent
+		}
+	}
+	return common
+}
+
+func isSameOrChildPath(parent string, child string) bool {
+	relative, err := filepath.Rel(parent, child)
+	if err != nil {
+		return false
+	}
+	return relative == "." || (relative != ".." && !strings.HasPrefix(relative, ".."+string(os.PathSeparator)) && !filepath.IsAbs(relative))
+}
+
+func appendUniqueString(values []string, value string) []string {
+	for _, item := range values {
+		if strings.EqualFold(item, value) {
+			return values
+		}
+	}
+	return append(values, value)
 }
 
 func collectProtobufSchemaFiles(root string) ([]string, []string, error) {
@@ -249,7 +398,7 @@ func collectProtobufSchemaFiles(root string) ([]string, []string, error) {
 		return nil, nil, err
 	}
 	if len(protoFiles) == 0 && len(descriptorFiles) == 0 {
-		return nil, nil, errors.New("当前目录未找到 .proto 或 .pb 描述文件")
+		return nil, nil, errors.New("当前目录未找到 .proto / .pb / .desc / .protoset 描述文件")
 	}
 	sort.Strings(protoFiles)
 	sort.Strings(descriptorFiles)

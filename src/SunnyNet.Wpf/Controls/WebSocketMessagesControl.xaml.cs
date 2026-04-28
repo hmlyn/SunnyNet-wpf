@@ -53,11 +53,13 @@ public partial class WebSocketMessagesControl : UserControl
     private const string PayloadViewHex = "Hex";
     private const string PayloadViewJson = "Json";
     private const string PayloadViewProtobuf = "Protobuf";
+    private const char ProtobufSchemaPathSeparator = '|';
     private const int MaxRecentSearchTerms = 6;
     private const int MaxAutoSelectFrameCount = 2000;
     private INotifyCollectionChanged? _trackedCollection;
     private CollectionViewSource? _entriesViewSource;
     private ICollectionView? _entriesView;
+    private readonly DispatcherTimer _replayAlertTimer = new() { Interval = TimeSpan.FromSeconds(2.8) };
     private readonly Dictionary<string, SocketPayloadSnapshot> _payloadCache = new(StringComparer.Ordinal);
     private readonly List<string> _recentSearchTerms = new();
     private int _payloadVersion;
@@ -75,6 +77,7 @@ public partial class WebSocketMessagesControl : UserControl
     public WebSocketMessagesControl()
     {
         InitializeComponent();
+        _replayAlertTimer.Tick += ReplayAlertTimer_Tick;
         Loaded += (_, _) =>
         {
             ApplyDisplayModeVisualState();
@@ -151,7 +154,7 @@ public partial class WebSocketMessagesControl : UserControl
         bool inspectorOnly = IsInspectorMode;
         bool full = !flowOnly && !inspectorOnly;
         bool showPayloadContent = !flowOnly && !IsReplayMode;
-        bool showReplay = !flowOnly && (IsClassicInspectorMode || IsReplayMode || IsPayloadProtobufMode);
+        bool showReplay = !flowOnly && (IsClassicInspectorMode || IsReplayMode);
         bool showReplayEditor = IsClassicInspectorMode || IsReplayMode;
         bool showProtobufTools = IsClassicInspectorMode || IsPayloadProtobufMode;
 
@@ -178,8 +181,6 @@ public partial class WebSocketMessagesControl : UserControl
         if (ProtobufToolsPanel is not null)
         {
             ProtobufToolsPanel.Visibility = showProtobufTools ? Visibility.Visible : Visibility.Collapsed;
-            Grid.SetColumn(ProtobufToolsPanel, IsPayloadProtobufMode && !showReplayEditor ? 0 : 2);
-            Grid.SetColumnSpan(ProtobufToolsPanel, IsPayloadProtobufMode && !showReplayEditor ? 3 : 1);
         }
 
         if (ReplayMainColumn is not null && ReplayGapColumn is not null && ReplaySideColumn is not null)
@@ -510,6 +511,7 @@ public partial class WebSocketMessagesControl : UserControl
 
         UpdateReplayHint();
         UpdateReplayEditorStatus();
+        UpdateProtobufPayloadSummary();
     }
 
     private void ReplayEditorTextBox_TextChanged(object sender, TextChangedEventArgs textChangedEventArgs)
@@ -521,6 +523,23 @@ public partial class WebSocketMessagesControl : UserControl
 
         _replayEditorDirty = true;
         UpdateReplayEditorStatus();
+        UpdateProtobufPayloadSummary();
+    }
+
+    private void ProtobufSkipTextBox_TextChanged(object sender, TextChangedEventArgs textChangedEventArgs)
+    {
+        UpdateProtobufPayloadSummary();
+    }
+
+    private void AdjustProtobufSkip_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        int current = TryGetSkipBytes(out int skip) ? skip : 0;
+        int delta = int.TryParse((sender as FrameworkElement)?.Tag?.ToString(), out int parsedDelta) ? parsedDelta : 0;
+        int max = GetProtobufPayloadBytesSafely().Length;
+        int next = Math.Clamp(current + delta, 0, max);
+        ProtobufSkipTextBox.Text = next.ToString();
+        ProtobufSkipTextBox.SelectAll();
+        ProtobufSkipTextBox.Focus();
     }
 
     private async void ParseProtobuf_Click(object sender, RoutedEventArgs routedEventArgs)
@@ -547,11 +566,11 @@ public partial class WebSocketMessagesControl : UserControl
 
             if (bytes.Length == 0)
             {
-                ParserStatusTextBlock.Text = "当前编辑区没有可解析的字节数据。";
+                ParserStatusTextBlock.Text = "当前消息没有可解析的字节数据。";
                 return;
             }
 
-            ParserStatusTextBlock.Text = $"正在解析 Protobuf · {bytes.Length:N0} Bytes";
+            ParserStatusTextBlock.Text = $"正在解析 Protobuf 消息体 · {bytes.Length - skip:N0}/{bytes.Length:N0} Bytes";
             string schemaPath = GetProtoSchemaPath();
             string json;
             if (!string.IsNullOrWhiteSpace(schemaPath))
@@ -631,31 +650,33 @@ public partial class WebSocketMessagesControl : UserControl
         return _currentPayloadSnapshot?.Bytes ?? Array.Empty<byte>();
     }
 
+    private byte[] GetProtobufPayloadBytesSafely()
+    {
+        try
+        {
+            return GetProtobufPayloadBytes();
+        }
+        catch
+        {
+            return Array.Empty<byte>();
+        }
+    }
+
     private void ClearProtobuf_Click(object sender, RoutedEventArgs routedEventArgs)
     {
-        ClearProtobufView();
-        ParserStatusTextBlock.Text = "已清空 Protobuf 解析结果，结构配置已保留。";
+        ResetProtobufState();
     }
 
-    private async void ImportProtoSchema_Click(object sender, RoutedEventArgs routedEventArgs)
-    {
-        if (DataContext is not MainWindowViewModel viewModel)
-        {
-            return;
-        }
-
-        await EnsureProtobufSchemaLoadedAsync(viewModel, forceReload: true);
-    }
-
-    private void BrowseProtoSchemaDirectory_Click(object sender, RoutedEventArgs routedEventArgs)
+    private async void BrowseProtoSchemaDirectory_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         OpenFileDialog dialog = new()
         {
             Title = "选择 Protobuf 描述文件",
-            Filter = "Protobuf 描述文件 (*.proto;*.pb)|*.proto;*.pb|所有文件 (*.*)|*.*"
+            Filter = "Protobuf 描述文件 (*.proto;*.pb;*.desc;*.protoset)|*.proto;*.pb;*.desc;*.protoset|所有文件 (*.*)|*.*",
+            Multiselect = true
         };
 
-        string currentPath = GetProtoSchemaPath();
+        string currentPath = GetFirstProtoSchemaPath(GetProtoSchemaPath());
         if (File.Exists(currentPath))
         {
             dialog.InitialDirectory = Path.GetDirectoryName(currentPath);
@@ -668,8 +689,11 @@ public partial class WebSocketMessagesControl : UserControl
 
         if (dialog.ShowDialog() == true)
         {
-            ProtoSchemaPathTextBox.Text = dialog.FileName;
-            ParserStatusTextBlock.Text = "已选择描述文件，请点击“导入”读取消息结构。";
+            ProtoSchemaPathTextBox.Text = BuildProtoSchemaPathValue(dialog.FileNames);
+            if (DataContext is MainWindowViewModel viewModel)
+            {
+                await EnsureProtobufSchemaLoadedAsync(viewModel, forceReload: true);
+            }
         }
     }
 
@@ -682,6 +706,7 @@ public partial class WebSocketMessagesControl : UserControl
 
         try
         {
+            HideReplayAlert();
             ReplayActionStatusTextBlock.Text = "正在发送重放消息...";
             bool sent = await viewModel.SendSocketFrameAsync(
                 Theology,
@@ -690,13 +715,67 @@ public partial class WebSocketMessagesControl : UserControl
                 GetSelectedComboTag(ReplayDirectionComboBox, entry.Icon == "下行" ? "Client" : "Server"),
                 ReplayEditorTextBox.Text ?? "");
 
-            ReplayActionStatusTextBlock.Text = sent ? "重放发送成功，消息流会追加新的手动帧。" : "重放发送失败。";
+            ReplayActionStatusTextBlock.Text = sent ? "发送成功" : "发送失败";
+            ShowReplayAlert(sent ? "发送成功" : "发送失败：请检查连接状态或数据格式。", sent ? ReplayAlertKind.Success : ReplayAlertKind.Error);
             _replayEditorDirty = false;
         }
         catch (Exception exception)
         {
             ReplayActionStatusTextBlock.Text = exception.Message;
+            ShowReplayAlert($"发送失败：{exception.Message}", ReplayAlertKind.Error);
         }
+    }
+
+    private void ShowReplayAlert(string message, ReplayAlertKind kind)
+    {
+        ApplyReplayAlertPalette(kind);
+        ReplayAlertTextBlock.Text = message;
+        ReplayAlertBorder.Visibility = Visibility.Visible;
+        _replayAlertTimer.Stop();
+        _replayAlertTimer.Start();
+    }
+
+    private void HideReplayAlert()
+    {
+        _replayAlertTimer.Stop();
+        ReplayAlertBorder.Visibility = Visibility.Collapsed;
+    }
+
+    private void ReplayAlertTimer_Tick(object? sender, EventArgs eventArgs)
+    {
+        HideReplayAlert();
+    }
+
+    private void ApplyReplayAlertPalette(ReplayAlertKind kind)
+    {
+        string background;
+        string border;
+        string icon;
+        string foreground;
+        string glyph;
+
+        if (kind == ReplayAlertKind.Success)
+        {
+            background = "#F0F9EB";
+            border = "#E1F3D8";
+            icon = "#67C23A";
+            foreground = "#2F8F45";
+            glyph = "✓";
+        }
+        else
+        {
+            background = "#FEF0F0";
+            border = "#FDE2E2";
+            icon = "#F56C6C";
+            foreground = "#F56C6C";
+            glyph = "×";
+        }
+
+        ReplayAlertBorder.Background = CreateBrush(background);
+        ReplayAlertBorder.BorderBrush = CreateBrush(border);
+        ReplayAlertIconBorder.Background = CreateBrush(icon);
+        ReplayAlertTextBlock.Foreground = CreateBrush(foreground);
+        ReplayAlertGlyphTextBlock.Text = glyph;
     }
 
     private void FramesList_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs mouseButtonEventArgs)
@@ -1443,12 +1522,92 @@ public partial class WebSocketMessagesControl : UserControl
     {
         PayloadProtobufViewer.JsonText = "";
         PayloadProtobufEmptyPanel.Visibility = Visibility.Visible;
-        PayloadProtobufStatusTextBlock.Text = "点击下方“解析”开始解析当前载荷";
+        PayloadProtobufStatusTextBlock.Text = "设置头部字节后，点击上方“解析当前帧”";
+        UpdateProtobufPayloadSummary();
+    }
+
+    private void ResetProtobufState()
+    {
+        _loadedProtobufSchemaPath = "";
+        ProtoSchemaPathTextBox.Text = "";
+        ApplyProtoMessageTypes(Array.Empty<string>(), "");
+        ProtobufSkipTextBox.Text = "0";
+        ClearProtobufView();
+        ParserStatusTextBlock.Text = "已清空 Protobuf 配置。";
+        UpdateProtobufPayloadSummary();
     }
 
     private bool TryGetSkipBytes(out int skip)
     {
         return int.TryParse(ProtobufSkipTextBox.Text?.Trim(), out skip);
+    }
+
+    private void UpdateProtobufPayloadSummary()
+    {
+        if (ProtobufPayloadSummaryTextBlock is null)
+        {
+            return;
+        }
+
+        byte[] bytes;
+        try
+        {
+            bytes = GetProtobufPayloadBytes();
+        }
+        catch (Exception exception)
+        {
+            ProtobufPayloadSummaryTextBlock.Text = "载荷无法解析";
+            ProtobufHeaderPreviewTextBlock.Text = "头部 HEX：无";
+            ProtobufBodyPreviewTextBlock.Text = $"消息体：{exception.Message}";
+            return;
+        }
+
+        int total = bytes.Length;
+        if (!TryGetSkipBytes(out int skip))
+        {
+            ProtobufPayloadSummaryTextBlock.Text = $"载荷 {total:N0} Bytes · 头部无效";
+            ProtobufHeaderPreviewTextBlock.Text = "头部 HEX：请输入整数";
+            ProtobufBodyPreviewTextBlock.Text = "消息体 HEX：等待有效头部长度";
+            return;
+        }
+
+        int normalizedSkip = Math.Clamp(skip, 0, total);
+        int bodyLength = Math.Max(total - normalizedSkip, 0);
+        string rangeHint = skip == normalizedSkip ? "" : " · 已按范围修正";
+        ProtobufPayloadSummaryTextBlock.Text = $"载荷 {total:N0} Bytes · 头部 {normalizedSkip:N0} · 消息体 {bodyLength:N0}{rangeHint}";
+        ProtobufHeaderPreviewTextBlock.Text = normalizedSkip > 0
+            ? $"头部 HEX：{FormatHexPreview(bytes, 0, normalizedSkip, 16)}"
+            : "头部 HEX：无";
+        ProtobufBodyPreviewTextBlock.Text = bodyLength > 0
+            ? $"消息体 HEX：{FormatHexPreview(bytes, normalizedSkip, bodyLength, 24)}"
+            : "消息体 HEX：无";
+    }
+
+    private static string FormatHexPreview(byte[] bytes, int offset, int count, int maxBytes)
+    {
+        if (bytes.Length == 0 || count <= 0 || offset < 0 || offset >= bytes.Length)
+        {
+            return "无";
+        }
+
+        int safeCount = Math.Min(Math.Min(count, maxBytes), bytes.Length - offset);
+        StringBuilder builder = new();
+        for (int index = 0; index < safeCount; index++)
+        {
+            if (index > 0)
+            {
+                builder.Append(' ');
+            }
+
+            builder.Append(bytes[offset + index].ToString("X2"));
+        }
+
+        if (count > safeCount && offset + safeCount < bytes.Length)
+        {
+            builder.Append(" ...");
+        }
+
+        return builder.ToString();
     }
 
     private byte[] DecodeReplayEditorBytes()
@@ -1745,6 +1904,19 @@ public partial class WebSocketMessagesControl : UserControl
 
     private static string NormalizeSchemaPath(string path)
     {
+        string[] paths = SplitProtoSchemaPaths(path);
+        if (paths.Length > 1)
+        {
+            return string.Join(
+                ProtobufSchemaPathSeparator,
+                paths.Select(NormalizeSingleSchemaPath).OrderBy(item => item, StringComparer.OrdinalIgnoreCase));
+        }
+
+        return NormalizeSingleSchemaPath(path);
+    }
+
+    private static string NormalizeSingleSchemaPath(string path)
+    {
         try
         {
             return Path.GetFullPath(path.Trim());
@@ -1753,6 +1925,24 @@ public partial class WebSocketMessagesControl : UserControl
         {
             return path.Trim();
         }
+    }
+
+    private static string BuildProtoSchemaPathValue(IEnumerable<string> paths)
+    {
+        return string.Join(
+            $" {ProtobufSchemaPathSeparator} ",
+            paths.Where(path => !string.IsNullOrWhiteSpace(path)).Select(path => path.Trim()));
+    }
+
+    private static string GetFirstProtoSchemaPath(string path)
+    {
+        string[] paths = SplitProtoSchemaPaths(path);
+        return paths.Length > 0 ? paths[0] : path;
+    }
+
+    private static string[] SplitProtoSchemaPaths(string path)
+    {
+        return (path ?? "").Split(ProtobufSchemaPathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
     private static string GetSelectedComboTag(ComboBox comboBox, string fallback)
@@ -2168,6 +2358,12 @@ public partial class WebSocketMessagesControl : UserControl
         string PreviewMode,
         string StatusText,
         string HintText);
+
+    private enum ReplayAlertKind
+    {
+        Error,
+        Success
+    }
 
     private readonly record struct FrameStatistics(int Total = 0, int Upstream = 0, int Downstream = 0, int Text = 0);
 }
