@@ -337,8 +337,8 @@
                     <DataGridTextColumn Header="匹配" Binding="{Binding UrlMatchType}" Width="82" />
                     <DataGridTextColumn Header="Url" Binding="{Binding UrlPattern}" Width="340" />
                     <DataGridTextColumn Header="映射类型" Binding="{Binding MappingType}" Width="116" />
-                    <DataGridTextColumn Header="值格式" Binding="{Binding ValueType}" Width="116" />
-                    <DataGridTextColumn Header="映射目标" Binding="{Binding TargetContent}" Width="430" />
+                    <DataGridTextColumn Header="内容格式" Binding="{Binding DisplayValueType}" Width="116" />
+                    <DataGridTextColumn Header="目标/内容" Binding="{Binding TargetContent}" Width="430" />
                     <DataGridTextColumn Header="备注" Binding="{Binding Note}" Width="180" />
                     <DataGridTextColumn Header="状态" Binding="{Binding State}" Width="100" />
                 </DataGrid.Columns>

@@ -126,6 +126,152 @@
             <Setter Property="FontSize" Value="13" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
+
+        <Style x:Key="RewriteCaptionTextStyle" TargetType="{x:Type TextBlock}">
+            <Setter Property="Margin" Value="0,0,0,4" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+        </Style>
+
+        <Style x:Key="RewriteStretchTextBoxStyle" TargetType="{x:Type TextBox}" BasedOn="{StaticResource EditorTextBoxStyle}">
+            <Setter Property="Width" Value="Auto" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+        </Style>
+
+        <Style x:Key="RewriteWorkbenchTextBoxStyle" TargetType="{x:Type TextBox}" BasedOn="{StaticResource EditorTextBoxStyle}">
+            <Setter Property="Width" Value="Auto" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+        </Style>
+
+        <Style x:Key="RewriteWorkbenchComboBoxStyle" TargetType="{x:Type ComboBox}" BasedOn="{StaticResource EditorComboBoxStyle}">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+        </Style>
+
+        <Style x:Key="RewriteWorkbenchFieldLabelStyle" TargetType="{x:Type TextBlock}">
+            <Setter Property="Margin" Value="0,0,0,4" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+        </Style>
+
+        <Style x:Key="RewritePaletteButtonStyle" TargetType="{x:Type Button}">
+            <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="#D8E3EE" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ContentPresenter Margin="{TemplateBinding Padding}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#F3F8FF" />
+                                <Setter TargetName="Root" Property="BorderBrush" Value="#BBD5F5" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#E8F2FF" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.46" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="RewriteChainListBoxStyle" TargetType="{x:Type ListBox}">
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+        </Style>
+
+        <Style x:Key="RewriteChainListBoxItemStyle" TargetType="{x:Type ListBoxItem}">
+            <Setter Property="Margin" Value="0,0,0,10" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="#D8E3EE" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ListBoxItem}">
+                        <Border x:Name="Root"
+                                Padding="10"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="11">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#F8FBFF" />
+                                <Setter TargetName="Root" Property="BorderBrush" Value="#BFD7F4" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#F7FBFF" />
+                                <Setter TargetName="Root" Property="BorderBrush" Value="#9BC8F8" />
+                                <Setter TargetName="Root" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                            <DataTrigger Binding="{Binding HasValidationWarning}" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#FFF7F6" />
+                                <Setter TargetName="Root" Property="BorderBrush" Value="#F0A39B" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="RewriteActionButtonStyle" TargetType="{x:Type Button}">
+            <Setter Property="MinWidth" Value="34" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Padding" Value="8,0" />
+            <Setter Property="Margin" Value="6,0,0,0" />
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="#DDE6F0" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="5">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#F2F7FF" />
+                                <Setter TargetName="Root" Property="BorderBrush" Value="#BFD6F6" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#E6F1FF" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid Margin="12,10,12,12">
@@ -290,52 +436,145 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <DockPanel Margin="0,2,0,8">
-                        <TextBlock VerticalAlignment="Center"
-                                   Style="{StaticResource EditorLabelTextStyle}"
-                                   Text="动作链" />
-                        <StackPanel DockPanel.Dock="Right"
-                                    Orientation="Horizontal">
-                            <Button MinWidth="58" Margin="0,0,6,0" Padding="8,4" Click="AddRewriteOperation_Click" Content="新增" />
-                            <Button MinWidth="58" Margin="0,0,6,0" Padding="8,4" Click="RemoveRewriteOperation_Click" Content="删除" />
-                            <Button MinWidth="58" Margin="0,0,6,0" Padding="8,4" Click="MoveRewriteOperationUp_Click" Content="上移" />
-                            <Button MinWidth="58" Padding="8,4" Click="MoveRewriteOperationDown_Click" Content="下移" />
+                    <Grid Margin="0,2,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource EditorLabelTextStyle}" Text="重写动作" />
+                            <TextBlock Margin="0,3,0,0"
+                                       FontSize="12"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       Text="按顺序执行；不同目标只显示需要填写的字段。" />
                         </StackPanel>
-                    </DockPanel>
-                    <DataGrid x:Name="RewriteOperationsGrid"
-                              Grid.Row="1"
-                              AutoGenerateColumns="False"
-                              CanUserAddRows="False"
-                              CanUserDeleteRows="False"
-                              CanUserResizeRows="False"
-                              HeadersVisibility="Column"
-                              GridLinesVisibility="Vertical"
-                              RowHeight="28"
-                              MinRowHeight="28"
-                              ItemsSource="{Binding Operations}"
-                              SelectionMode="Single"
-                              SelectionUnit="FullRow">
-                        <DataGrid.Columns>
-                            <DataGridComboBoxColumn Header="目标"
-                                                    ItemsSource="{StaticResource RewriteTargetItems}"
-                                                    SelectedItemBinding="{Binding Target, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                    Width="105" />
-                            <DataGridComboBoxColumn Header="操作"
-                                                    ItemsSource="{StaticResource RewriteOperationItems}"
-                                                    SelectedItemBinding="{Binding Operation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                    Width="82" />
-                            <DataGridTextColumn Header="键"
-                                                Binding="{Binding Key, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                Width="130" />
-                            <DataGridComboBoxColumn Header="值格式"
-                                                    ItemsSource="{StaticResource MappingValueTypeItems}"
-                                                    SelectedItemBinding="{Binding ValueType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                    Width="110" />
-                            <DataGridTextColumn Header="值"
-                                                Binding="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                Width="*" />
-                        </DataGrid.Columns>
-                    </DataGrid>
+                        <Button Grid.Column="1"
+                                MinWidth="82"
+                                Height="30"
+                                Padding="12,0"
+                                Click="AddRewriteOperation_Click"
+                                Content="添加动作"
+                                Style="{StaticResource PrimaryButtonStyle}" />
+                    </Grid>
+                    <Border Grid.Row="1"
+                            Padding="8"
+                            Background="#F6F9FC"
+                            BorderBrush="#E1E8F0"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                        <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                      VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding Operations}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Margin="0,0,0,8"
+                                                Padding="10,9"
+                                                Background="#FFFFFF"
+                                                BorderBrush="#DDE6F0"
+                                                BorderThickness="1"
+                                                CornerRadius="7">
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                </Grid.RowDefinitions>
+
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Border Width="5"
+                                                                Height="18"
+                                                                Margin="0,0,8,0"
+                                                                VerticalAlignment="Center"
+                                                                Background="#4AA3F0"
+                                                                CornerRadius="3" />
+                                                        <TextBlock VerticalAlignment="Center"
+                                                                   FontSize="13"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                                                   Text="{Binding Summary}" />
+                                                        <TextBlock Margin="10,0,0,0"
+                                                                   VerticalAlignment="Center"
+                                                                   FontSize="12"
+                                                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                                                   Text="{Binding EditorHint}" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1"
+                                                                Orientation="Horizontal">
+                                                        <Button Click="MoveRewriteOperationUp_Click"
+                                                                Content="↑"
+                                                                Style="{StaticResource RewriteActionButtonStyle}"
+                                                                ToolTip="上移" />
+                                                        <Button Click="MoveRewriteOperationDown_Click"
+                                                                Content="↓"
+                                                                Style="{StaticResource RewriteActionButtonStyle}"
+                                                                ToolTip="下移" />
+                                                        <Button Click="RemoveRewriteOperation_Click"
+                                                                Content="删除"
+                                                                Foreground="#D94C3A"
+                                                                Style="{StaticResource RewriteActionButtonStyle}" />
+                                                    </StackPanel>
+                                                </Grid>
+
+                                                <WrapPanel Grid.Row="1"
+                                                           Margin="0,10,0,0">
+                                                    <StackPanel Width="150" Margin="0,0,10,8">
+                                                        <TextBlock Style="{StaticResource RewriteCaptionTextStyle}" Text="目标" />
+                                                        <ComboBox ItemsSource="{Binding Source={StaticResource RewriteTargetItems}}"
+                                                                  SelectedItem="{Binding Target, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                  Style="{StaticResource EditorComboBoxStyle}" />
+                                                    </StackPanel>
+
+                                                    <StackPanel Width="110" Margin="0,0,10,8">
+                                                        <TextBlock Style="{StaticResource RewriteCaptionTextStyle}" Text="操作" />
+                                                        <ComboBox ItemsSource="{Binding Source={StaticResource RewriteOperationItems}}"
+                                                                  SelectedItem="{Binding Operation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                  Style="{StaticResource EditorComboBoxStyle}" />
+                                                    </StackPanel>
+
+                                                    <StackPanel Width="160"
+                                                                Margin="0,0,10,8"
+                                                                Visibility="{Binding ShowsKey, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                        <TextBlock Style="{StaticResource RewriteCaptionTextStyle}" Text="{Binding KeyLabel}" />
+                                                        <TextBox Text="{Binding Key, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                 Style="{StaticResource EditorTextBoxStyle}"
+                                                                 Width="160" />
+                                                    </StackPanel>
+
+                                                    <StackPanel Width="120"
+                                                                Margin="0,0,10,8"
+                                                                Visibility="{Binding ShowsValueType, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                        <TextBlock Style="{StaticResource RewriteCaptionTextStyle}" Text="值格式" />
+                                                        <ComboBox ItemsSource="{Binding Source={StaticResource MappingValueTypeItems}}"
+                                                                  SelectedItem="{Binding ValueType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                  Style="{StaticResource EditorComboBoxStyle}" />
+                                                    </StackPanel>
+
+                                                    <StackPanel Width="{Binding ValueBoxWidth}"
+                                                                Margin="0,0,0,8"
+                                                                Visibility="{Binding ShowsValue, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                        <TextBlock Style="{StaticResource RewriteCaptionTextStyle}" Text="{Binding ValueLabel}" />
+                                                        <TextBox Width="{Binding ValueBoxWidth}"
+                                                                 Height="{Binding ValueBoxHeight}"
+                                                                 AcceptsReturn="{Binding UsesMultilineValue}"
+                                                                 TextWrapping="Wrap"
+                                                                 VerticalScrollBarVisibility="Auto"
+                                                                 VerticalContentAlignment="Center"
+                                                                 Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                 Style="{StaticResource RewriteStretchTextBoxStyle}" />
+                                                    </StackPanel>
+                                                </WrapPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Border>
                 </Grid>
 
                 <Grid x:Name="MappingTypePanel"
@@ -350,12 +589,18 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Style="{StaticResource EditorLabelTextStyle}" Text="映射类型" />
-                    <ComboBox Grid.Column="1"
+                    <ComboBox x:Name="MappingTypeComboBox"
+                              Grid.Column="1"
                               ItemsSource="{StaticResource MappingTypeItems}"
                               SelectedItem="{Binding MappingType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                              SelectionChanged="MappingTypeComboBox_SelectionChanged"
                               Style="{StaticResource EditorComboBoxStyle}" />
-                    <TextBlock Grid.Column="3" Style="{StaticResource EditorLabelTextStyle}" Text="值格式" />
-                    <ComboBox Grid.Column="4"
+                    <TextBlock x:Name="MappingValueTypeLabelTextBlock"
+                               Grid.Column="3"
+                               Style="{StaticResource EditorLabelTextStyle}"
+                               Text="内容格式" />
+                    <ComboBox x:Name="MappingValueTypeComboBox"
+                              Grid.Column="4"
                               ItemsSource="{StaticResource MappingValueTypeItems}"
                               SelectedItem="{Binding ValueType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                               Style="{StaticResource EditorComboBoxStyle}" />
@@ -409,10 +654,12 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBox Text="{Binding TargetContent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             x:Name="MappingTargetTextBox"
                              Style="{StaticResource EditorTextBoxStyle}" />
-                    <Button Grid.Column="2"
+                    <Button x:Name="BrowseMappingFileButton"
+                            Grid.Column="2"
                             Click="BrowseMappingFile_Click"
-                            Content="选择配置"
+                            Content="选择文件"
                             MinWidth="86"
                             Padding="10,5" />
                 </Grid>
@@ -463,6 +710,415 @@
                          Style="{StaticResource EditorTextBoxStyle}" />
             </Grid>
         </ScrollViewer>
+
+        <Grid x:Name="RewriteWorkbenchPanel"
+              Grid.Row="1"
+              Visibility="Collapsed">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Border Padding="14,12"
+                    Background="#FFFFFF"
+                    BorderBrush="#DDE6EF"
+                    BorderThickness="1"
+                    CornerRadius="9">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <DockPanel LastChildFill="False">
+                        <StackPanel DockPanel.Dock="Left">
+                            <TextBlock FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       Text="触发条件" />
+                            <StackPanel Margin="0,3,0,0"
+                                        Orientation="Horizontal">
+                                <TextBlock FontSize="12"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Text="先匹配请求，再按中间动作链顺序改写。" />
+                                <TextBlock x:Name="RewriteUrlMatchHintTextBlock"
+                                           Margin="14,0,0,0"
+                                           FontSize="12"
+                                           Foreground="#486DD3"
+                                           Text="示例：https://*.example.com/api/*" />
+                            </StackPanel>
+                        </StackPanel>
+                        <StackPanel DockPanel.Dock="Right"
+                                    VerticalAlignment="Center"
+                                    Orientation="Horizontal">
+                            <CheckBox VerticalAlignment="Center"
+                                      IsChecked="{Binding Enabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Margin="8,0,14,0"
+                                       VerticalAlignment="Center"
+                                       FontSize="12"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       Text="启用" />
+                            <Border Padding="9,4"
+                                    Background="#FFF2E8"
+                                    BorderBrush="#F3C8AE"
+                                    BorderThickness="1"
+                                    CornerRadius="12">
+                                <TextBlock FontSize="12"
+                                           Foreground="#B85C25"
+                                           Text="{Binding Direction}" />
+                            </Border>
+                        </StackPanel>
+                    </DockPanel>
+
+                    <Grid Grid.Row="1"
+                          Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="110" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="110" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="110" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource RewriteWorkbenchFieldLabelStyle}" Text="别名" />
+                            <TextBox x:Name="RewriteNameTextBox"
+                                     Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource RewriteWorkbenchTextBoxStyle}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Style="{StaticResource RewriteWorkbenchFieldLabelStyle}" Text="Url" />
+                            <TextBox Text="{Binding UrlPattern, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource RewriteWorkbenchTextBoxStyle}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="4">
+                            <TextBlock Style="{StaticResource RewriteWorkbenchFieldLabelStyle}" Text="方法" />
+                            <ComboBox ItemsSource="{StaticResource RuleMethodItems}"
+                                      SelectedItem="{Binding Method, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      Style="{StaticResource RewriteWorkbenchComboBoxStyle}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="6">
+                            <TextBlock Style="{StaticResource RewriteWorkbenchFieldLabelStyle}" Text="策略" />
+                            <ComboBox x:Name="RewriteUrlMatchTypeComboBox"
+                                      ItemsSource="{StaticResource UrlMatchTypeItems}"
+                                      SelectedItem="{Binding UrlMatchType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      SelectionChanged="UrlMatchTypeComboBox_SelectionChanged"
+                                      Style="{StaticResource RewriteWorkbenchComboBoxStyle}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="8">
+                            <TextBlock Style="{StaticResource RewriteWorkbenchFieldLabelStyle}" Text="方向" />
+                            <ComboBox ItemsSource="{StaticResource RewriteDirectionItems}"
+                                      SelectedItem="{Binding Direction, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      Style="{StaticResource RewriteWorkbenchComboBoxStyle}" />
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="1"
+                  Margin="0,12,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="205" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="310" />
+                </Grid.ColumnDefinitions>
+
+                <Border Padding="13"
+                        Background="#FBFDFF"
+                        BorderBrush="#DDE6EF"
+                        BorderThickness="1"
+                        CornerRadius="9">
+                    <StackPanel>
+                        <TextBlock FontSize="15"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   Text="动作类型" />
+                        <TextBlock Margin="0,4,0,12"
+                                   FontSize="12"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   Text="点击后插入到当前动作后面。" />
+
+                        <Button Tag="请求方法"
+                                IsEnabled="{Binding CanAddRequestMethod}"
+                                Click="AddRewriteOperationFromPalette_Click"
+                                Style="{StaticResource RewritePaletteButtonStyle}">
+                            <StackPanel>
+                                <TextBlock FontWeight="SemiBold" Text="请求方法" />
+                                <TextBlock Margin="0,3,0,0" Foreground="#5E7190" Text="GET / POST / PUT" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Tag="URL"
+                                IsEnabled="{Binding CanAddUrl}"
+                                Click="AddRewriteOperationFromPalette_Click"
+                                Style="{StaticResource RewritePaletteButtonStyle}">
+                            <StackPanel>
+                                <TextBlock FontWeight="SemiBold" Text="URL" />
+                                <TextBlock Margin="0,3,0,0" Foreground="#5E7190" Text="改完整地址" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Tag="Path"
+                                IsEnabled="{Binding CanAddPath}"
+                                Click="AddRewriteOperationFromPalette_Click"
+                                Style="{StaticResource RewritePaletteButtonStyle}">
+                            <StackPanel>
+                                <TextBlock FontWeight="SemiBold" Text="Path" />
+                                <TextBlock Margin="0,3,0,0" Foreground="#5E7190" Text="只改请求路径" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Tag="参数"
+                                IsEnabled="{Binding CanAddParameter}"
+                                Click="AddRewriteOperationFromPalette_Click"
+                                Style="{StaticResource RewritePaletteButtonStyle}">
+                            <StackPanel>
+                                <TextBlock FontWeight="SemiBold" Text="参数" />
+                                <TextBlock Margin="0,3,0,0" Foreground="#5E7190" Text="设置 / 添加 / 删除" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Tag="协议头"
+                                IsEnabled="{Binding CanAddHeader}"
+                                Click="AddRewriteOperationFromPalette_Click"
+                                Style="{StaticResource RewritePaletteButtonStyle}">
+                            <StackPanel>
+                                <TextBlock FontWeight="SemiBold" Text="协议头" />
+                                <TextBlock Margin="0,3,0,0" Foreground="#5E7190" Text="请求头 / 响应头" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Tag="Body"
+                                IsEnabled="{Binding CanAddBody}"
+                                Click="AddRewriteOperationFromPalette_Click"
+                                Style="{StaticResource RewritePaletteButtonStyle}">
+                            <StackPanel>
+                                <TextBlock FontWeight="SemiBold" Text="Body" />
+                                <TextBlock Margin="0,3,0,0" Foreground="#5E7190" Text="文本 / Base64 / HEX" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Tag="状态码"
+                                IsEnabled="{Binding CanAddStatusCode}"
+                                Click="AddRewriteOperationFromPalette_Click"
+                                Style="{StaticResource RewritePaletteButtonStyle}">
+                            <StackPanel>
+                                <TextBlock FontWeight="SemiBold" Text="状态码" />
+                                <TextBlock Margin="0,3,0,0" Foreground="#5E7190" Text="响应专用" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2"
+                        Padding="13"
+                        Background="#F6FAFD"
+                        BorderBrush="#DDE6EF"
+                        BorderThickness="1"
+                        CornerRadius="9">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <DockPanel Margin="0,0,0,12">
+                            <Button DockPanel.Dock="Right"
+                                    MinWidth="82"
+                                    Height="30"
+                                    Padding="12,0"
+                                    Click="AddRewriteOperation_Click"
+                                    Content="添加动作"
+                                    Style="{StaticResource PrimaryButtonStyle}" />
+                            <StackPanel>
+                                <TextBlock FontSize="15"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           Text="动作编排" />
+                                <TextBlock Margin="0,4,0,0"
+                                           FontSize="12"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Text="选中动作后在右侧编辑，执行顺序从上到下。" />
+                            </StackPanel>
+                        </DockPanel>
+
+                        <ListBox x:Name="RewriteChainListBox"
+                                 Grid.Row="1"
+                                 ItemsSource="{Binding Operations}"
+                                 SelectedItem="{Binding SelectedRewriteOperation, RelativeSource={RelativeSource AncestorType=Window}, Mode=TwoWay}"
+                                 ItemContainerStyle="{StaticResource RewriteChainListBoxItemStyle}"
+                                 Style="{StaticResource RewriteChainListBoxStyle}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="74" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border Width="56"
+                                                Height="24"
+                                                VerticalAlignment="Center"
+                                                Background="#E8F2FF"
+                                                BorderBrush="#B7D4F6"
+                                                BorderThickness="1"
+                                                CornerRadius="12">
+                                            <TextBlock HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="#2F80ED"
+                                                       Text="{Binding DisplayIndexText}" />
+                                        </Border>
+
+                                        <StackPanel Grid.Column="1"
+                                                    VerticalAlignment="Center">
+                                            <TextBlock FontSize="14"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                                       Text="{Binding Summary}" />
+                                            <TextBlock Margin="0,3,0,0"
+                                                       FontSize="12"
+                                                       Foreground="#5E7190"
+                                                       Text="{Binding DisplayHint}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="2"
+                                                    VerticalAlignment="Center"
+                                                    Orientation="Horizontal">
+                                            <Button Click="MoveRewriteOperationUp_Click"
+                                                    Content="↑"
+                                                    Style="{StaticResource RewriteActionButtonStyle}"
+                                                    ToolTip="上移" />
+                                            <Button Click="MoveRewriteOperationDown_Click"
+                                                    Content="↓"
+                                                    Style="{StaticResource RewriteActionButtonStyle}"
+                                                    ToolTip="下移" />
+                                            <Button Click="RemoveRewriteOperation_Click"
+                                                    Content="删除"
+                                                    Foreground="#D94C3A"
+                                                    Style="{StaticResource RewriteActionButtonStyle}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="4"
+                        Padding="13"
+                        Background="#FFFFFF"
+                        BorderBrush="#DDE6EF"
+                        BorderThickness="1"
+                        CornerRadius="9">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel>
+                            <TextBlock FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       Text="动作属性" />
+                            <TextBlock Margin="0,4,0,0"
+                                       FontSize="12"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       Text="复杂 Body、HEX、Base64 都在这里编辑。" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1"
+                                    Margin="0,13,0,0"
+                                    DataContext="{Binding SelectedRewriteOperation, RelativeSource={RelativeSource AncestorType=Window}}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource RewriteWorkbenchFieldLabelStyle}" Text="目标" />
+                                    <ComboBox ItemsSource="{StaticResource RewriteTargetItems}"
+                                              SelectedItem="{Binding Target, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              Style="{StaticResource RewriteWorkbenchComboBoxStyle}" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Style="{StaticResource RewriteWorkbenchFieldLabelStyle}" Text="操作" />
+                                    <ComboBox ItemsSource="{Binding AvailableOperations}"
+                                              SelectedItem="{Binding Operation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              Style="{StaticResource RewriteWorkbenchComboBoxStyle}" />
+                                </StackPanel>
+                            </Grid>
+
+                            <StackPanel Margin="0,10,0,0"
+                                        Visibility="{Binding ShowsKey, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Style="{StaticResource RewriteWorkbenchFieldLabelStyle}" Text="{Binding KeyLabel}" />
+                                <TextBox Text="{Binding Key, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource RewriteWorkbenchTextBoxStyle}" />
+                            </StackPanel>
+
+                            <StackPanel Margin="0,10,0,0"
+                                        Visibility="{Binding ShowsValueType, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Style="{StaticResource RewriteWorkbenchFieldLabelStyle}" Text="值格式" />
+                                <ComboBox ItemsSource="{StaticResource MappingValueTypeItems}"
+                                          SelectedItem="{Binding ValueType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          Style="{StaticResource RewriteWorkbenchComboBoxStyle}" />
+                            </StackPanel>
+
+                            <StackPanel Margin="0,10,0,0"
+                                        Visibility="{Binding ShowsValue, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Style="{StaticResource RewriteWorkbenchFieldLabelStyle}" Text="{Binding ValueLabel}" />
+                                <TextBox Height="{Binding ValueBoxHeight}"
+                                         AcceptsReturn="{Binding UsesMultilineValue}"
+                                         TextWrapping="Wrap"
+                                         VerticalScrollBarVisibility="Auto"
+                                         VerticalContentAlignment="Center"
+                                         Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource RewriteWorkbenchTextBoxStyle}" />
+                            </StackPanel>
+
+                            <Border Margin="0,12,0,0"
+                                    Padding="10,8"
+                                    Background="#F7FAFD"
+                                    BorderBrush="#E1E8F0"
+                                    BorderThickness="1"
+                                    CornerRadius="8">
+                                <TextBlock FontSize="12"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Text="{Binding EditorHint}"
+                                           TextWrapping="Wrap" />
+                            </Border>
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="2"
+                                    Margin="0,12,0,0">
+                            <TextBlock Style="{StaticResource RewriteWorkbenchFieldLabelStyle}" Text="规则备注" />
+                            <TextBox Height="62"
+                                     AcceptsReturn="True"
+                                     TextWrapping="Wrap"
+                                     VerticalScrollBarVisibility="Auto"
+                                     Text="{Binding DataContext.Note, RelativeSource={RelativeSource AncestorType=Window}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource RewriteWorkbenchTextBoxStyle}" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
 
         <StackPanel Grid.Row="2"
                     Margin="0,16,0,0"
