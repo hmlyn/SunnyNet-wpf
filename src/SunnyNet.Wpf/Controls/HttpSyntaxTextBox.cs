@@ -7,6 +7,7 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using SunnyNet.Wpf.Services;
 
 namespace SunnyNet.Wpf.Controls;
 
@@ -349,7 +350,7 @@ public sealed class HttpSyntaxTextBox : RichTextBox
 
         try
         {
-            Clipboard.SetText(text);
+            ClipboardService.SetText(text);
         }
         catch
         {

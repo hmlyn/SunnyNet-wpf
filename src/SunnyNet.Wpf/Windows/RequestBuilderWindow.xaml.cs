@@ -136,6 +136,7 @@ public partial class RequestBuilderWindow : Window
                 URL = url,
                 HttpVersion = GetComboText(HttpVersionComboBox),
                 Headers = headers,
+                HeadersBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(headers)),
                 BodyBase64 = Convert.ToBase64String(body)
             });
             if (result is null)
@@ -794,7 +795,7 @@ public partial class RequestBuilderWindow : Window
 
     private string BuildHeaderTextFromCurrentView()
     {
-        string text = BuildHeaderTextFromMode(_headerMode);
+        string text = NormalizeHeaderLineBreaks(BuildHeaderTextFromMode(_headerMode));
         HeadersTextBox.Text = text;
         return text;
     }
@@ -1144,7 +1145,7 @@ public partial class RequestBuilderWindow : Window
 
     private static IEnumerable<(string Name, string Value)> ParseHeaderPairs(string text)
     {
-        foreach (string rawLine in (text ?? "").Replace("\r\n", "\n").Split('\n'))
+        foreach (string rawLine in NormalizeHeaderLineBreaks(text).Split('\n'))
         {
             string line = rawLine.Trim();
             if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#'))
@@ -1160,6 +1161,22 @@ public partial class RequestBuilderWindow : Window
 
             yield return (line[..separatorIndex].Trim(), line[(separatorIndex + 1)..].Trim());
         }
+    }
+
+    private static string NormalizeHeaderLineBreaks(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return "";
+        }
+
+        return text
+            .Replace("\\r\\n", "\n", StringComparison.Ordinal)
+            .Replace("\\n", "\n", StringComparison.Ordinal)
+            .Replace("\\r", "\n", StringComparison.Ordinal)
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n')
+            .TrimEnd();
     }
 
     private static void ApplyHeaders(HttpRequestMessage request, Dictionary<string, List<string>> headers)
@@ -1204,13 +1221,13 @@ public partial class RequestBuilderWindow : Window
             {
                 foreach (JsonElement value in property.Value.EnumerateArray())
                 {
-                    builder.Append(property.Name).Append(": ").Append(value.GetString()).AppendLine();
+                    builder.Append(property.Name).Append(": ").Append(NormalizeHeaderLineBreaks(value.GetString())).AppendLine();
                 }
 
                 continue;
             }
 
-            builder.Append(property.Name).Append(": ").Append(property.Value.ToString()).AppendLine();
+            builder.Append(property.Name).Append(": ").Append(NormalizeHeaderLineBreaks(property.Value.ToString())).AppendLine();
         }
 
         return builder.ToString().TrimEnd();

@@ -97,12 +97,13 @@ public partial class MainWindow : Window
 
         try
         {
-            Clipboard.SetText(ip);
+            ClipboardService.SetText(ip);
             _viewModel.StatusRight = $"已复制内网 IP：{ip}";
             LanIpPopup.IsOpen = false;
         }
-        catch
+        catch (Exception exception)
         {
+            _viewModel.StatusRight = ClipboardService.GetFriendlyErrorMessage(exception);
         }
     }
 
@@ -1990,12 +1991,12 @@ public partial class MainWindow : Window
 
         try
         {
-            Clipboard.SetText(text);
+            ClipboardService.SetText(text);
             _viewModel.StatusRight = statusText;
         }
         catch (Exception exception)
         {
-            ViewModel_NotificationRequested("错误", $"复制失败：{exception.Message}");
+            ViewModel_NotificationRequested("错误", ClipboardService.GetFriendlyErrorMessage(exception));
         }
     }
 

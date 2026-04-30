@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Media.Imaging;
+using SunnyNet.Wpf.Services;
 
 namespace SunnyNet.Wpf.Windows;
 
@@ -36,7 +37,7 @@ public partial class OpenSourceWindow : Window
 
     private void CopyProject_Click(object sender, RoutedEventArgs routedEventArgs)
     {
-        Clipboard.SetText(ProjectUrl);
+        ClipboardService.SetText(ProjectUrl);
     }
 
     private void OpenCore_Click(object sender, RoutedEventArgs routedEventArgs)

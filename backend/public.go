@@ -51,7 +51,7 @@ func GetWorkingState() bool {
 
 func parseBuilderHeaders(text string) http.Header {
 	header := make(http.Header)
-	for _, rawLine := range strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n") {
+	for _, rawLine := range strings.Split(normalizeBuilderHeaderText(text), "\n") {
 		line := strings.TrimSpace(rawLine)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
@@ -68,6 +68,29 @@ func parseBuilderHeaders(text string) http.Header {
 		header.Add(name, value)
 	}
 	return header
+}
+
+func getBuilderHeadersText(args *JSON.SyJson) string {
+	if args == nil {
+		return ""
+	}
+	if encoded := args.GetData("HeadersBase64"); encoded != "" {
+		if data, err := base64.StdEncoding.DecodeString(encoded); err == nil {
+			return string(data)
+		}
+	}
+	return args.GetData("Headers")
+}
+
+func normalizeBuilderHeaderText(text string) string {
+	replacer := strings.NewReplacer(
+		`\r\n`, "\n",
+		`\n`, "\n",
+		`\r`, "\n",
+		"\r\n", "\n",
+		"\r", "\n",
+	)
+	return strings.TrimSpace(replacer.Replace(text))
 }
 
 func errorText(err error) string {
@@ -345,7 +368,7 @@ func event(command string, args *JSON.SyJson) any {
 			args.GetData("Method"),
 			args.GetData("URL"),
 			args.GetData("HttpVersion"),
-			parseBuilderHeaders(args.GetData("Headers")),
+			parseBuilderHeaders(getBuilderHeadersText(args)),
 			body,
 			app.App.Port(),
 		)

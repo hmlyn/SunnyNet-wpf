@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using Microsoft.Win32;
 using SunnyNet.Wpf.Models;
+using SunnyNet.Wpf.Services;
 using SunnyNet.Wpf.ViewModels;
 
 namespace SunnyNet.Wpf.Windows;
@@ -148,7 +149,7 @@ public partial class SettingsWindow : Window
             return;
         }
 
-        Clipboard.SetText(text);
+        ClipboardService.SetText(text);
         MessageBox.Show(message, "MCP", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 

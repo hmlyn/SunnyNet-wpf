@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using SunnyNet.Wpf.Models;
+using SunnyNet.Wpf.Services;
 
 namespace SunnyNet.Wpf.Controls;
 
@@ -112,7 +113,7 @@ public partial class NameValueTableControl : UserControl
 
         try
         {
-            Clipboard.SetText(text);
+            ClipboardService.SetText(text);
         }
         catch
         {
@@ -174,7 +175,7 @@ public partial class NameValueTableControl : UserControl
 
         try
         {
-            Clipboard.SetText(text);
+            ClipboardService.SetText(text);
         }
         catch
         {

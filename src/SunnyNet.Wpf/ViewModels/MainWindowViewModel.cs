@@ -717,7 +717,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             throw new InvalidOperationException("没有生成可复制的请求代码。");
         }
 
-        Clipboard.SetText(code);
+        ClipboardService.SetText(code);
         StatusRight = $"已复制请求代码：{lang} / {module}";
     }
 
@@ -3881,20 +3881,112 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         }
 
         StringBuilder builder = new();
-        foreach (JsonProperty property in header.EnumerateObject())
+        foreach ((string name, string value) in EnumerateHeaderPairs(header))
         {
-            if (property.Value.ValueKind == JsonValueKind.Array)
-            {
-                string values = string.Join("; ", property.Value.EnumerateArray().Select(ElementToText));
-                builder.AppendLine($"{property.Name}: {values}");
-            }
-            else
-            {
-                builder.AppendLine($"{property.Name}: {ElementToText(property.Value)}");
-            }
+            builder.AppendLine($"{name}: {value}");
         }
 
         return builder.ToString().TrimEnd();
+    }
+
+    private static IEnumerable<(string Name, string Value)> EnumerateHeaderPairs(JsonElement headers)
+    {
+        if (headers.ValueKind != JsonValueKind.Object)
+        {
+            yield break;
+        }
+
+        foreach (JsonProperty property in headers.EnumerateObject())
+        {
+            if (property.Value.ValueKind == JsonValueKind.Array)
+            {
+                foreach (JsonElement item in property.Value.EnumerateArray())
+                {
+                    foreach ((string name, string value) in ExpandHeaderValue(property.Name, ElementToText(item)))
+                    {
+                        yield return (name, value);
+                    }
+                }
+
+                continue;
+            }
+
+            foreach ((string name, string value) in ExpandHeaderValue(property.Name, ElementToText(property.Value)))
+            {
+                yield return (name, value);
+            }
+        }
+    }
+
+    private static IEnumerable<(string Name, string Value)> ExpandHeaderValue(string name, string value)
+    {
+        string[] lines = NormalizeHeaderLineBreaks(value).Split('\n');
+        string currentName = name;
+        StringBuilder currentValue = new(lines.FirstOrDefault()?.Trim() ?? "");
+
+        for (int i = 1; i < lines.Length; i++)
+        {
+            string line = lines[i].Trim();
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            int separatorIndex = line.IndexOf(':', StringComparison.Ordinal);
+            if (separatorIndex > 0 && IsHttpHeaderName(line[..separatorIndex]))
+            {
+                yield return (currentName, currentValue.ToString());
+                currentName = line[..separatorIndex].Trim();
+                currentValue.Clear();
+                currentValue.Append(line[(separatorIndex + 1)..].Trim());
+                continue;
+            }
+
+            if (currentValue.Length > 0)
+            {
+                currentValue.Append(' ');
+            }
+
+            currentValue.Append(line);
+        }
+
+        yield return (currentName, currentValue.ToString());
+    }
+
+    private static string NormalizeHeaderLineBreaks(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return "";
+        }
+
+        return text
+            .Replace("\\r\\n", "\n", StringComparison.Ordinal)
+            .Replace("\\n", "\n", StringComparison.Ordinal)
+            .Replace("\\r", "\n", StringComparison.Ordinal)
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n');
+    }
+
+    private static bool IsHttpHeaderName(string text)
+    {
+        string name = text.Trim();
+        if (name.Length == 0)
+        {
+            return false;
+        }
+
+        foreach (char character in name)
+        {
+            bool valid = char.IsLetterOrDigit(character) || character is '!' or '#' or '$' or '%' or '&' or '\''
+                or '*' or '+' or '-' or '.' or '^' or '_' or '`' or '|' or '~';
+            if (!valid)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static string FormatMessageObject(JsonElement element)
@@ -4131,25 +4223,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     private static List<DetailNameValueRow> ToHeaderRows(JsonElement headers)
     {
         List<DetailNameValueRow> rows = new();
-        if (headers.ValueKind != JsonValueKind.Object)
+        rows.AddRange(EnumerateHeaderPairs(headers).Select(static item => new DetailNameValueRow
         {
-            return rows;
-        }
-
-        foreach (JsonProperty property in headers.EnumerateObject())
-        {
-            if (property.Value.ValueKind == JsonValueKind.Array)
-            {
-                foreach (JsonElement item in property.Value.EnumerateArray())
-                {
-                    rows.Add(new DetailNameValueRow { Name = property.Name, Value = ElementToText(item) });
-                }
-            }
-            else
-            {
-                rows.Add(new DetailNameValueRow { Name = property.Name, Value = ElementToText(property.Value) });
-            }
-        }
+            Name = item.Name,
+            Value = item.Value
+        }));
 
         return rows;
     }
@@ -4386,25 +4464,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
     private static string GetHeaderValue(JsonElement headers, string name)
     {
-        if (headers.ValueKind != JsonValueKind.Object)
+        foreach ((string headerName, string value) in EnumerateHeaderPairs(headers))
         {
-            return "";
-        }
-
-        foreach (JsonProperty property in headers.EnumerateObject())
-        {
-            if (!property.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+            if (headerName.Equals(name, StringComparison.OrdinalIgnoreCase))
             {
-                continue;
+                return value;
             }
-
-            if (property.Value.ValueKind == JsonValueKind.Array)
-            {
-                JsonElement first = property.Value.EnumerateArray().FirstOrDefault();
-                return ElementToText(first);
-            }
-
-            return ElementToText(property.Value);
         }
 
         return "";

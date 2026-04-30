@@ -10,6 +10,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using Microsoft.Win32;
 using SunnyNet.Wpf.Models;
+using SunnyNet.Wpf.Services;
 using SunnyNet.Wpf.ViewModels;
 
 namespace SunnyNet.Wpf.Controls;
@@ -954,7 +955,7 @@ public partial class PacketMessagesControl : UserControl
             return;
         }
 
-        Clipboard.SetText($"{entry.CompactIndex}\t{entry.TimeLabel}\t{entry.DirectionLabel}\t{entry.LengthLabel}\t{entry.PreviewText}");
+        ClipboardService.SetText($"{entry.CompactIndex}\t{entry.TimeLabel}\t{entry.DirectionLabel}\t{entry.LengthLabel}\t{entry.PreviewText}");
     }
 
     private async void CopyPacketText_Click(object sender, RoutedEventArgs routedEventArgs)
@@ -962,7 +963,7 @@ public partial class PacketMessagesControl : UserControl
         PacketPayloadSnapshot? snapshot = await GetSelectedPayloadAsync();
         if (snapshot is not null)
         {
-            Clipboard.SetText(string.IsNullOrEmpty(snapshot.RawText) ? snapshot.DisplayText : snapshot.RawText);
+            ClipboardService.SetText(string.IsNullOrEmpty(snapshot.RawText) ? snapshot.DisplayText : snapshot.RawText);
         }
     }
 
@@ -971,7 +972,7 @@ public partial class PacketMessagesControl : UserControl
         PacketPayloadSnapshot? snapshot = await GetSelectedPayloadAsync();
         if (snapshot is not null)
         {
-            Clipboard.SetText(Convert.ToHexString(snapshot.Bytes));
+            ClipboardService.SetText(Convert.ToHexString(snapshot.Bytes));
         }
     }
 
@@ -980,7 +981,7 @@ public partial class PacketMessagesControl : UserControl
         PacketPayloadSnapshot? snapshot = await GetSelectedPayloadAsync();
         if (snapshot is not null)
         {
-            Clipboard.SetText(Convert.ToBase64String(snapshot.Bytes));
+            ClipboardService.SetText(Convert.ToBase64String(snapshot.Bytes));
         }
     }
 

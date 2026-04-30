@@ -16,6 +16,7 @@ using System.Windows.Media.Media3D;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using SunnyNet.Wpf.Models;
+using SunnyNet.Wpf.Services;
 using SunnyNet.Wpf.ViewModels;
 
 namespace SunnyNet.Wpf.Controls;
@@ -2190,7 +2191,7 @@ public partial class WebSocketMessagesControl : UserControl
 
         try
         {
-            Clipboard.SetText(text);
+            ClipboardService.SetText(text);
             return true;
         }
         catch

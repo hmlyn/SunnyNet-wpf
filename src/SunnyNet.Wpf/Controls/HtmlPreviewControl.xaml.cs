@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using SunnyNet.Wpf.Services;
 
 namespace SunnyNet.Wpf.Controls;
 
@@ -80,7 +81,7 @@ public partial class HtmlPreviewControl : UserControl
 
         try
         {
-            Clipboard.SetText(HtmlText);
+            ClipboardService.SetText(HtmlText);
         }
         catch
         {
