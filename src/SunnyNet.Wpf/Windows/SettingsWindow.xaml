@@ -592,11 +592,28 @@
                             <CheckBox Margin="92,6,0,0" Content="禁止浏览器缓存" IsChecked="{Binding Settings.DisableCache}" />
                             <CheckBox Margin="92,6,0,0" Content="开启身份验证模式" IsChecked="{Binding Settings.Authentication}" />
                             <Border Style="{StaticResource SettingsSectionDividerStyle}" />
-                            <Button Margin="92,14,0,0"
-                                    HorizontalAlignment="Left"
-                                    Style="{StaticResource SettingsPrimaryActionButtonStyle}"
-                                    Click="ApplyBasic_Click"
-                                    Content="保存设置" />
+                            <Grid Margin="0,14,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="92" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="1"
+                                        Style="{StaticResource SettingsPrimaryActionButtonStyle}"
+                                        Click="ApplyBasic_Click"
+                                        Content="保存设置" />
+                                <Button Grid.Column="3"
+                                        Style="{StaticResource SettingsSmallActionButtonStyle}"
+                                        Click="CheckUpdate_Click"
+                                        Content="检查更新" />
+                                <TextBlock Grid.Column="4"
+                                           Margin="12,0,0,0"
+                                           VerticalAlignment="Center"
+                                           Style="{StaticResource SettingsPageHintTextStyle}"
+                                           Text="{Binding CurrentVersionText, StringFormat=当前版本：{0}}" />
+                            </Grid>
                         </StackPanel>
 
                         <StackPanel x:Name="McpSectionPanel" Visibility="Collapsed">
@@ -1044,8 +1061,25 @@
                                                       ItemsSource="{Binding ProcessCaptureNames}"
                                                       SelectedItem="{Binding SelectedProcessCaptureName, Mode=TwoWay}"
                                                       SelectionMode="Single"
+                                                      PreviewMouseRightButtonDown="ProcessGrid_PreviewMouseRightButtonDown"
                                                       Style="{StaticResource ProcessDataGridStyle}">
+                                                <DataGrid.ContextMenu>
+                                                    <ContextMenu>
+                                                        <MenuItem Header="复制进程名" Click="CopySelectedProcessName_Click" />
+                                                    </ContextMenu>
+                                                </DataGrid.ContextMenu>
                                                 <DataGrid.Columns>
+                                                    <DataGridTemplateColumn Header="捕获"
+                                                                            Width="58"
+                                                                            IsReadOnly="False">
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate>
+                                                                <CheckBox IsChecked="{Binding IsCaptured}"
+                                                                          Style="{StaticResource ProcessGridCheckBoxStyle}"
+                                                                          Click="ProcessNameCaptureCheckBox_Click" />
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
                                                     <DataGridTextColumn Header="进程名"
                                                                         Binding="{Binding Name}"
                                                                         ElementStyle="{StaticResource ProcessGridTextStyle}"
@@ -1083,15 +1117,40 @@
                                                                 Click="ClearProcessPid_Click"
                                                                 Content="移除所选" />
                                                     </StackPanel>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Margin="0,0,6,0"
+                                                                   VerticalAlignment="Center"
+                                                                   Style="{StaticResource ProcessCaptionTextStyle}"
+                                                                   Text="搜索" />
+                                                        <Border Width="178"
+                                                                Background="#F8FAFD"
+                                                                BorderBrush="#DCE5F1"
+                                                                BorderThickness="1"
+                                                                CornerRadius="4">
+                                                            <TextBox Style="{StaticResource ProcessGridInputTextBoxStyle}"
+                                                                     ToolTip="输入 PID 或进程名快速筛选"
+                                                                     Text="{Binding ProcessSearchText, UpdateSourceTrigger=PropertyChanged}" />
+                                                        </Border>
+                                                        <TextBlock Margin="10,0,0,0"
+                                                                   VerticalAlignment="Center"
+                                                                   Style="{StaticResource ProcessCaptionTextStyle}"
+                                                                   Text="{Binding ProcessSearchSummaryText}" />
+                                                    </StackPanel>
                                                 </DockPanel>
                                             </Border>
 
                                             <DataGrid x:Name="RunningProcessesGrid"
                                                       Grid.Row="2"
-                                                      ItemsSource="{Binding RunningProcesses}"
+                                                      ItemsSource="{Binding RunningProcessesView}"
                                                       SelectedItem="{Binding SelectedRunningProcess, Mode=TwoWay}"
                                                       SelectionMode="Extended"
+                                                      PreviewMouseRightButtonDown="ProcessGrid_PreviewMouseRightButtonDown"
                                                       Style="{StaticResource ProcessDataGridStyle}">
+                                                <DataGrid.ContextMenu>
+                                                    <ContextMenu>
+                                                        <MenuItem Header="复制进程名" Click="CopySelectedProcessName_Click" />
+                                                    </ContextMenu>
+                                                </DataGrid.ContextMenu>
                                                 <DataGrid.Columns>
                                                     <DataGridTextColumn Header="PID"
                                                                         Binding="{Binding Pid}"

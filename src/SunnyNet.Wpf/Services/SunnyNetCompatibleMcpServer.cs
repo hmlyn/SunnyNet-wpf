@@ -772,8 +772,14 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
             }
         }
 
-        if (_viewModel.ProcessCaptureNames.Any(item => string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase)))
+        ProcessCaptureNameItem? existing = _viewModel.ProcessCaptureNames.FirstOrDefault(item => string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
         {
+            if (!existing.IsCaptured)
+            {
+                await _viewModel.SetProcessCaptureNameEnabledAsync(existing, true);
+            }
+
             return new
             {
                 success = true,
@@ -782,9 +788,7 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
             };
         }
 
-        await _viewModel.InvokeBackendCommandAsync("进程驱动添加进程名", new { Name = name, isSet = true });
-        _viewModel.ProcessCaptureNames.Add(new ProcessCaptureNameItem { Name = name });
-        _viewModel.StatusRight = $"已添加进程名：{name}";
+        await _viewModel.AddProcessCaptureNameAsync(name);
         return new
         {
             success = true,
@@ -801,14 +805,17 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
             throw new InvalidOperationException("进程名称不能为空");
         }
 
-        await _viewModel.InvokeBackendCommandAsync("进程驱动添加进程名", new { Name = name, isSet = false });
         ProcessCaptureNameItem? item = _viewModel.ProcessCaptureNames.FirstOrDefault(entry => string.Equals(entry.Name, name, StringComparison.OrdinalIgnoreCase));
         if (item is not null)
         {
-            _viewModel.ProcessCaptureNames.Remove(item);
+            await _viewModel.RemoveProcessCaptureNameAsync(item);
+        }
+        else
+        {
+            await _viewModel.InvokeBackendCommandAsync("进程驱动添加进程名", new { Name = name, isSet = false });
+            _viewModel.StatusRight = $"已移除进程名：{name}";
         }
 
-        _viewModel.StatusRight = $"已移除进程名：{name}";
         return new
         {
             success = true,

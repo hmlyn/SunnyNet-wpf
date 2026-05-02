@@ -102,6 +102,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     private bool _captureAllProcesses;
     private readonly HashSet<int> _activeProcessPids = new();
     private string _newProcessName = "";
+    private string _processSearchText = "";
+    private string _processSearchSummaryText = "输入 PID 或进程名快速筛选";
     private string _statusLeft = "未设置系统IE代理";
     private string _statusMiddle = "正在捕获";
     private string _statusRight = "等待 Go 核心启动";
@@ -114,6 +116,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     {
         SessionsView = CollectionViewSource.GetDefaultView(Sessions);
         SessionsView.Filter = FilterSession;
+        RunningProcessesView = CollectionViewSource.GetDefaultView(RunningProcesses);
+        RunningProcessesView.Filter = FilterRunningProcess;
         _sessionFilterRefreshTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
             Interval = TimeSpan.FromMilliseconds(650)
@@ -133,9 +137,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
     public event Action<CaptureEntry>? ScrollToEntryRequested;
     public event Action<string, string>? NotificationRequested;
+    public event Action? ProcessCaptureSettingsChanged;
+    public event Action<AppUpdateInfo>? UpdateAvailableRequested;
 
     public ObservableCollection<CaptureEntry> Sessions { get; } = new();
     public ICollectionView SessionsView { get; }
+    public ICollectionView RunningProcessesView { get; }
     public SessionDetail Detail { get; } = new();
     public AppConfigState Settings { get; } = new();
     public McpIntegrationState Mcp { get; } = new();
@@ -162,6 +169,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     public AsyncRelayCommand ResendSelectedCommand { get; }
     public AsyncRelayCommand CloseSessionCommand { get; }
     public AsyncRelayCommand ReleaseCurrentCommand { get; }
+
+    public string CurrentVersionText => $"v{GitHubUpdateService.CurrentVersionText}";
 
     public CaptureEntry? SelectedSession
     {
@@ -277,6 +286,27 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     {
         get => _newProcessName;
         set => SetProperty(ref _newProcessName, value ?? "");
+    }
+
+    public string ProcessSearchText
+    {
+        get => _processSearchText;
+        set
+        {
+            if (!SetProperty(ref _processSearchText, value ?? ""))
+            {
+                return;
+            }
+
+            RunningProcessesView.Refresh();
+            UpdateProcessSearchSummary();
+        }
+    }
+
+    public string ProcessSearchSummaryText
+    {
+        get => _processSearchSummaryText;
+        private set => SetProperty(ref _processSearchSummaryText, value ?? "");
     }
 
     public string CurrentPidCaptureText => _activeProcessPids.Count switch
@@ -748,6 +778,41 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         }
     }
 
+    public async Task CheckForUpdatesAsync(bool manual)
+    {
+        try
+        {
+            if (manual)
+            {
+                StatusRight = "正在检查更新...";
+            }
+
+            AppUpdateInfo update = await GitHubUpdateService.CheckLatestAsync();
+            if (update.IsNewVersion)
+            {
+                StatusRight = $"发现新版本：v{update.LatestVersion}";
+                UpdateAvailableRequested?.Invoke(update);
+                return;
+            }
+
+            StatusRight = $"当前已是最新版本：v{update.CurrentVersion}";
+            if (manual)
+            {
+                NotificationRequested?.Invoke("提示", $"当前已是最新版本：v{update.CurrentVersion}");
+            }
+        }
+        catch (Exception exception)
+        {
+            if (!manual)
+            {
+                return;
+            }
+
+            StatusRight = "检查更新失败";
+            NotificationRequested?.Invoke("检查更新失败", exception.Message);
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (_disposed)
@@ -1096,6 +1161,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         if (ok)
         {
             StatusRight = "进程驱动已加载";
+            await ApplyEnabledProcessCaptureNamesAsync();
             await RefreshRunningProcessesAsync();
             return;
         }
@@ -1111,6 +1177,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         {
             ReplaceRows(RunningProcesses, Array.Empty<RunningProcessItem>());
             SelectedRunningProcess = null;
+            RunningProcessesView.Refresh();
+            UpdateProcessSearchSummary();
             return;
         }
 
@@ -1137,8 +1205,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         });
 
         ReplaceRows(RunningProcesses, items);
+        RunningProcessesView.Refresh();
         SelectedRunningProcess = RunningProcesses.FirstOrDefault(item => _activeProcessPids.Contains(item.Pid))
             ?? RunningProcesses.FirstOrDefault();
+        UpdateProcessSearchSummary();
     }
 
     public async Task SetCaptureAllProcessesAsync(bool enable)
@@ -1150,8 +1220,42 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             await ClearPidCaptureAsync();
             UpdateRunningProcessCaptureState();
         }
+        else
+        {
+            await ApplyEnabledProcessCaptureNamesAsync();
+        }
 
         StatusRight = enable ? "已切换为捕获所有进程" : "已关闭捕获所有进程";
+    }
+
+    public void InitializeProcessCaptureNames(IEnumerable<ProcessCaptureNameSetting>? settings)
+    {
+        List<ProcessCaptureNameItem> items = (settings ?? Array.Empty<ProcessCaptureNameSetting>())
+            .Where(static item => !string.IsNullOrWhiteSpace(item.Name))
+            .GroupBy(static item => item.Name.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(static group => group.First())
+            .Select(static item => new ProcessCaptureNameItem
+            {
+                Name = item.Name.Trim(),
+                IsCaptured = item.IsCaptured
+            })
+            .OrderBy(static item => item.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        ReplaceRows(ProcessCaptureNames, items);
+        SelectedProcessCaptureName = ProcessCaptureNames.FirstOrDefault();
+    }
+
+    public IReadOnlyList<ProcessCaptureNameSetting> GetProcessCaptureNameSettings()
+    {
+        return ProcessCaptureNames
+            .Where(static item => !string.IsNullOrWhiteSpace(item.Name))
+            .Select(static item => new ProcessCaptureNameSetting
+            {
+                Name = item.Name.Trim(),
+                IsCaptured = item.IsCaptured
+            })
+            .ToList();
     }
 
     public async Task AddProcessCaptureNameAsync(string? name = null)
@@ -1171,14 +1275,23 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
         if (ProcessCaptureNames.Any(item => string.Equals(item.Name, processName, StringComparison.OrdinalIgnoreCase)))
         {
+            ProcessCaptureNameItem? existing = ProcessCaptureNames.FirstOrDefault(item => string.Equals(item.Name, processName, StringComparison.OrdinalIgnoreCase));
+            if (existing is not null && !existing.IsCaptured)
+            {
+                await SetProcessCaptureNameEnabledAsync(existing, true);
+            }
+
             NewProcessName = "";
             return;
         }
 
         await _backend.InvokeAsync("进程驱动添加进程名", new { Name = processName, isSet = true });
-        ProcessCaptureNames.Add(new ProcessCaptureNameItem { Name = processName });
+        ProcessCaptureNameItem newItem = new() { Name = processName, IsCaptured = true };
+        ProcessCaptureNames.Add(newItem);
+        SelectedProcessCaptureName = newItem;
         NewProcessName = "";
         StatusRight = $"已添加进程名：{processName}";
+        RaiseProcessCaptureSettingsChanged();
     }
 
     public async Task RemoveProcessCaptureNameAsync(ProcessCaptureNameItem? item)
@@ -1188,7 +1301,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             return;
         }
 
-        await _backend.InvokeAsync("进程驱动添加进程名", new { Name = item.Name, isSet = false });
+        if (item.IsCaptured)
+        {
+            await _backend.InvokeAsync("进程驱动添加进程名", new { Name = item.Name, isSet = false });
+        }
+
         ProcessCaptureNames.Remove(item);
         if (ReferenceEquals(SelectedProcessCaptureName, item))
         {
@@ -1196,6 +1313,27 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         }
 
         StatusRight = $"已移除进程名：{item.Name}";
+        RaiseProcessCaptureSettingsChanged();
+    }
+
+    public async Task SetProcessCaptureNameEnabledAsync(ProcessCaptureNameItem? item, bool enable)
+    {
+        if (item is null || string.IsNullOrWhiteSpace(item.Name))
+        {
+            return;
+        }
+
+        if (enable && CaptureAllProcesses)
+        {
+            item.IsCaptured = false;
+            NotificationRequested?.Invoke("错误", "请先关闭“捕获所有进程”，再启用指定进程名。");
+            return;
+        }
+
+        item.IsCaptured = enable;
+        await _backend.InvokeAsync("进程驱动添加进程名", new { Name = item.Name.Trim(), isSet = enable });
+        StatusRight = enable ? $"已启用进程名捕获：{item.Name}" : $"已停用进程名捕获：{item.Name}";
+        RaiseProcessCaptureSettingsChanged();
     }
 
     public Task SetPidCaptureAsync(RunningProcessItem? item)
@@ -2780,6 +2918,23 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         return true;
     }
 
+    private bool FilterRunningProcess(object process)
+    {
+        if (process is not RunningProcessItem item)
+        {
+            return false;
+        }
+
+        string term = ProcessSearchText.Trim();
+        if (string.IsNullOrWhiteSpace(term))
+        {
+            return true;
+        }
+
+        return item.Pid.ToString(CultureInfo.InvariantCulture).Contains(term, StringComparison.OrdinalIgnoreCase)
+            || item.Name.Contains(term, StringComparison.OrdinalIgnoreCase);
+    }
+
     private void RefreshSessionView()
     {
         SessionsView.Refresh();
@@ -3402,6 +3557,51 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         OnPropertyChanged(nameof(CurrentPidCaptureText));
         SelectedRunningProcess = RunningProcesses.FirstOrDefault(item => _activeProcessPids.Contains(item.Pid))
             ?? SelectedRunningProcess;
+    }
+
+    private async Task ApplyEnabledProcessCaptureNamesAsync()
+    {
+        if (CaptureAllProcesses)
+        {
+            return;
+        }
+
+        foreach (ProcessCaptureNameItem item in ProcessCaptureNames.Where(static item => item.IsCaptured && !string.IsNullOrWhiteSpace(item.Name)))
+        {
+            await _backend.InvokeAsync("进程驱动添加进程名", new { Name = item.Name.Trim(), isSet = true });
+        }
+    }
+
+    private void UpdateProcessSearchSummary()
+    {
+        string term = ProcessSearchText.Trim();
+        if (string.IsNullOrWhiteSpace(term))
+        {
+            ProcessSearchSummaryText = RunningProcesses.Count == 0
+                ? "输入 PID 或进程名快速筛选"
+                : $"共 {RunningProcesses.Count:N0} 个进程";
+            return;
+        }
+
+        if (int.TryParse(term, NumberStyles.Integer, CultureInfo.InvariantCulture, out int pid))
+        {
+            RunningProcessItem? exact = RunningProcesses.FirstOrDefault(item => item.Pid == pid);
+            if (exact is not null)
+            {
+                ProcessSearchSummaryText = $"PID {pid}：{exact.Name}";
+                SelectedRunningProcess = exact;
+                RunningProcessesView.MoveCurrentTo(exact);
+                return;
+            }
+        }
+
+        int matchCount = RunningProcesses.Count(item => FilterRunningProcess(item));
+        ProcessSearchSummaryText = matchCount <= 0 ? "未匹配到进程" : $"匹配 {matchCount:N0} 个进程";
+    }
+
+    private void RaiseProcessCaptureSettingsChanged()
+    {
+        ProcessCaptureSettingsChanged?.Invoke();
     }
 
     private static string EnsureRuleHash(string? hash)

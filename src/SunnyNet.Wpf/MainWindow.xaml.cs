@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -38,6 +39,7 @@ public partial class MainWindow : Window
     private CaptureEntry? _contextSessionEntry;
     private DispatcherTimer? _columnWidthSaveTimer;
     private SunnyNetCompatibleMcpServer? _mcpServer;
+    private string? _mainAlertActionUrl;
 
     public MainWindow()
     {
@@ -47,6 +49,7 @@ public partial class MainWindow : Window
         ApplySavedColumnLayout();
         ApplySavedCaptureScope();
         ApplySavedFavoriteSettings();
+        ApplySavedProcessCaptureSettings();
         _isInitializingLayout = false;
         DataContext = _viewModel;
         Loaded += MainWindow_Loaded;
@@ -55,6 +58,8 @@ public partial class MainWindow : Window
         StateChanged += MainWindow_StateChanged;
         _mainAlertTimer.Tick += MainAlertTimer_Tick;
         _viewModel.NotificationRequested += ViewModel_NotificationRequested;
+        _viewModel.ProcessCaptureSettingsChanged += ViewModel_ProcessCaptureSettingsChanged;
+        _viewModel.UpdateAvailableRequested += ViewModel_UpdateAvailableRequested;
         _viewModel.ScrollToEntryRequested += ViewModel_ScrollToEntryRequested;
         _viewModel.PropertyChanged += ViewModel_PropertyChanged;
         _viewModel.Mcp.PropertyChanged += Mcp_PropertyChanged;
@@ -194,6 +199,29 @@ public partial class MainWindow : Window
         await ApplyMcpServerStateAsync(_viewModel.Mcp.Enabled);
         await _viewModel.InitializeAsync();
         UpdateFooterState();
+        _ = CheckUpdatesOnStartupAsync();
+    }
+
+    private async Task CheckUpdatesOnStartupAsync()
+    {
+        try
+        {
+            DateTime lastCheckUtc = _layoutSettings.LastUpdateCheckUtc.Kind == DateTimeKind.Local
+                ? _layoutSettings.LastUpdateCheckUtc.ToUniversalTime()
+                : _layoutSettings.LastUpdateCheckUtc;
+            if (DateTime.UtcNow - lastCheckUtc < TimeSpan.FromDays(1))
+            {
+                return;
+            }
+
+            _layoutSettings.LastUpdateCheckUtc = DateTime.UtcNow;
+            UiLayoutSettingsStore.Save(_layoutSettings);
+            await Task.Delay(TimeSpan.FromSeconds(3));
+            await _viewModel.CheckForUpdatesAsync(manual: false);
+        }
+        catch
+        {
+        }
     }
 
     private async void MainWindow_Closing(object? sender, CancelEventArgs cancelEventArgs)
@@ -214,6 +242,8 @@ public partial class MainWindow : Window
         {
             SaveLayoutSettings();
             _viewModel.Mcp.PropertyChanged -= Mcp_PropertyChanged;
+            _viewModel.ProcessCaptureSettingsChanged -= ViewModel_ProcessCaptureSettingsChanged;
+            _viewModel.UpdateAvailableRequested -= ViewModel_UpdateAvailableRequested;
             if (_mcpServer is not null)
             {
                 await _mcpServer.DisposeAsync();
@@ -387,6 +417,27 @@ public partial class MainWindow : Window
         ShowMainAlert(title, message);
     }
 
+    private void ViewModel_UpdateAvailableRequested(AppUpdateInfo update)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => ViewModel_UpdateAvailableRequested(update));
+            return;
+        }
+
+        ApplyMainAlertPalette(AlertKind.Info);
+        MainAlertTextBlock.Text = string.IsNullOrWhiteSpace(update.AssetName)
+            ? $"发现新版本 v{update.LatestVersion}，当前版本 v{update.CurrentVersion}"
+            : $"发现新版本 v{update.LatestVersion}：{update.AssetName}";
+        MainAlertActionButton.Visibility = Visibility.Visible;
+        MainAlertActionButton.Content = "查看更新";
+        _mainAlertActionUrl = update.ReleaseUrl;
+        MainAlertBorder.Visibility = Visibility.Visible;
+        _mainAlertTimer.Stop();
+        _mainAlertTimer.Interval = TimeSpan.FromSeconds(8);
+        _mainAlertTimer.Start();
+    }
+
     private void ShowMainAlert(string title, string message)
     {
         if (!Dispatcher.CheckAccess())
@@ -398,8 +449,11 @@ public partial class MainWindow : Window
         AlertKind kind = ResolveAlertKind(title, message);
         ApplyMainAlertPalette(kind);
         MainAlertTextBlock.Text = BuildAlertMessage(title, message);
+        MainAlertActionButton.Visibility = Visibility.Collapsed;
+        _mainAlertActionUrl = null;
         MainAlertBorder.Visibility = Visibility.Visible;
         _mainAlertTimer.Stop();
+        _mainAlertTimer.Interval = TimeSpan.FromSeconds(2.8);
         _mainAlertTimer.Start();
     }
 
@@ -407,6 +461,8 @@ public partial class MainWindow : Window
     {
         _mainAlertTimer.Stop();
         MainAlertBorder.Visibility = Visibility.Collapsed;
+        MainAlertActionButton.Visibility = Visibility.Collapsed;
+        _mainAlertActionUrl = null;
     }
 
     private void MainAlertTimer_Tick(object? sender, EventArgs eventArgs)
@@ -459,6 +515,24 @@ public partial class MainWindow : Window
         MainAlertIconBorder.Background = CreateSolidBrush(icon);
         MainAlertTextBlock.Foreground = CreateSolidBrush(foreground);
         MainAlertGlyphTextBlock.Text = glyph;
+    }
+
+    private void MainAlertActionButton_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        if (string.IsNullOrWhiteSpace(_mainAlertActionUrl))
+        {
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(_mainAlertActionUrl) { UseShellExecute = true });
+            HideMainAlert();
+        }
+        catch (Exception exception)
+        {
+            _viewModel.StatusRight = $"打开更新页面失败：{exception.Message}";
+        }
     }
 
     private static AlertKind ResolveAlertKind(string title, string message)
@@ -1094,6 +1168,11 @@ public partial class MainWindow : Window
         _viewModel.InitializeFavoriteSettings(_layoutSettings.FavoriteSessionKeys, _layoutSettings.ShowFavoritesOnly);
     }
 
+    private void ApplySavedProcessCaptureSettings()
+    {
+        _viewModel.InitializeProcessCaptureNames(_layoutSettings.ProcessCaptureNames);
+    }
+
     private void SaveLayoutSettings()
     {
         CaptureInternalLayoutSettings();
@@ -1127,6 +1206,13 @@ public partial class MainWindow : Window
 
         _layoutSettings.ShowFavoritesOnly = _viewModel.ShowFavoritesOnly;
         _layoutSettings.FavoriteSessionKeys = _viewModel.GetFavoriteKeys().ToList();
+        _layoutSettings.ProcessCaptureNames = _viewModel.GetProcessCaptureNameSettings().ToList();
+        UiLayoutSettingsStore.Save(_layoutSettings);
+    }
+
+    private void ViewModel_ProcessCaptureSettingsChanged()
+    {
+        _layoutSettings.ProcessCaptureNames = _viewModel.GetProcessCaptureNameSettings().ToList();
         UiLayoutSettingsStore.Save(_layoutSettings);
     }
 

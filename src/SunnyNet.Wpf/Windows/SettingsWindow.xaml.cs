@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using Microsoft.Win32;
 using SunnyNet.Wpf.Models;
 using SunnyNet.Wpf.Services;
@@ -130,6 +131,11 @@ public partial class SettingsWindow : Window
     private async void ApplyBasic_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         await RunActionAsync(() => _viewModel.ApplyBasicSettingsAsync());
+    }
+
+    private async void CheckUpdate_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        await RunActionAsync(() => _viewModel.CheckForUpdatesAsync(manual: true));
     }
 
     private async void RefreshMcp_Click(object sender, RoutedEventArgs routedEventArgs)
@@ -392,6 +398,87 @@ public partial class SettingsWindow : Window
         }
 
         await RunActionAsync(() => _viewModel.ClearPidCaptureAsync(new[] { item }));
+    }
+
+    private async void ProcessNameCaptureCheckBox_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        if (sender is not CheckBox { DataContext: ProcessCaptureNameItem item } checkBox)
+        {
+            return;
+        }
+
+        bool enable = checkBox.IsChecked == true;
+        await RunActionAsync(() => _viewModel.SetProcessCaptureNameEnabledAsync(item, enable));
+        checkBox.IsChecked = item.IsCaptured;
+    }
+
+    private void ProcessGrid_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs mouseButtonEventArgs)
+    {
+        if (sender is not DataGrid grid || mouseButtonEventArgs.OriginalSource is not DependencyObject source)
+        {
+            return;
+        }
+
+        DataGridRow? row = FindVisualParent<DataGridRow>(source);
+        if (row is null)
+        {
+            return;
+        }
+
+        if (!row.IsSelected)
+        {
+            grid.SelectedItems.Clear();
+            row.IsSelected = true;
+            grid.SelectedItem = row.Item;
+        }
+
+        row.Focus();
+    }
+
+    private async void CopySelectedProcessName_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        if (sender is not MenuItem { Parent: ContextMenu { PlacementTarget: DataGrid grid } })
+        {
+            return;
+        }
+
+        string? processName = grid.SelectedItem switch
+        {
+            ProcessCaptureNameItem item => item.Name,
+            RunningProcessItem item => item.Name,
+            _ => null
+        };
+
+        if (string.IsNullOrWhiteSpace(processName))
+        {
+            return;
+        }
+
+        try
+        {
+            await ClipboardService.SetTextAsync(processName);
+            _viewModel.StatusRight = $"已复制进程名：{processName}";
+        }
+        catch (Exception exception)
+        {
+            _viewModel.StatusRight = ClipboardService.GetFriendlyErrorMessage(exception);
+        }
+    }
+
+    private static T? FindVisualParent<T>(DependencyObject source) where T : DependencyObject
+    {
+        DependencyObject? current = source;
+        while (current is not null)
+        {
+            if (current is T target)
+            {
+                return target;
+            }
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        return null;
     }
 
     private async void AddRequestCert_Click(object sender, RoutedEventArgs routedEventArgs)

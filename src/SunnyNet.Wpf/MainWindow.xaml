@@ -1663,6 +1663,14 @@
                                Foreground="#F56C6C"
                                TextTrimming="CharacterEllipsis"
                                Text="操作失败" />
+                    <Button x:Name="MainAlertActionButton"
+                            Margin="12,0,0,0"
+                            MinWidth="68"
+                            Padding="10,3"
+                            VerticalAlignment="Center"
+                            Click="MainAlertActionButton_Click"
+                            Content="查看"
+                            Visibility="Collapsed" />
                 </StackPanel>
             </Border>
         </Grid>

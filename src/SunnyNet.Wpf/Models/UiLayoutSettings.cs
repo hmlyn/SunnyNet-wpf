@@ -15,6 +15,14 @@ public sealed class UiLayoutSettings
     public string CaptureScopeMode { get; set; } = "All";
     public bool ShowFavoritesOnly { get; set; }
     public List<string> FavoriteSessionKeys { get; set; } = new();
+    public List<ProcessCaptureNameSetting> ProcessCaptureNames { get; set; } = new();
+    public DateTime LastUpdateCheckUtc { get; set; } = DateTime.MinValue;
     public Dictionary<string, bool> SessionColumns { get; set; } = new();
     public Dictionary<string, double> SessionColumnWidths { get; set; } = new();
+}
+
+public sealed class ProcessCaptureNameSetting
+{
+    public string Name { get; set; } = "";
+    public bool IsCaptured { get; set; } = true;
 }
