@@ -8,7 +8,8 @@ public sealed record SearchRequest(
     bool IgnoreCase,
     bool RemoveSpaces,
     bool ClearPrevious,
-    int ProtoSkip)
+    int ProtoSkip,
+    string Replacement = "")
 {
     public string Options
     {
@@ -35,4 +36,4 @@ public sealed record SearchRequest(
     }
 }
 
-public sealed record SearchExecutionResult(int MatchCount, CaptureEntry? FirstMatch);
+public sealed record SearchExecutionResult(int MatchCount, CaptureEntry? FirstMatch, int ReplaceCount = 0);

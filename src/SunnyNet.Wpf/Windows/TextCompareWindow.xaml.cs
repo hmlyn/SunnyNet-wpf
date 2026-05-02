@@ -109,6 +109,7 @@ public partial class TextCompareWindow : Window
             CodecOutputTextBox.Text = type switch
             {
                 "Base64" => Convert.ToBase64String(inputBytes),
+                "Base64URL" => ToBase64Url(inputBytes),
                 "URL" => WebUtility.UrlEncode(Encoding.UTF8.GetString(inputBytes)),
                 "UCS2" => CodecHexCheckBox.IsChecked == true ? ToHex(Encoding.Unicode.GetBytes(Encoding.UTF8.GetString(inputBytes))) : Encoding.Unicode.GetString(Encoding.Unicode.GetBytes(Encoding.UTF8.GetString(inputBytes))),
                 _ => Encoding.UTF8.GetString(inputBytes)
@@ -127,6 +128,7 @@ public partial class TextCompareWindow : Window
             CodecOutputTextBox.Text = type switch
             {
                 "Base64" => Encoding.UTF8.GetString(Convert.FromBase64String(RemoveWhitespace(input))),
+                "Base64URL" => Encoding.UTF8.GetString(FromBase64Url(input)),
                 "URL" => WebUtility.UrlDecode(input),
                 "UCS2" => Encoding.UTF8.GetString(Encoding.Convert(Encoding.Unicode, Encoding.UTF8, CodecHexCheckBox.IsChecked == true ? FromHex(input) : Encoding.Unicode.GetBytes(input))),
                 _ => input
@@ -288,6 +290,19 @@ public partial class TextCompareWindow : Window
     private static string GetComboText(ComboBox comboBox) => (comboBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "";
     private static string FormatTimestampResult(DateTimeOffset value) => $"本地时间：{value.LocalDateTime:yyyy-MM-dd HH:mm:ss.fff}\r\nUTC时间：{value.UtcDateTime:yyyy-MM-dd HH:mm:ss.fff}\r\nUnix秒：{value.ToUnixTimeSeconds()}\r\nUnix毫秒：{value.ToUnixTimeMilliseconds()}\r\nISO 8601：{value:O}";
     private static string RemoveWhitespace(string? text) => new((text ?? "").Where(static c => !char.IsWhiteSpace(c)).ToArray());
+    private static string ToBase64Url(byte[] bytes) => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    private static byte[] FromBase64Url(string? text)
+    {
+        string base64 = RemoveWhitespace(text).Replace('-', '+').Replace('_', '/');
+        base64 = (base64.Length % 4) switch
+        {
+            0 => base64,
+            2 => base64 + "==",
+            3 => base64 + "=",
+            _ => throw new FormatException("Base64URL 长度无效。")
+        };
+        return Convert.FromBase64String(base64);
+    }
     private static string ToHex(byte[] bytes) => Convert.ToHexString(bytes);
     private static byte[] FromHex(string? text) { string hex = RemoveWhitespace(text).Replace("0x", "", StringComparison.OrdinalIgnoreCase); if (hex.Length % 2 != 0) hex = "0" + hex; return Convert.FromHexString(hex); }
     private readonly record struct DiffSpan(int Start, int Length);

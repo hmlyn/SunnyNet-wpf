@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 using System.IO;
 using System.Net.Http;
 using System.Windows.Data;
@@ -1559,6 +1560,57 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         }
     }
 
+    public async Task<SearchExecutionResult> ReplaceSearchAsync(SearchRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Value))
+        {
+            NotificationRequested?.Invoke("替换失败", "请输入要查找的内容。");
+            return new SearchExecutionResult(0, null);
+        }
+
+        try
+        {
+            IsBusy = true;
+            StatusRight = "正在替换...";
+
+            JsonElement? result = await _backend.InvokeAsync("查找替换", new
+            {
+                Options = request.Options,
+                request.Value,
+                ReplacementBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(request.Replacement ?? "")),
+                request.Type,
+                request.Range,
+                request.Color,
+                ProtoSkip = request.ProtoSkip
+            });
+
+            if (result is null || result.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+            {
+                StatusRight = "替换未返回结果";
+                return new SearchExecutionResult(0, null);
+            }
+
+            List<int> matchedTheology = GetIntArray(result.Value, "SearchResult");
+            await RefreshSessionSummariesAsync(matchedTheology);
+            SearchExecutionResult applied = await ApplySearchResultAsync(result.Value, request);
+            int replaceCount = GetInt(result.Value, "ReplaceCount");
+            StatusRight = replaceCount > 0
+                ? $"替换完成：命中 {applied.MatchCount:N0} 条，替换 {replaceCount:N0} 处"
+                : "替换完成：没有找到可替换内容";
+            return new SearchExecutionResult(applied.MatchCount, applied.FirstMatch, replaceCount);
+        }
+        catch (Exception exception)
+        {
+            StatusRight = "替换失败";
+            NotificationRequested?.Invoke("替换失败", exception.Message);
+            return new SearchExecutionResult(0, null);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
     public async Task CancelSearchHighlightAsync()
     {
         try
@@ -1785,6 +1837,51 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         StatusRight = mode == 1 ? "上行修改已保存并放行" : mode == 2 ? "下行修改已保存并放行" : "已运行到结束";
     }
 
+    private async Task RefreshSessionSummariesAsync(IEnumerable<int> theologyIds)
+    {
+        foreach (int theology in theologyIds.Distinct())
+        {
+            if (!_sessionMap.TryGetValue(theology, out CaptureEntry? entry))
+            {
+                continue;
+            }
+
+            JsonElement? result = await _backend.InvokeAsync("HTTP请求获取静默", new { Theology = theology });
+            if (result is not { ValueKind: JsonValueKind.Object })
+            {
+                continue;
+            }
+
+            JsonElement data = result.Value;
+            entry.Method = GetString(data, "Method", entry.Method);
+            entry.Url = GetString(data, "URL", entry.Url);
+            if (Uri.TryCreate(entry.Url, UriKind.Absolute, out Uri? uri))
+            {
+                entry.Host = uri.Host;
+                entry.Query = uri.PathAndQuery;
+            }
+
+            JsonElement response = GetProperty(data, "Response");
+            JsonElement responseHeader = GetProperty(response, "Header");
+            string contentType = GetHeaderValue(responseHeader, "Content-Type");
+            if (!string.IsNullOrWhiteSpace(contentType))
+            {
+                entry.ResponseType = contentType;
+            }
+
+            if (string.IsNullOrWhiteSpace(ResolveSocketProtocol(entry, GetProperty(data, "SocketData"))))
+            {
+                int responseBodySize = GetInt(response, "BodySize", -1);
+                if (responseBodySize >= 0)
+                {
+                    entry.ResponseLength = responseBodySize.ToString(CultureInfo.InvariantCulture);
+                }
+            }
+        }
+
+        ScheduleSessionFilterRefresh(refreshSessionView: HasActiveSessionFilter);
+    }
+
     private async Task<SearchExecutionResult> ApplySearchResultAsync(JsonElement result, SearchRequest request)
     {
         if (request.ClearPrevious)
@@ -1878,8 +1975,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         }
 
         Detail.DetailSearchIgnoreCase = _lastTextSearchRequest.IgnoreCase;
-        bool searchRequest = _lastTextSearchRequest.Range is "全部" or "HTTP请求";
-        bool searchResponse = _lastTextSearchRequest.Range is "全部" or "HTTP响应";
+        bool searchRequest = _lastTextSearchRequest.Range is "全部" or "HTTP请求" or "URL" or "HTTP请求头" or "HTTP请求Body";
+        bool searchResponse = _lastTextSearchRequest.Range is "全部" or "HTTP响应" or "HTTP响应头" or "HTTP响应Body";
         Detail.RequestSearchText = searchRequest ? _lastTextSearchRequest.Value : "";
         Detail.ResponseSearchText = searchResponse ? _lastTextSearchRequest.Value : "";
     }
@@ -1887,7 +1984,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     private static bool IsTextDetailSearchRequest(SearchRequest request)
     {
         return (request.Type is "UTF8" or "GBK")
-            && (request.Range is "全部" or "HTTP请求" or "HTTP响应");
+            && (request.Range is "全部" or "HTTP请求" or "HTTP响应" or "URL" or "HTTP请求头" or "HTTP请求Body" or "HTTP响应头" or "HTTP响应Body");
     }
 
     private void OnBackendEventReceived(object? sender, BackendEventEnvelope envelope)

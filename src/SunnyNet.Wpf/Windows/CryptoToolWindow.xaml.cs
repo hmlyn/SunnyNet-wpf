@@ -24,7 +24,7 @@ public partial class CryptoToolWindow : Window
         HashInputTextBox.Clear();
         HashOutputTextBox.Clear();
         HashHmacKeyTextBox.Clear();
-        ToolSummaryTextBlock.Text = "支持 AES/DES、RSA 和常用哈希，输入/输出支持文本、Base64、HEX。";
+        ToolSummaryTextBlock.Text = "支持 AES/DES、RSA 和常用哈希，输入/输出支持文本、Base64、Base64URL、HEX。";
     }
 
     private void SymmetricEncrypt_Click(object sender, RoutedEventArgs routedEventArgs)
@@ -252,6 +252,7 @@ public partial class CryptoToolWindow : Window
         return format switch
         {
             "Base64" => Convert.FromBase64String(RemoveWhitespace(text)),
+            "Base64URL" => FromBase64Url(text),
             "HEX" => FromHex(text),
             _ => Encoding.UTF8.GetBytes(text)
         };
@@ -262,6 +263,7 @@ public partial class CryptoToolWindow : Window
         return format switch
         {
             "Base64" => Convert.ToBase64String(data),
+            "Base64URL" => ToBase64Url(data),
             "HEX" => ToHex(data),
             _ => Encoding.UTF8.GetString(data)
         };
@@ -281,6 +283,24 @@ public partial class CryptoToolWindow : Window
         }
 
         return Convert.FromHexString(hex);
+    }
+
+    private static string ToBase64Url(byte[] bytes)
+    {
+        return Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    }
+
+    private static byte[] FromBase64Url(string text)
+    {
+        string base64 = RemoveWhitespace(text).Replace('-', '+').Replace('_', '/');
+        base64 = (base64.Length % 4) switch
+        {
+            0 => base64,
+            2 => base64 + "==",
+            3 => base64 + "=",
+            _ => throw new FormatException("Base64URL 长度无效。")
+        };
+        return Convert.FromBase64String(base64);
     }
 
     private static string RemoveWhitespace(string text)

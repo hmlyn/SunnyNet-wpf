@@ -3,11 +3,11 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="查找内容"
         Width="600"
-        Height="280"
+        Height="322"
         MinWidth="600"
-        MinHeight="280"
+        MinHeight="322"
         MaxWidth="600"
-        MaxHeight="280"
+        MaxHeight="322"
         ResizeMode="NoResize"
         Background="#F3F6FA"
         Foreground="{StaticResource TextPrimaryBrush}"
@@ -63,6 +63,7 @@
             <Grid Margin="18,18,18,16">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="34" />
+                    <RowDefinition Height="34" />
                     <RowDefinition Height="27" />
                     <RowDefinition Height="40" />
                     <RowDefinition Height="56" />
@@ -97,7 +98,30 @@
                               SelectionChanged="FindTypeComboBox_SelectionChanged" />
                 </Grid>
 
-                <StackPanel Grid.Row="1"
+                <Grid Grid.Row="1" Margin="0,6,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="84" />
+                        <ColumnDefinition Width="190" />
+                        <ColumnDefinition Width="92" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Style="{StaticResource SearchLabelStyle}" Text="替换为：" />
+                    <TextBox x:Name="ReplaceTextBox"
+                             Grid.Column="1"
+                             Height="32"
+                             Padding="8,0,4,0"
+                             VerticalContentAlignment="Center" />
+                    <TextBlock Grid.Column="2"
+                               Grid.ColumnSpan="2"
+                               Margin="0,0,0,0"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               Foreground="#7B8794"
+                               Text="留空表示替换为空" />
+                </Grid>
+
+                <StackPanel Grid.Row="2"
                             Margin="84,0,0,0"
                             Orientation="Horizontal"
                             VerticalAlignment="Center">
@@ -112,7 +136,7 @@
                               IsChecked="True" />
                 </StackPanel>
 
-                <Grid Grid.Row="2" Margin="0,6,0,0">
+                <Grid Grid.Row="3" Margin="0,6,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="84" />
                         <ColumnDefinition Width="190" />
@@ -135,7 +159,7 @@
                               SelectionChanged="FindColorComboBox_SelectionChanged" />
                 </Grid>
 
-                <Grid Grid.Row="3" Margin="0,16,0,0">
+                <Grid Grid.Row="4" Margin="0,16,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="84" />
                         <ColumnDefinition Width="190" />
@@ -145,13 +169,23 @@
 
                     <Button x:Name="FindButton"
                             Grid.Column="1"
-                            Width="190"
+                            Width="92"
                             Height="32"
                             Padding="0"
                             HorizontalAlignment="Left"
                             VerticalContentAlignment="Center"
                             Click="FindButton_Click"
                             Content="查 找" />
+                    <Button x:Name="ReplaceButton"
+                            Grid.Column="1"
+                            Width="92"
+                            Height="32"
+                            Margin="98,0,0,0"
+                            Padding="0"
+                            HorizontalAlignment="Left"
+                            VerticalContentAlignment="Center"
+                            Click="ReplaceButton_Click"
+                            Content="替 换" />
                     <CheckBox x:Name="ClearPreviousCheckBox"
                               Grid.Column="3"
                               VerticalAlignment="Center"
@@ -180,7 +214,7 @@
                     </StackPanel>
                 </Grid>
                 <ProgressBar x:Name="SearchProgressBar"
-                             Grid.Row="5"
+                             Grid.Row="6"
                              Width="190"
                              Height="4"
                              Margin="84,0,0,0"

@@ -197,7 +197,7 @@ public sealed class HttpSyntaxTextBox : RichTextBox
 
         if (keyEventArgs.Key == Key.C && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
         {
-            CopyCurrentSelection();
+            _ = CopyCurrentSelectionAsync();
             keyEventArgs.Handled = true;
             return;
         }
@@ -299,15 +299,15 @@ public sealed class HttpSyntaxTextBox : RichTextBox
         canExecuteRoutedEventArgs.Handled = true;
     }
 
-    private void CopyCommand_Executed(object sender, ExecutedRoutedEventArgs executedRoutedEventArgs)
+    private async void CopyCommand_Executed(object sender, ExecutedRoutedEventArgs executedRoutedEventArgs)
     {
-        CopyCurrentSelection();
+        await CopyCurrentSelectionAsync();
         executedRoutedEventArgs.Handled = true;
     }
 
-    private void CopyAllMenuItem_Click(object sender, RoutedEventArgs routedEventArgs)
+    private async void CopyAllMenuItem_Click(object sender, RoutedEventArgs routedEventArgs)
     {
-        CopyText(SourceText ?? "");
+        await CopyTextAsync(SourceText ?? "");
     }
 
     private void OpenInNotepadMenuItem_Click(object sender, RoutedEventArgs routedEventArgs)
@@ -327,21 +327,26 @@ public sealed class HttpSyntaxTextBox : RichTextBox
         }
     }
 
-    private void CopyCurrentSelection()
+    private async Task CopyCurrentSelectionAsync()
     {
+        string text;
         if (_logicalSelectAll)
         {
-            CopyText(SourceText ?? "");
+            text = SourceText ?? "";
+        }
+        else if (!Selection.IsEmpty)
+        {
+            text = Selection.Text;
+        }
+        else
+        {
             return;
         }
 
-        if (!Selection.IsEmpty)
-        {
-            CopyText(Selection.Text);
-        }
+        await CopyTextAsync(text);
     }
 
-    private static void CopyText(string text)
+    private static async Task CopyTextAsync(string text)
     {
         if (string.IsNullOrEmpty(text))
         {
@@ -350,7 +355,7 @@ public sealed class HttpSyntaxTextBox : RichTextBox
 
         try
         {
-            ClipboardService.SetText(text);
+            await ClipboardService.SetTextAsync(text);
         }
         catch
         {

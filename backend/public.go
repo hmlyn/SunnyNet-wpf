@@ -434,6 +434,23 @@ func event(command string, args *JSON.SyJson) any {
 			PbSkip:  getInt(args.GetData("ProtoSkip")),
 		}
 		return obj.Find()
+	case "查找替换":
+		replaceValue := args.GetData("Replacement")
+		if encoded := args.GetData("ReplacementBase64"); encoded != "" {
+			if data, err := base64.StdEncoding.DecodeString(encoded); err == nil {
+				replaceValue = string(data)
+			}
+		}
+		obj := &FindValue{
+			Value:        args.GetData("Value"),
+			ReplaceValue: replaceValue,
+			Options:      args.GetData("Options"),
+			Type:         args.GetData("Type"),
+			Range:        args.GetData("Range"),
+			Color:        args.GetData("Color"),
+			PbSkip:       getInt(args.GetData("ProtoSkip")),
+		}
+		return obj.Replace()
 	//主界面的关闭按钮点击
 	case "CloseWindow":
 		ColumnsData, _ := base64.StdEncoding.DecodeString(strings.ReplaceAll(args.GetData("StorageColumns"), "\\\\", "\\"))
@@ -666,6 +683,9 @@ func event(command string, args *JSON.SyJson) any {
 		Insert.Unlock()
 		h := HashMap.GetRequestWeb(Theology)
 		return h
+	case "HTTP请求获取静默":
+		Theology := getInt(args.GetData("Theology"))
+		return HashMap.GetRequestWeb(Theology)
 	case "HTTP正文范围读取":
 		Theology := getInt(args.GetData("Theology"))
 		direction := args.GetData("Direction")

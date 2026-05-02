@@ -75,8 +75,13 @@ public partial class SearchWindow : Window
         FindRangeComboBox.ItemsSource = new[]
         {
             new SelectOption("全部", "全部"),
+            new SelectOption("URL", "URL"),
             new SelectOption("HTTP请求", "HTTP/HTTPS 请求"),
+            new SelectOption("HTTP请求头", "请求协议头"),
+            new SelectOption("HTTP请求Body", "请求 Body"),
             new SelectOption("HTTP响应", "HTTP/HTTPS 响应"),
+            new SelectOption("HTTP响应头", "响应协议头"),
+            new SelectOption("HTTP响应Body", "响应 Body"),
             new SelectOption("socketSend", "TCP/UDP/WebSocket 发送"),
             new SelectOption("socketRec", "TCP/UDP/WebSocket 接收"),
             new SelectOption("socketAll", "TCP/UDP/WebSocket 发送/接收")
@@ -99,6 +104,11 @@ public partial class SearchWindow : Window
     private async void FindButton_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         await StartSearchAsync();
+    }
+
+    private async void ReplaceButton_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        await StartReplaceAsync();
     }
 
     private async void ClearSearchMark_Click(object sender, RoutedEventArgs routedEventArgs)
@@ -209,10 +219,65 @@ public partial class SearchWindow : Window
         }
     }
 
+    private async Task StartReplaceAsync()
+    {
+        if (_isSearching)
+        {
+            return;
+        }
+
+        string value = FindTextComboBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            ShowSearchAlert("替换失败：请输入要查找的内容");
+            FocusSearchText();
+            return;
+        }
+
+        string type = GetSelectedValue(FindTypeComboBox, "UTF8");
+        if (!IsReplaceSupported(type))
+        {
+            ShowSearchAlert("替换失败：当前查找类型不支持替换");
+            return;
+        }
+
+        int protoSkip = 0;
+        AddHistory(type, value);
+        SetSearchingState(true);
+        try
+        {
+            SearchRequest request = new(
+                value,
+                type,
+                GetSelectedValue(FindRangeComboBox, "全部"),
+                GetSelectedValue(FindColorComboBox, "#ffe100"),
+                IgnoreCaseCheckBox.Visibility == Visibility.Visible && IgnoreCaseCheckBox.IsChecked == true,
+                false,
+                ClearPreviousCheckBox.IsChecked == true,
+                Math.Max(protoSkip, 0),
+                ReplaceTextBox.Text ?? "");
+
+            SearchExecutionResult result = await _viewModel.ReplaceSearchAsync(request);
+            if (result.MatchCount <= 0)
+            {
+                ShowSearchAlert("替换提示：没有找到可替换内容");
+                FocusSearchText();
+                return;
+            }
+
+            ShowSearchAlert($"替换完成：命中 {result.MatchCount:N0} 条，替换 {result.ReplaceCount:N0} 处");
+        }
+        finally
+        {
+            SetSearchingState(false);
+        }
+    }
+
     private void SetSearchingState(bool isSearching)
     {
         _isSearching = isSearching;
         FindButton.IsEnabled = !isSearching;
+        ReplaceButton.IsEnabled = !isSearching && IsReplaceSupported(GetSelectedValue(FindTypeComboBox, "UTF8"));
         SearchProgressBar.Visibility = isSearching ? Visibility.Visible : Visibility.Collapsed;
         if (isSearching)
         {
@@ -251,6 +316,18 @@ public partial class SearchWindow : Window
 
         ProtoSkipPanel.Visibility = type == "pb" ? Visibility.Visible : Visibility.Collapsed;
         ClearPreviousCheckBox.Visibility = type == "pb" ? Visibility.Collapsed : Visibility.Visible;
+        if (ReplaceButton is not null)
+        {
+            ReplaceButton.IsEnabled = !_isSearching && IsReplaceSupported(type);
+            ReplaceButton.ToolTip = ReplaceButton.IsEnabled
+                ? "替换 URL、协议头、Body 或 Socket 文本/字节内容"
+                : "当前查找类型不支持替换";
+        }
+    }
+
+    private static bool IsReplaceSupported(string type)
+    {
+        return type is "UTF8" or "GBK" or "Hex" or "Base64";
     }
 
     private static void AddHistory(string type, string value)

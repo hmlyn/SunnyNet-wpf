@@ -43,6 +43,7 @@
                         <StackPanel Margin="14,10" Orientation="Horizontal">
                             <ComboBox x:Name="CodecComboBox" Width="150" SelectedIndex="0">
                                 <ComboBoxItem Content="Base64" />
+                                <ComboBoxItem Content="Base64URL" />
                                 <ComboBoxItem Content="URL" />
                                 <ComboBoxItem Content="UCS2" />
                             </ComboBox>

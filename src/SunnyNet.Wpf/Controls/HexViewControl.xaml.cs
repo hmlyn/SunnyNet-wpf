@@ -613,7 +613,7 @@ public partial class HexViewControl : UserControl
         }
 
         byte[] bytes = await ReadBytesForCopyAsync(0, length);
-        if (bytes.Length > 0 && CopyText(BuildHexLines(bytes, 0, bytes.Length, includeOffset: false, includeAscii: false)))
+        if (bytes.Length > 0 && await CopyTextAsync(BuildHexLines(bytes, 0, bytes.Length, includeOffset: false, includeAscii: false)))
         {
             ShowCopyFeedback($"已复制全部 HEX · {length:N0} Bytes");
         }
@@ -628,7 +628,7 @@ public partial class HexViewControl : UserControl
         }
 
         byte[] bytes = await ReadBytesForCopyAsync(0, length);
-        if (bytes.Length > 0 && CopyText(ToVisibleText(bytes)))
+        if (bytes.Length > 0 && await CopyTextAsync(ToVisibleText(bytes)))
         {
             ShowCopyFeedback($"已复制全部文本 · {length:N0} Bytes");
         }
@@ -643,7 +643,7 @@ public partial class HexViewControl : UserControl
         }
 
         byte[] bytes = await ReadBytesForCopyAsync(0, length);
-        if (bytes.Length > 0 && CopyText(BuildHexLines(bytes, 0, bytes.Length, includeOffset: true, includeAscii: true)))
+        if (bytes.Length > 0 && await CopyTextAsync(BuildHexLines(bytes, 0, bytes.Length, includeOffset: true, includeAscii: true)))
         {
             ShowCopyFeedback($"已复制全部内容 · {length:N0} Bytes");
         }
@@ -657,7 +657,7 @@ public partial class HexViewControl : UserControl
             return;
         }
 
-        if (CopyText(DecodeBodyText(body)))
+        if (await CopyTextAsync(DecodeBodyText(body)))
         {
             ShowCopyFeedback($"已复制 Body 文本 · {body.Length:N0} Bytes");
         }
@@ -671,7 +671,7 @@ public partial class HexViewControl : UserControl
             return;
         }
 
-        if (CopyText(BuildHexLines(body, 0, body.Length, includeOffset: false, includeAscii: false)))
+        if (await CopyTextAsync(BuildHexLines(body, 0, body.Length, includeOffset: false, includeAscii: false)))
         {
             ShowCopyFeedback($"已复制 Body HEX · {body.Length:N0} Bytes");
         }
@@ -685,7 +685,7 @@ public partial class HexViewControl : UserControl
             return;
         }
 
-        if (CopyText(Convert.ToBase64String(body)))
+        if (await CopyTextAsync(Convert.ToBase64String(body)))
         {
             ShowCopyFeedback($"已复制 Body Base64 · {body.Length:N0} Bytes");
         }
@@ -700,7 +700,7 @@ public partial class HexViewControl : UserControl
         }
 
         byte[] selection = await ReadBytesForCopyAsync(start, count);
-        if (selection.Length > 0 && CopyText(BuildHexLines(selection, 0, selection.Length, includeOffset: false, includeAscii: false, displayOffset: start)))
+        if (selection.Length > 0 && await CopyTextAsync(BuildHexLines(selection, 0, selection.Length, includeOffset: false, includeAscii: false, displayOffset: start)))
         {
             ShowCopyFeedback($"已复制选中 HEX · {count:N0} Bytes");
         }
@@ -715,7 +715,7 @@ public partial class HexViewControl : UserControl
             return;
         }
 
-        if (CopyText(ToVisibleText(selection)))
+        if (await CopyTextAsync(ToVisibleText(selection)))
         {
             ShowCopyFeedback($"已复制选中文本 · {selection.Length:N0} Bytes");
         }
@@ -730,7 +730,7 @@ public partial class HexViewControl : UserControl
         }
 
         byte[] selection = await ReadBytesForCopyAsync(start, count);
-        if (selection.Length > 0 && CopyText(BuildHexLines(selection, 0, selection.Length, includeOffset: true, includeAscii: true, displayOffset: start)))
+        if (selection.Length > 0 && await CopyTextAsync(BuildHexLines(selection, 0, selection.Length, includeOffset: true, includeAscii: true, displayOffset: start)))
         {
             ShowCopyFeedback($"已复制选中全部 · {count:N0} Bytes");
         }
@@ -1144,7 +1144,7 @@ public partial class HexViewControl : UserControl
         return builder.ToString().TrimEnd();
     }
 
-    private bool CopyText(string text)
+    private async Task<bool> CopyTextAsync(string text)
     {
         if (string.IsNullOrEmpty(text))
         {
@@ -1153,7 +1153,7 @@ public partial class HexViewControl : UserControl
 
         try
         {
-            ClipboardService.SetText(text);
+            await ClipboardService.SetTextAsync(text);
             return true;
         }
         catch

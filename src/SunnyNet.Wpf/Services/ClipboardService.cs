@@ -18,11 +18,48 @@ public static class ClipboardService
         }
     }
 
+    public static async Task SetTextAsync(string? text)
+    {
+        ClipboardSetResult result = await TrySetTextWithResultAsync(text).ConfigureAwait(false);
+        if (!result.Success)
+        {
+            throw new InvalidOperationException(GetFriendlyErrorMessage(result.Exception), result.Exception);
+        }
+    }
+
+    public static async Task<bool> TrySetTextAsync(string? text)
+    {
+        ClipboardSetResult result = await TrySetTextWithResultAsync(text).ConfigureAwait(false);
+        return result.Success;
+    }
+
     public static bool TrySetText(string? text, out Exception? exception)
     {
-        exception = null;
         string value = text ?? "";
+        return TrySetTextCore(value, out exception);
+    }
 
+    private static Task<ClipboardSetResult> TrySetTextWithResultAsync(string? text)
+    {
+        string value = text ?? "";
+        TaskCompletionSource<ClipboardSetResult> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Thread thread = new(() =>
+        {
+            bool success = TrySetTextCore(value, out Exception? exception);
+            completion.TrySetResult(new ClipboardSetResult(success, exception));
+        })
+        {
+            IsBackground = true,
+            Name = "SunnyNet Clipboard Writer"
+        };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        return completion.Task;
+    }
+
+    private static bool TrySetTextCore(string value, out Exception? exception)
+    {
+        exception = null;
         for (int attempt = 0; attempt < RetryCount; attempt++)
         {
             try
@@ -62,4 +99,6 @@ public static class ClipboardService
             || (exception?.Message.Contains("OpenClipboard", StringComparison.OrdinalIgnoreCase) ?? false)
             || (exception?.Message.Contains("CLIPBRD_E_CANT_OPEN", StringComparison.OrdinalIgnoreCase) ?? false);
     }
+
+    private readonly record struct ClipboardSetResult(bool Success, Exception? Exception);
 }

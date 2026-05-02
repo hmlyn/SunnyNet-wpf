@@ -20,7 +20,7 @@
                 <Button DockPanel.Dock="Right" MinWidth="88" Padding="12,5" Click="ClearAll_Click" Content="清空" />
                 <StackPanel>
                     <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="加密/解密" />
-                    <TextBlock x:Name="ToolSummaryTextBlock" Margin="0,6,0,0" Style="{StaticResource DialogSubtitleTextStyle}" Text="支持 AES/DES、RSA 和常用哈希，输入/输出支持文本、Base64、HEX。" />
+                    <TextBlock x:Name="ToolSummaryTextBlock" Margin="0,6,0,0" Style="{StaticResource DialogSubtitleTextStyle}" Text="支持 AES/DES、RSA 和常用哈希，输入/输出支持文本、Base64、Base64URL、HEX。" />
                 </StackPanel>
             </DockPanel>
         </Border>
@@ -52,15 +52,17 @@
                                 <ComboBoxItem Content="None" />
                             </ComboBox>
                             <TextBlock Margin="12,0,6,0" VerticalAlignment="Center" Text="输入" />
-                            <ComboBox x:Name="SymmetricInputFormatComboBox" Width="88" SelectedIndex="0">
+                            <ComboBox x:Name="SymmetricInputFormatComboBox" Width="112" SelectedIndex="0">
                                 <ComboBoxItem Content="文本" />
                                 <ComboBoxItem Content="Base64" />
+                                <ComboBoxItem Content="Base64URL" />
                                 <ComboBoxItem Content="HEX" />
                             </ComboBox>
                             <TextBlock Margin="12,0,6,0" VerticalAlignment="Center" Text="输出" />
-                            <ComboBox x:Name="SymmetricOutputFormatComboBox" Width="88" SelectedIndex="1">
+                            <ComboBox x:Name="SymmetricOutputFormatComboBox" Width="112" SelectedIndex="1">
                                 <ComboBoxItem Content="文本" />
                                 <ComboBoxItem Content="Base64" />
+                                <ComboBoxItem Content="Base64URL" />
                                 <ComboBoxItem Content="HEX" />
                             </ComboBox>
                             <Button Margin="14,0,0,0" MinWidth="88" Padding="12,5" Click="SymmetricEncrypt_Click" Content="加密" />
@@ -90,17 +92,19 @@
                                 <TextBlock VerticalAlignment="Center" Text="Key" />
                                 <TextBox x:Name="SymmetricKeyTextBox" Grid.Column="1" Margin="8,0,16,0" Height="34" Padding="10,6" VerticalContentAlignment="Center" />
                                 <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="Key格式" />
-                                <ComboBox x:Name="SymmetricKeyFormatComboBox" Grid.Column="3" Margin="8,0,16,0" Width="100" SelectedIndex="0">
+                                <ComboBox x:Name="SymmetricKeyFormatComboBox" Grid.Column="3" Margin="8,0,16,0" Width="112" SelectedIndex="0">
                                     <ComboBoxItem Content="文本" />
                                     <ComboBoxItem Content="Base64" />
+                                    <ComboBoxItem Content="Base64URL" />
                                     <ComboBoxItem Content="HEX" />
                                 </ComboBox>
                                 <TextBlock Grid.Column="4" VerticalAlignment="Center" Text="IV/Nonce" />
                                 <StackPanel Grid.Column="5" Orientation="Horizontal">
                                     <TextBox x:Name="SymmetricIvTextBox" Width="240" Height="34" Padding="10,6" VerticalContentAlignment="Center" />
-                                    <ComboBox x:Name="SymmetricIvFormatComboBox" Margin="8,0,0,0" Width="100" SelectedIndex="0">
+                                    <ComboBox x:Name="SymmetricIvFormatComboBox" Margin="8,0,0,0" Width="112" SelectedIndex="0">
                                         <ComboBoxItem Content="文本" />
                                         <ComboBoxItem Content="Base64" />
+                                        <ComboBoxItem Content="Base64URL" />
                                         <ComboBoxItem Content="HEX" />
                                     </ComboBox>
                                 </StackPanel>
@@ -139,15 +143,17 @@
                                 <ComboBoxItem Content="OAEP-SHA512" />
                             </ComboBox>
                             <TextBlock Margin="12,0,6,0" VerticalAlignment="Center" Text="输入" />
-                            <ComboBox x:Name="RsaInputFormatComboBox" Width="88" SelectedIndex="0">
+                            <ComboBox x:Name="RsaInputFormatComboBox" Width="112" SelectedIndex="0">
                                 <ComboBoxItem Content="文本" />
                                 <ComboBoxItem Content="Base64" />
+                                <ComboBoxItem Content="Base64URL" />
                                 <ComboBoxItem Content="HEX" />
                             </ComboBox>
                             <TextBlock Margin="12,0,6,0" VerticalAlignment="Center" Text="输出" />
-                            <ComboBox x:Name="RsaOutputFormatComboBox" Width="88" SelectedIndex="1">
+                            <ComboBox x:Name="RsaOutputFormatComboBox" Width="112" SelectedIndex="1">
                                 <ComboBoxItem Content="文本" />
                                 <ComboBoxItem Content="Base64" />
+                                <ComboBoxItem Content="Base64URL" />
                                 <ComboBoxItem Content="HEX" />
                             </ComboBox>
                             <Button Margin="14,0,0,0" MinWidth="88" Padding="12,5" Click="RsaEncrypt_Click" Content="加密" />
@@ -213,20 +219,23 @@
                                      VerticalContentAlignment="Center"
                                      ToolTip="为空时使用普通哈希；不为空时使用 HMAC 模式。" />
                             <TextBlock Margin="12,0,6,0" VerticalAlignment="Center" Text="密钥格式" />
-                            <ComboBox x:Name="HashHmacKeyFormatComboBox" Width="88" SelectedIndex="0">
+                            <ComboBox x:Name="HashHmacKeyFormatComboBox" Width="112" SelectedIndex="0">
                                 <ComboBoxItem Content="文本" />
                                 <ComboBoxItem Content="Base64" />
+                                <ComboBoxItem Content="Base64URL" />
                                 <ComboBoxItem Content="HEX" />
                             </ComboBox>
                             <TextBlock Margin="12,0,6,0" VerticalAlignment="Center" Text="输入" />
-                            <ComboBox x:Name="HashInputFormatComboBox" Width="88" SelectedIndex="0">
+                            <ComboBox x:Name="HashInputFormatComboBox" Width="112" SelectedIndex="0">
                                 <ComboBoxItem Content="文本" />
                                 <ComboBoxItem Content="Base64" />
+                                <ComboBoxItem Content="Base64URL" />
                                 <ComboBoxItem Content="HEX" />
                             </ComboBox>
                             <TextBlock Margin="12,0,6,0" VerticalAlignment="Center" Text="输出" />
-                            <ComboBox x:Name="HashOutputFormatComboBox" Width="88" SelectedIndex="1">
+                            <ComboBox x:Name="HashOutputFormatComboBox" Width="112" SelectedIndex="1">
                                 <ComboBoxItem Content="Base64" />
+                                <ComboBoxItem Content="Base64URL" />
                                 <ComboBoxItem Content="HEX" />
                             </ComboBox>
                             <Button Margin="14,0,0,0" MinWidth="88" Padding="12,5" Click="Hash_Click" Content="计算" />
