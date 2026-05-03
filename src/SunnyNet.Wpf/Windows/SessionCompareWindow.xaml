@@ -1,0 +1,195 @@
+<Window x:Class="SunnyNet.Wpf.Windows.SessionCompareWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="会话比较"
+        Width="1240"
+        Height="760"
+        MinWidth="980"
+        MinHeight="620"
+        Background="{StaticResource WindowBackgroundBrush}"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Style="{StaticResource CardBorderStyle}">
+            <DockPanel Margin="16,12" LastChildFill="True">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button MinWidth="82"
+                            Padding="12,5"
+                            Click="Swap_Click"
+                            Content="交换左右" />
+                    <Button Margin="8,0,0,0"
+                            MinWidth="70"
+                            Padding="12,5"
+                            Click="Clear_Click"
+                            Content="清空" />
+                </StackPanel>
+                <StackPanel>
+                    <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="会话比较" />
+                    <TextBlock x:Name="SummaryTextBlock"
+                               Margin="0,5,0,0"
+                               Style="{StaticResource DialogSubtitleTextStyle}"
+                               Text="从会话列表拖拽请求到左右区域，或使用会话右键菜单加入比较。" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <Border Grid.Row="1"
+                Margin="0,12,0,0"
+                Style="{StaticResource CardBorderStyle}">
+            <StackPanel Margin="14,9" Orientation="Horizontal">
+                <TextBlock VerticalAlignment="Center"
+                           Style="{StaticResource SectionTitleTextStyle}"
+                           Text="比较范围" />
+                <ComboBox x:Name="RangeComboBox"
+                          Margin="10,0,0,0"
+                          Width="150"
+                          SelectedIndex="0"
+                          SelectionChanged="RangeComboBox_SelectionChanged">
+                    <ComboBoxItem Content="请求原文" Tag="RequestRaw" />
+                    <ComboBoxItem Content="请求协议头" Tag="RequestHeaders" />
+                    <ComboBoxItem Content="请求 Body" Tag="RequestBody" />
+                    <ComboBoxItem Content="响应原文" Tag="ResponseRaw" />
+                    <ComboBoxItem Content="响应协议头" Tag="ResponseHeaders" />
+                    <ComboBoxItem Content="响应 Body" Tag="ResponseBody" />
+                </ComboBox>
+                <CheckBox x:Name="IgnoreCaseCheckBox"
+                          Margin="18,0,0,0"
+                          VerticalAlignment="Center"
+                          Content="忽略大小写"
+                          Checked="CompareOption_Changed"
+                          Unchecked="CompareOption_Changed" />
+                <TextBlock x:Name="CompareStatusTextBlock"
+                           Margin="18,0,0,0"
+                           VerticalAlignment="Center"
+                           Foreground="{StaticResource TextSecondaryBrush}"
+                           Text="等待选择会话" />
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="2" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="10" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border x:Name="LeftSlotBorder"
+                    AllowDrop="True"
+                    DragOver="CompareSlot_DragOver"
+                    Drop="LeftSlot_Drop"
+                    Style="{StaticResource CardBorderStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border Background="{StaticResource SurfaceAltBrush}"
+                            BorderBrush="{StaticResource DividerBrush}"
+                            BorderThickness="0,0,0,1"
+                            CornerRadius="8,8,0,0">
+                        <StackPanel Margin="14,10">
+                            <TextBlock x:Name="LeftTitleTextBlock"
+                                       Style="{StaticResource SectionTitleTextStyle}"
+                                       Text="左侧会话：拖入请求" />
+                            <TextBlock x:Name="LeftMetaTextBlock"
+                                       Margin="0,4,0,0"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       Text="可拖拽会话列表中的任意 HTTP 请求到这里。" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Row="1"
+                            Margin="12,10,12,0"
+                            Padding="10,7"
+                            Background="#F8FAFC"
+                            BorderBrush="{StaticResource DividerBrush}"
+                            BorderThickness="1"
+                            CornerRadius="7">
+                        <TextBlock x:Name="LeftHashTextBlock"
+                                   FontFamily="Consolas, Microsoft YaHei UI"
+                                   FontSize="11"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Text="Raw MD5：-" />
+                    </Border>
+                    <RichTextBox x:Name="LeftEditor"
+                                 Grid.Row="2"
+                                 Margin="12"
+                                 IsReadOnly="True"
+                                 BorderThickness="0"
+                                 Background="Transparent"
+                                 FontFamily="Consolas, Microsoft YaHei UI"
+                                 FontSize="12"
+                                 HorizontalScrollBarVisibility="Auto"
+                                 VerticalScrollBarVisibility="Auto" />
+                </Grid>
+            </Border>
+
+            <GridSplitter Grid.Column="1"
+                          Width="10"
+                          HorizontalAlignment="Stretch"
+                          Background="Transparent" />
+
+            <Border x:Name="RightSlotBorder"
+                    Grid.Column="2"
+                    AllowDrop="True"
+                    DragOver="CompareSlot_DragOver"
+                    Drop="RightSlot_Drop"
+                    Style="{StaticResource CardBorderStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border Background="{StaticResource SurfaceAltBrush}"
+                            BorderBrush="{StaticResource DividerBrush}"
+                            BorderThickness="0,0,0,1"
+                            CornerRadius="8,8,0,0">
+                        <StackPanel Margin="14,10">
+                            <TextBlock x:Name="RightTitleTextBlock"
+                                       Style="{StaticResource SectionTitleTextStyle}"
+                                       Text="右侧会话：拖入请求" />
+                            <TextBlock x:Name="RightMetaTextBlock"
+                                       Margin="0,4,0,0"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       Text="也可以右键会话列表，选择加入比较右侧。" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Row="1"
+                            Margin="12,10,12,0"
+                            Padding="10,7"
+                            Background="#F8FAFC"
+                            BorderBrush="{StaticResource DividerBrush}"
+                            BorderThickness="1"
+                            CornerRadius="7">
+                        <TextBlock x:Name="RightHashTextBlock"
+                                   FontFamily="Consolas, Microsoft YaHei UI"
+                                   FontSize="11"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Text="Raw MD5：-" />
+                    </Border>
+                    <RichTextBox x:Name="RightEditor"
+                                 Grid.Row="2"
+                                 Margin="12"
+                                 IsReadOnly="True"
+                                 BorderThickness="0"
+                                 Background="Transparent"
+                                 FontFamily="Consolas, Microsoft YaHei UI"
+                                 FontSize="12"
+                                 HorizontalScrollBarVisibility="Auto"
+                                 VerticalScrollBarVisibility="Auto" />
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

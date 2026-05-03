@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Windows.Data;
 using System.Text;
 using System.Text.Json;
@@ -752,6 +753,116 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
         ClipboardService.SetText(code);
         StatusRight = $"已复制请求代码：{lang} / {module}";
+    }
+
+    public async Task<SessionCompareSnapshot?> BuildSessionCompareSnapshotAsync(CaptureEntry entry)
+    {
+        JsonElement? result = await _backend.InvokeAsync("HTTP请求获取", new { Theology = entry.Theology });
+        if (result is null || result.Value.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        JsonElement data = result.Value;
+        string method = GetString(data, "Method", entry.Method);
+        string url = GetString(data, "URL", entry.Url);
+        string proto = GetString(data, "Proto", "HTTP/1.1");
+        string requestLine = $"{method} {url} {proto}";
+        JsonElement requestHeader = GetProperty(data, "Header");
+        string requestHeaders = FormatHeaders(requestHeader);
+        byte[] requestBodyPreview = DecodePayloadBytes(GetProperty(data, "Body"));
+        int requestBodySize = GetInt(data, "BodySize", requestBodyPreview.Length);
+        bool requestBodyTruncated = GetBool(data, "BodyTruncated");
+        (byte[] requestBodyBytes, bool requestBodyIncomplete, int requestBodyTotal) = await LoadCompareBodyBytesAsync(entry.Theology, "Request", "Raw", requestBodyPreview, requestBodySize, requestBodyTruncated);
+
+        bool hasRequestDisplayBody = GetBool(data, "HasDisplayBody");
+        byte[] requestDisplayPreview = hasRequestDisplayBody
+            ? DecodePayloadBytes(GetProperty(data, "DisplayBody"))
+            : requestBodyPreview;
+        int requestDisplayBodySize = hasRequestDisplayBody ? GetInt(data, "DisplayBodySize", requestDisplayPreview.Length) : requestBodySize;
+        bool requestDisplayBodyTruncated = hasRequestDisplayBody ? GetBool(data, "DisplayBodyTruncated") : requestBodyTruncated;
+        (byte[] requestDisplayBytes, bool requestDisplayIncomplete, int requestDisplayTotal) = await LoadCompareBodyBytesAsync(
+            entry.Theology,
+            "Request",
+            hasRequestDisplayBody ? "Display" : "Raw",
+            requestDisplayPreview,
+            requestDisplayBodySize,
+            requestDisplayBodyTruncated);
+
+        string requestBodyText = WithComparePreviewNotice(BytesToPreviewText(requestDisplayBytes), requestDisplayIncomplete, requestDisplayBytes.Length, requestDisplayTotal);
+        string requestHeaderText = $"{requestLine}\r\n{requestHeaders}".Trim();
+        string requestRawText = $"{requestHeaderText}\r\n\r\n{requestBodyText}".Trim();
+        (byte[] requestRawBytes, _) = BuildHttpBytes(requestLine, requestHeaders, requestBodyBytes);
+
+        string responseHeaderText = "";
+        string responseBodyText = "";
+        string responseRawText = "";
+        string responseRawMd5 = "";
+        string responseRawSha256 = "";
+        string responseBodyMd5 = "";
+        string responseBodySha256 = "";
+
+        JsonElement response = GetProperty(data, "Response");
+        if (response.ValueKind == JsonValueKind.Object)
+        {
+            string statusLine = $"HTTP {GetInt(response, "StateCode")} {GetString(response, "StateText")}";
+            JsonElement responseHeader = GetProperty(response, "Header");
+            string responseHeaders = FormatHeaders(responseHeader);
+            byte[] responseBodyPreview = DecodePayloadBytes(GetProperty(response, "Body"));
+            int responseBodySize = GetInt(response, "BodySize", responseBodyPreview.Length);
+            bool responseBodyTruncated = GetBool(response, "BodyTruncated");
+            (byte[] responseBodyBytes, bool responseBodyIncomplete, int responseBodyTotal) = await LoadCompareBodyBytesAsync(entry.Theology, "Response", "Raw", responseBodyPreview, responseBodySize, responseBodyTruncated);
+
+            bool hasResponseDisplayBody = GetBool(response, "HasDisplayBody");
+            byte[] responseDisplayPreview = hasResponseDisplayBody
+                ? DecodePayloadBytes(GetProperty(response, "DisplayBody"))
+                : responseBodyPreview;
+            int responseDisplayBodySize = hasResponseDisplayBody ? GetInt(response, "DisplayBodySize", responseDisplayPreview.Length) : responseBodySize;
+            bool responseDisplayBodyTruncated = hasResponseDisplayBody ? GetBool(response, "DisplayBodyTruncated") : responseBodyTruncated;
+            (byte[] responseDisplayBytes, bool responseDisplayIncomplete, int responseDisplayTotal) = await LoadCompareBodyBytesAsync(
+                entry.Theology,
+                "Response",
+                hasResponseDisplayBody ? "Display" : "Raw",
+                responseDisplayPreview,
+                responseDisplayBodySize,
+                responseDisplayBodyTruncated);
+
+            responseBodyText = WithComparePreviewNotice(BytesToPreviewText(responseDisplayBytes), responseDisplayIncomplete, responseDisplayBytes.Length, responseDisplayTotal);
+            responseHeaderText = $"{statusLine}\r\n{responseHeaders}".Trim();
+            responseRawText = $"{responseHeaderText}\r\n\r\n{responseBodyText}".Trim();
+            (byte[] responseRawBytes, _) = BuildHttpBytes(statusLine, responseHeaders, responseBodyBytes);
+            responseRawMd5 = ComputeDigest(responseRawBytes, responseBodyIncomplete, DigestKind.Md5);
+            responseRawSha256 = ComputeDigest(responseRawBytes, responseBodyIncomplete, DigestKind.Sha256);
+            responseBodyMd5 = ComputeDigest(responseBodyBytes, responseBodyIncomplete, DigestKind.Md5);
+            responseBodySha256 = ComputeDigest(responseBodyBytes, responseBodyIncomplete, DigestKind.Sha256);
+        }
+
+        return new SessionCompareSnapshot
+        {
+            Index = entry.Index,
+            Theology = entry.Theology,
+            Method = entry.DisplayMethod,
+            Url = url,
+            State = entry.State,
+            ResponseLength = entry.ResponseLength,
+            ResponseType = entry.ResponseType,
+            Process = entry.Process,
+            Notes = entry.Notes,
+            RequestHeaders = requestHeaderText,
+            RequestBody = requestBodyText,
+            RequestRaw = requestRawText,
+            ResponseHeaders = responseHeaderText,
+            ResponseBody = responseBodyText,
+            ResponseRaw = responseRawText,
+            RequestRawMd5 = ComputeDigest(requestRawBytes, requestBodyIncomplete, DigestKind.Md5),
+            RequestRawSha256 = ComputeDigest(requestRawBytes, requestBodyIncomplete, DigestKind.Sha256),
+            RequestBodyMd5 = ComputeDigest(requestBodyBytes, requestBodyIncomplete, DigestKind.Md5),
+            RequestBodySha256 = ComputeDigest(requestBodyBytes, requestBodyIncomplete, DigestKind.Sha256),
+            ResponseRawMd5 = responseRawMd5,
+            ResponseRawSha256 = responseRawSha256,
+            ResponseBodyMd5 = responseBodyMd5,
+            ResponseBodySha256 = responseBodySha256
+        };
     }
 
     public async Task InitializeAsync()
@@ -3736,6 +3847,26 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         return await LoadHttpBodyChunkAsync(theology, direction, kind, 0, total);
     }
 
+    private async Task<(byte[] Bytes, bool Incomplete, int Total)> LoadCompareBodyBytesAsync(int theology, string direction, string kind, byte[] previewBytes, int total, bool truncated)
+    {
+        int safeTotal = total > 0 ? total : previewBytes.Length;
+        if (!truncated || safeTotal <= previewBytes.Length)
+        {
+            return (previewBytes, false, safeTotal);
+        }
+
+        if (safeTotal <= DetailFullBodyLoadLimitBytes)
+        {
+            byte[] fullBytes = await LoadHttpBodyRangeAsync(theology, direction, kind, safeTotal);
+            if (fullBytes.Length > 0)
+            {
+                return (fullBytes, fullBytes.Length < safeTotal, safeTotal);
+            }
+        }
+
+        return (previewBytes, true, safeTotal);
+    }
+
     private async Task<byte[]> LoadHttpBodyChunkAsync(int theology, string direction, string kind, int offset, int count)
     {
         if (count <= 0 || offset < 0)
@@ -4445,6 +4576,21 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             : $"{text}\r\n\r\n{notice}";
     }
 
+    private static string WithComparePreviewNotice(string text, bool incomplete, int loadedLength, int totalLength)
+    {
+        if (!incomplete)
+        {
+            return text;
+        }
+
+        string notice = totalLength > DetailFullBodyLoadLimitBytes
+            ? $"比较视图已加载前 {loadedLength:N0} Bytes，完整内容 {totalLength:N0} Bytes，请使用 HEX 或复制功能查看完整数据。"
+            : $"比较视图已加载前 {loadedLength:N0} Bytes，完整内容 {totalLength:N0} Bytes。";
+        return string.IsNullOrEmpty(text)
+            ? notice
+            : $"{text}\r\n\r\n{notice}";
+    }
+
     private static string WithStreamingNotice(string text, int loadedLength, int totalLength, bool complete)
     {
         if (complete)
@@ -4456,6 +4602,21 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         return string.IsNullOrEmpty(text)
             ? notice
             : $"{text}\r\n\r\n{notice}";
+    }
+
+    private static string ComputeDigest(byte[] bytes, bool incomplete, DigestKind kind)
+    {
+        byte[] digest = kind == DigestKind.Md5
+            ? MD5.HashData(bytes)
+            : SHA256.HashData(bytes);
+        string value = Convert.ToHexString(digest).ToLowerInvariant();
+        return incomplete ? $"{value} (预览)" : value;
+    }
+
+    private enum DigestKind
+    {
+        Md5,
+        Sha256
     }
 
     private static string BuildJsonViewText(byte[] bytes, string displayText)

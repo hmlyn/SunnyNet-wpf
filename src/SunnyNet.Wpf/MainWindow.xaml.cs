@@ -40,6 +40,8 @@ public partial class MainWindow : Window
     private DispatcherTimer? _columnWidthSaveTimer;
     private SunnyNetCompatibleMcpServer? _mcpServer;
     private string? _mainAlertActionUrl;
+    private SessionCompareWindow? _sessionCompareWindow;
+    private Point? _sessionsDragStartPoint;
 
     public MainWindow()
     {
@@ -799,6 +801,33 @@ public partial class MainWindow : Window
         new RequestBuilderWindow(_viewModel) { Owner = this }.Show();
     }
 
+    private void SessionCompare_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        ShowSessionCompareWindow();
+    }
+
+    private SessionCompareWindow ShowSessionCompareWindow()
+    {
+        if (_sessionCompareWindow is null)
+        {
+            _sessionCompareWindow = new SessionCompareWindow(_viewModel) { Owner = this };
+            _sessionCompareWindow.Closed += (_, _) => _sessionCompareWindow = null;
+        }
+
+        if (!_sessionCompareWindow.IsVisible)
+        {
+            _sessionCompareWindow.Show();
+        }
+
+        if (_sessionCompareWindow.WindowState == WindowState.Minimized)
+        {
+            _sessionCompareWindow.WindowState = WindowState.Normal;
+        }
+
+        _sessionCompareWindow.Activate();
+        return _sessionCompareWindow;
+    }
+
     private void RulesMenuButton_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         if (RulesMenuButton.ContextMenu is null)
@@ -1541,6 +1570,38 @@ public partial class MainWindow : Window
         await Dispatcher.InvokeAsync(async () => await _viewModel.UpdateSelectedNotesAsync());
     }
 
+    private void SessionsGrid_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs mouseButtonEventArgs)
+    {
+        _sessionsDragStartPoint = mouseButtonEventArgs.GetPosition(null);
+    }
+
+    private void SessionsGrid_MouseMove(object sender, MouseEventArgs mouseEventArgs)
+    {
+        if (mouseEventArgs.LeftButton != MouseButtonState.Pressed || _sessionsDragStartPoint is not Point startPoint)
+        {
+            return;
+        }
+
+        Point currentPoint = mouseEventArgs.GetPosition(null);
+        if (Math.Abs(currentPoint.X - startPoint.X) < SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(currentPoint.Y - startPoint.Y) < SystemParameters.MinimumVerticalDragDistance)
+        {
+            return;
+        }
+
+        CaptureEntry? entry = FindVisualParent<DataGridRow>(mouseEventArgs.OriginalSource as DependencyObject)?.Item as CaptureEntry
+                              ?? _viewModel.SelectedSession;
+        if (entry is null)
+        {
+            return;
+        }
+
+        DataObject data = new();
+        data.SetData(typeof(CaptureEntry), entry);
+        _sessionsDragStartPoint = null;
+        DragDrop.DoDragDrop(SessionsGrid, data, DragDropEffects.Copy);
+    }
+
     private void SessionsGrid_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs mouseButtonEventArgs)
     {
         if (FindVisualParent<DataGridRow>(mouseButtonEventArgs.OriginalSource as DependencyObject) is not { Item: CaptureEntry entry } row)
@@ -1578,6 +1639,7 @@ public partial class MainWindow : Window
         MarkColorSelectedSessionsMenuItem.IsEnabled = hasSelection;
         EditNotesSessionsMenuItem.IsEnabled = hasSelection;
         EditNotesSessionsMenuItem.Header = entries.Length > 1 ? $"编辑备注 ({entries.Length})..." : "编辑备注...";
+        CompareSelectedSessionsMenuItem.IsEnabled = isHttpSelection;
         SelectSessionsMenuItem.IsEnabled = SessionsGrid.Items.Count > 0;
         SelectParentRequestsMenuItem.IsEnabled = hasContext;
         SelectChildRequestsMenuItem.IsEnabled = hasContext;
@@ -1715,6 +1777,53 @@ public partial class MainWindow : Window
         catch (Exception exception)
         {
             ViewModel_NotificationRequested("复制失败", exception.Message);
+        }
+    }
+
+    private async void AddSessionToCompare_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        if (sender is not MenuItem { Tag: string tag } ||
+            !Enum.TryParse(tag, out CompareSlot slot))
+        {
+            return;
+        }
+
+        CaptureEntry? entry = GetSelectedSessionEntries().FirstOrDefault();
+        if (entry is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await ShowSessionCompareWindow().LoadSessionAsync(entry, slot);
+        }
+        catch (Exception exception)
+        {
+            ViewModel_NotificationRequested("比较失败", exception.Message);
+        }
+    }
+
+    private async void CompareTwoSelectedSessions_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        CaptureEntry[] entries = GetSelectedSessionEntries().Take(2).ToArray();
+        if (entries.Length == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            SessionCompareWindow window = ShowSessionCompareWindow();
+            await window.LoadSessionAsync(entries[0], CompareSlot.Left);
+            if (entries.Length > 1)
+            {
+                await window.LoadSessionAsync(entries[1], CompareSlot.Right);
+            }
+        }
+        catch (Exception exception)
+        {
+            ViewModel_NotificationRequested("比较失败", exception.Message);
         }
     }
 

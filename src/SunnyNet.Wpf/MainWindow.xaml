@@ -316,6 +316,12 @@
                                     <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="请求构造器" />
                                 </StackPanel>
                             </Button>
+                            <Button Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}" Click="SessionCompare_Click" ToolTip="会话比较">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE8AB;" />
+                                    <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="比较" />
+                                </StackPanel>
+                            </Button>
                             <Button Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}" Click="CertificateGuide_Click" ToolTip="证书安装教程">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE7C3;" />
@@ -710,6 +716,8 @@
                                       VirtualizingPanel.IsVirtualizing="True"
                                       VirtualizingPanel.VirtualizationMode="Recycling"
                                       ScrollViewer.CanContentScroll="True"
+                                      PreviewMouseLeftButtonDown="SessionsGrid_PreviewMouseLeftButtonDown"
+                                      MouseMove="SessionsGrid_MouseMove"
                                       PreviewMouseRightButtonDown="SessionsGrid_PreviewMouseRightButtonDown"
                                       CellEditEnding="SessionsGrid_CellEditEnding">
                                 <DataGrid.ContextMenu>
@@ -788,6 +796,12 @@
                                             <MenuItem Header="取消标记" InputGestureText="Ctrl+0" Tag="" Click="MarkSelectedSessions_Click" />
                                         </MenuItem>
                                         <MenuItem x:Name="EditNotesSessionsMenuItem" Header="编辑备注..." Click="EditSelectedSessionNotes_Click" />
+                                        <MenuItem x:Name="CompareSelectedSessionsMenuItem" Header="比较">
+                                            <MenuItem Header="加入比较左侧" Tag="Left" Click="AddSessionToCompare_Click" />
+                                            <MenuItem Header="加入比较右侧" Tag="Right" Click="AddSessionToCompare_Click" />
+                                            <Separator />
+                                            <MenuItem Header="选中两条比较" Click="CompareTwoSelectedSessions_Click" />
+                                        </MenuItem>
                                         <Separator />
                                         <MenuItem x:Name="SelectSessionsMenuItem" Header="选择">
                                             <MenuItem Header="全选" InputGestureText="Ctrl+A" Click="SelectAllSessions_Click" />
