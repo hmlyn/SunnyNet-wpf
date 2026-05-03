@@ -94,15 +94,16 @@ type Request struct {
 		StopRec  bool `json:"StopRec"`
 		StopALL  bool `json:"StopALL"`
 	} `json:"StopSend"`
-	SocketData []*UpdateSocketData `json:"SocketData"`
-	SendTime   string              `json:"SendTime"`
-	RecTime    string              `json:"RecTime"`
-	SendNum    int                 `json:"SendNum"`
-	RecNum     int                 `json:"RecNum"`
-	Way        string              `json:"Way"`
-	Notes      string              `json:"Notes"`
-	ClientIP   string              `json:"ClientIP"`
-	Color      struct {
+	SocketData     []*UpdateSocketData `json:"SocketData"`
+	SendTime       string              `json:"SendTime"`
+	RecTime        string              `json:"RecTime"`
+	SendNum        int                 `json:"SendNum"`
+	RecNum         int                 `json:"RecNum"`
+	Way            string              `json:"Way"`
+	Notes          string              `json:"Notes"`
+	ClientIP       string              `json:"ClientIP"`
+	TLSFingerprint *TLSFingerprint     `json:"TLSFingerprint,omitempty"`
+	Color          struct {
 		TagColor string `json:"TagColor"` //标记的文本颜色
 		Search   string `json:"search"`   //搜索的背景颜色
 	} `json:"color"` //显示图标
@@ -148,8 +149,9 @@ type RequestWeb struct {
 		StateText              string
 		Error                  bool
 	}
-	SocketData []*UpdateSocketList
-	Options    struct {
+	SocketData     []*UpdateSocketList
+	TLSFingerprint *TLSFingerprint
+	Options        struct {
 		StopSend bool
 		StopRec  bool
 		StopALL  bool
@@ -405,7 +407,7 @@ func (m *Map) GetRequestWeb(Theology int) *RequestWeb {
 	requestDisplayBody, requestDisplayBodySize, requestDisplayBodyTruncated := BodyPreview(h.DisplayBody, h.DisplayBodyRef)
 	responseBody, responseBodySize, responseBodyTruncated := BodyPreview(h.Response.Body, h.Response.BodyRef)
 	responseDisplayBody, responseDisplayBodySize, responseDisplayBodyTruncated := BodyPreview(h.Response.DisplayBody, h.Response.DisplayBodyRef)
-	r := &RequestWeb{Body: requestBody, URL: h.URL, Proto: h.Proto, Header: h.Header, Method: h.Method}
+	r := &RequestWeb{Body: requestBody, URL: h.URL, Proto: h.Proto, Header: h.Header, Method: h.Method, TLSFingerprint: h.TLSFingerprint}
 	r.BodySize = requestBodySize
 	r.BodyPreviewSize = len(requestBody)
 	r.BodyTruncated = requestBodyTruncated

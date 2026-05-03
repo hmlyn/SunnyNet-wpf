@@ -22,6 +22,14 @@ This is a compact reference for the current SunnyNet WPF MCP implementation. Ful
 
 `scope`: `url`, `request_body`, `response_body`, `all`.
 
+`request_get` returns `tlsFingerprint` for HTTPS sessions with captured TLS ClientHello data. It is `null` when no TLS fingerprint exists. Key fields:
+
+- `ja3Hash`, `ja3Text`, `ja3nHash`, `ja3nText`
+- `ja4`, `ja4o`, `ja4r`, `ja4ro`
+- `sni`, `alpn`, `legacyVersion`, `legacyVersionText`, `highestVersion`, `highestVersionText`
+- `cipherSuites`, `extensions`, `supportedGroups`, `ecPointFormats`, `signatureAlgorithms`
+- `rawClientHelloHex`
+
 ## Favorites and Notes
 
 - `request_favorites_list(limit, offset)`
@@ -108,6 +116,7 @@ Session list/detail results usually include:
 - `way`
 - `host`
 - `query`
+- `tlsFingerprint`
 - `length`
 - `type`
 - `process`

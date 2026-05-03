@@ -4145,6 +4145,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         Detail.RequestCookies = ExtractCookies(requestHeader);
         Detail.RequestJson = requestDisplayTruncated ? Detail.RequestBody : BuildJsonViewText(requestDisplayBytes, Detail.RequestBody);
         Detail.RequestXml = requestDisplayTruncated ? "" : BuildXmlViewText(requestDisplayBytes, Detail.RequestBody, requestContentType);
+        List<DetailNameValueRow> tlsFingerprintRows = ToTlsFingerprintRows(GetProperty(data, "TLSFingerprint"));
+        ReplaceRows(Detail.RequestTlsFingerprintRows, tlsFingerprintRows);
+        Detail.HasTlsFingerprint = tlsFingerprintRows.Count > 0;
         Detail.RequestImageBytes = requestDisplayTruncated || requestDisplayBytes.Length > LargePayloadThresholdBytes ? Array.Empty<byte>() : TryGetImageBytes(requestContentType, requestDisplayBytes);
         Detail.RequestImageType = ExtractImageType(requestContentType);
         (byte[] requestRawBytes, int requestHeaderLength) = BuildHttpBytes($"{method} {url} {proto}", requestHeadersText, requestBodyBytes);
@@ -4810,6 +4813,59 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         }));
 
         return rows;
+    }
+
+    private static List<DetailNameValueRow> ToTlsFingerprintRows(JsonElement fingerprint)
+    {
+        List<DetailNameValueRow> rows = new();
+        if (fingerprint.ValueKind != JsonValueKind.Object)
+        {
+            return rows;
+        }
+
+        AddTlsRow(rows, "JA4", GetString(fingerprint, "JA4"));
+        AddTlsRow(rows, "JA4_o", GetString(fingerprint, "JA4O"));
+        AddTlsRow(rows, "JA4_r", GetString(fingerprint, "JA4R"));
+        AddTlsRow(rows, "JA4_ro", GetString(fingerprint, "JA4RO"));
+        AddTlsRow(rows, "JA3 Hash", GetString(fingerprint, "JA3Hash"));
+        AddTlsRow(rows, "JA3 Text", GetString(fingerprint, "JA3Text"));
+        AddTlsRow(rows, "JA3N Hash", GetString(fingerprint, "JA3NHash"));
+        AddTlsRow(rows, "JA3N Text", GetString(fingerprint, "JA3NText"));
+        AddTlsRow(rows, "SNI", GetString(fingerprint, "SNI"));
+        AddTlsRow(rows, "ALPN", string.Join(", ", GetStringArray(fingerprint, "ALPN")));
+        AddTlsRow(rows, "最高版本", GetString(fingerprint, "HighestVersionText"));
+        AddTlsRow(rows, "ClientHello版本", GetString(fingerprint, "LegacyVersionText"));
+        AddTlsRow(rows, "Cipher Suites", FormatHexList(GetIntArray(fingerprint, "CipherSuites")));
+        AddTlsRow(rows, "Extensions", FormatHexList(GetIntArray(fingerprint, "Extensions")));
+        AddTlsRow(rows, "Supported Groups", FormatHexList(GetIntArray(fingerprint, "SupportedGroups")));
+        AddTlsRow(rows, "EC Point Formats", FormatByteList(GetIntArray(fingerprint, "ECPointFormats")));
+        AddTlsRow(rows, "Signature Algorithms", FormatHexList(GetIntArray(fingerprint, "SignatureAlgorithms")));
+        AddTlsRow(rows, "ClientHello HEX", GetString(fingerprint, "RawClientHelloHex"));
+        return rows;
+    }
+
+    private static void AddTlsRow(ICollection<DetailNameValueRow> rows, string name, string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        rows.Add(new DetailNameValueRow
+        {
+            Name = name,
+            Value = value
+        });
+    }
+
+    private static string FormatHexList(IEnumerable<int> values)
+    {
+        return string.Join(", ", values.Select(static value => $"0x{value:X4}"));
+    }
+
+    private static string FormatByteList(IEnumerable<int> values)
+    {
+        return string.Join(", ", values.Select(static value => $"0x{value:X2}"));
     }
 
     private static List<DetailNameValueRow> ToQueryRows(string url)

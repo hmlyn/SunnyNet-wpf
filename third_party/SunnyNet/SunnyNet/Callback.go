@@ -95,7 +95,7 @@ func (s *ProxyRequest) CallbackBeforeRequest() {
 	pid, _ := strconv.Atoi(s.Pid)
 	if s.HttpCall < 10 {
 		if s.HttpGoCall != nil {
-			m := &HttpConn{Theology: s.Theology, MessageId: MessageId, PID: pid, SunnyContext: s.Global.SunnyContext, Type: public.HttpSendRequest, Request: s.Request, Response: nil, err: "", proxy: s.Proxy, ClientIP: s.Conn.RemoteAddr().String()}
+			m := &HttpConn{Theology: s.Theology, MessageId: MessageId, PID: pid, SunnyContext: s.Global.SunnyContext, Type: public.HttpSendRequest, Request: s.Request, Response: nil, ClientHello: s.ClientHello, err: "", proxy: s.Proxy, ClientIP: s.Conn.RemoteAddr().String()}
 			s.HttpGoCall(m)
 			s.CloseRequest = m.closeRequest
 			s.Response = m.Response
@@ -123,7 +123,7 @@ func (s *ProxyRequest) CallbackBeforeResponse() {
 	pid, _ := strconv.Atoi(s.Pid)
 	if s.HttpCall < 10 {
 		if s.HttpGoCall != nil {
-			m := &HttpConn{Theology: s.Theology, MessageId: NewMessageId(), PID: pid, SunnyContext: s.Global.SunnyContext, Type: public.HttpResponseOK, Request: s.Request, Response: s.Response, err: "", ClientIP: s.Conn.RemoteAddr().String()}
+			m := &HttpConn{Theology: s.Theology, MessageId: NewMessageId(), PID: pid, SunnyContext: s.Global.SunnyContext, Type: public.HttpResponseOK, Request: s.Request, Response: s.Response, ClientHello: s.ClientHello, err: "", ClientIP: s.Conn.RemoteAddr().String()}
 			s.HttpGoCall(m)
 			s.CloseResponse = m.closeResponse
 		}
@@ -164,7 +164,7 @@ func (s *ProxyRequest) CallbackError(err error) {
 	pid, _ := strconv.Atoi(s.Pid)
 	if s.HttpCall < 10 {
 		if s.HttpGoCall != nil {
-			m := &HttpConn{Theology: s.Theology, MessageId: NewMessageId(), PID: pid, SunnyContext: s.Global.SunnyContext, Type: public.HttpRequestFail, Request: s.Request, Response: nil, err: err.Error(), ClientIP: s.Conn.RemoteAddr().String()}
+			m := &HttpConn{Theology: s.Theology, MessageId: NewMessageId(), PID: pid, SunnyContext: s.Global.SunnyContext, Type: public.HttpRequestFail, Request: s.Request, Response: nil, ClientHello: s.ClientHello, err: err.Error(), ClientIP: s.Conn.RemoteAddr().String()}
 			s.HttpGoCall(m)
 		}
 		return

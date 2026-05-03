@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/qtgolang/SunnyNet/public"
 	"github.com/qtgolang/SunnyNet/src/GoWinHttp"
+	"github.com/qtgolang/SunnyNet/src/crypto/tls"
 	"io"
 	"net/http"
 	"net/url"
@@ -271,10 +272,11 @@ type HttpConn struct {
 	Theology      int //唯一ID
 	MessageId     int //消息ID,仅标识消息ID,不能用于API函数
 	PID           int
-	Type          int              //请求类型 例如 public.HttpSendRequest  public.Http....
-	ClientIP      string           //来源IP地址,请求从哪里来
-	Request       *http.Request    //请求体
-	Response      *http.Response   //响应体
+	Type          int            //请求类型 例如 public.HttpSendRequest  public.Http....
+	ClientIP      string         //来源IP地址,请求从哪里来
+	Request       *http.Request  //请求体
+	Response      *http.Response //响应体
+	ClientHello   *tls.ClientHelloMsg
 	err           string           //错误信息
 	proxy         *GoWinHttp.Proxy //代理信息
 	closeRequest  bool             //直接关闭客户端HTTP连接，不返回HTTP响应

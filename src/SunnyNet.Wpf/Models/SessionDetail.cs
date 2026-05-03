@@ -22,6 +22,7 @@ public sealed class SessionDetail : ViewModelBase
     private string _requestCookies = "";
     private string _requestJson = "";
     private string _requestXml = "";
+    private bool _hasTlsFingerprint;
     private string _requestImageText = "暂无图片请求";
     private bool _hasRequestBodyRows;
     private byte[] _requestHexBytes = Array.Empty<byte>();
@@ -150,6 +151,12 @@ public sealed class SessionDetail : ViewModelBase
     }
 
     public bool HasRequestXml => !string.IsNullOrWhiteSpace(RequestXml);
+
+    public bool HasTlsFingerprint
+    {
+        get => _hasTlsFingerprint;
+        set => SetProperty(ref _hasTlsFingerprint, value);
+    }
 
     public string RequestImageText
     {
@@ -457,6 +464,8 @@ public sealed class SessionDetail : ViewModelBase
 
     public ObservableCollection<HexViewRow> RequestHexRows { get; } = new();
 
+    public ObservableCollection<DetailNameValueRow> RequestTlsFingerprintRows { get; } = new();
+
     public ObservableCollection<DetailNameValueRow> ResponseHeaderRows { get; } = new();
 
     public ObservableCollection<DetailNameValueRow> ResponseCookieRows { get; } = new();
@@ -478,6 +487,7 @@ public sealed class SessionDetail : ViewModelBase
         RequestCookies = "";
         RequestJson = "";
         RequestXml = "";
+        HasTlsFingerprint = false;
         RequestImageText = "暂无图片请求";
         HasRequestBodyRows = false;
         RequestHexBytes = Array.Empty<byte>();
@@ -518,6 +528,7 @@ public sealed class SessionDetail : ViewModelBase
         RequestCookieRows.Clear();
         RequestBodyRows.Clear();
         RequestHexRows.Clear();
+        RequestTlsFingerprintRows.Clear();
         ResponseHeaderRows.Clear();
         ResponseCookieRows.Clear();
         ResponseHexRows.Clear();

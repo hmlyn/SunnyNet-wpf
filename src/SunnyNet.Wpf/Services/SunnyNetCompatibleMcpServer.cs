@@ -1156,6 +1156,7 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
 
         byte[] requestBodyBytes = DecodePayloadBytes(GetProperty(payload, "Body"));
         JsonElement response = GetProperty(payload, "Response");
+        object? tlsFingerprint = BuildTlsFingerprintObject(GetProperty(payload, "TLSFingerprint"));
         byte[] responseBodyBytes = DecodePayloadBytes(GetProperty(response, "Body"));
         (string requestBodyText, string requestBodyB64) = EncodeBody(requestBodyBytes, RequestBodyPreviewLimit);
         (string responseBodyText, string responseBodyB64) = EncodeBody(responseBodyBytes, RequestBodyPreviewLimit);
@@ -1171,6 +1172,7 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
             host = entry.Host,
             query = entry.Query,
             proto = GetString(payload, "Proto", "HTTP/1.1"),
+            tlsFingerprint,
             request = new
             {
                 headers = ToHeaderDictionary(GetProperty(payload, "Header")),
@@ -1210,6 +1212,38 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
             }).ToArray(),
             notes = entry.Notes,
             isFavorite = entry.IsFavorite
+        };
+    }
+
+    private static object? BuildTlsFingerprintObject(JsonElement fingerprint)
+    {
+        if (fingerprint.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        return new
+        {
+            sni = GetString(fingerprint, "SNI"),
+            alpn = GetStringArray(fingerprint, "ALPN"),
+            legacyVersion = GetInt(fingerprint, "LegacyVersion"),
+            legacyVersionText = GetString(fingerprint, "LegacyVersionText"),
+            highestVersion = GetInt(fingerprint, "HighestVersion"),
+            highestVersionText = GetString(fingerprint, "HighestVersionText"),
+            ja3Text = GetString(fingerprint, "JA3Text"),
+            ja3Hash = GetString(fingerprint, "JA3Hash"),
+            ja3nText = GetString(fingerprint, "JA3NText"),
+            ja3nHash = GetString(fingerprint, "JA3NHash"),
+            ja4 = GetString(fingerprint, "JA4"),
+            ja4o = GetString(fingerprint, "JA4O"),
+            ja4r = GetString(fingerprint, "JA4R"),
+            ja4ro = GetString(fingerprint, "JA4RO"),
+            cipherSuites = GetIntArray(fingerprint, "CipherSuites").Select(static value => $"0x{value:X4}").ToArray(),
+            extensions = GetIntArray(fingerprint, "Extensions").Select(static value => $"0x{value:X4}").ToArray(),
+            supportedGroups = GetIntArray(fingerprint, "SupportedGroups").Select(static value => $"0x{value:X4}").ToArray(),
+            ecPointFormats = GetIntArray(fingerprint, "ECPointFormats").Select(static value => $"0x{value:X2}").ToArray(),
+            signatureAlgorithms = GetIntArray(fingerprint, "SignatureAlgorithms").Select(static value => $"0x{value:X4}").ToArray(),
+            rawClientHelloHex = GetString(fingerprint, "RawClientHelloHex")
         };
     }
 
@@ -2473,6 +2507,51 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
         }
 
         return defaultValue;
+    }
+
+    private static IReadOnlyList<int> GetIntArray(JsonElement element, string propertyName)
+    {
+        JsonElement property = GetProperty(element, propertyName);
+        if (property.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<int>();
+        }
+
+        List<int> values = new();
+        foreach (JsonElement item in property.EnumerateArray())
+        {
+            if (item.ValueKind == JsonValueKind.Number && item.TryGetInt32(out int number))
+            {
+                values.Add(number);
+            }
+            else if (item.ValueKind == JsonValueKind.String && int.TryParse(item.GetString(), out int stringNumber))
+            {
+                values.Add(stringNumber);
+            }
+        }
+
+        return values;
+    }
+
+    private static IReadOnlyList<string> GetStringArray(JsonElement element, string propertyName)
+    {
+        JsonElement property = GetProperty(element, propertyName);
+        if (property.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<string>();
+        }
+
+        List<string> values = new();
+        foreach (JsonElement item in property.EnumerateArray())
+        {
+            string value = ElementToText(item);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                values.Add(value);
+            }
+        }
+
+        return values;
     }
 
     private static bool GetBool(JsonElement element, string propertyName)

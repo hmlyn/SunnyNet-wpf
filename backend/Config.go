@@ -431,6 +431,7 @@ func RunHTTPRequestScriptCode(Conn *SunnyNet.HttpConn) (_Display bool) {
 	h.Header = Conn.Request.Header.Clone()
 	h.Method = Conn.Request.Method
 	h.Proto = "HTTP/1.1"
+	h.TLSFingerprint = BuildTLSFingerprint(Conn.ClientHello)
 	if Conn.Request.Body != nil {
 		Body, _ := io.ReadAll(Conn.Request.Body)
 		_ = Conn.Request.Body.Close()

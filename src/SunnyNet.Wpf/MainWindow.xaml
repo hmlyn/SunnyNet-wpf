@@ -1163,6 +1163,11 @@
                                                                             SearchText="{Binding Detail.RequestSearchText}"
                                                                             SearchIgnoreCase="{Binding Detail.DetailSearchIgnoreCase}" />
                                             </TabItem>
+                                            <TabItem x:Name="RequestTlsFingerprintTab" Header="TLS指纹">
+                                                <controls:NameValueTableControl Rows="{Binding Detail.RequestTlsFingerprintRows}"
+                                                                                EmptyText="无 TLS 指纹"
+                                                                                ShowExtraColumn="False" />
+                                            </TabItem>
                                             <TabItem x:Name="RequestWebSocketTab" Header="WebSocket">
                                                 <TabItem.Style>
                                                     <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">

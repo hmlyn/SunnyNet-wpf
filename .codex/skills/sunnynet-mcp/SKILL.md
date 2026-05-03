@@ -21,9 +21,10 @@ If SunnyNet MCP tools are unavailable, tell the user to enable MCP in SunnyNet a
 1. For traffic questions, start with `request_list` or `request_search`.
 2. Use the UI-visible `index` when the user says “序号 5 / #5”; use `theology` only when you already have the backend ID.
 3. For one session, call `request_get` first, then call `request_get_response_body_decoded` only when body content is needed.
-4. For WebSocket/TCP/UDP, call `connection_list`, then `socket_data_list`, then `socket_data_get` or `socket_data_get_range`.
-5. Prefer summaries for large bodies; do not paste huge responses unless the user explicitly asks.
-6. Do not mutate or destroy data unless the user explicitly asks.
+4. For HTTPS fingerprint questions, read `request_get(...).tlsFingerprint`; it contains JA3/JA3N/JA4 fields when the captured session has a TLS ClientHello.
+5. For WebSocket/TCP/UDP, call `connection_list`, then `socket_data_list`, then `socket_data_get` or `socket_data_get_range`.
+6. Prefer summaries for large bodies; do not paste huge responses unless the user explicitly asks.
+7. Do not mutate or destroy data unless the user explicitly asks.
 
 ## Safety Rules
 
@@ -56,6 +57,25 @@ Return the important fields: `index`, `method`, `url`, `statusCode`, `length`, `
 1. `request_get` with `{ "index": 5 }`
 2. If needed, `request_get_response_body_decoded` with `{ "index": 5 }`
 3. Summarize request URL, method, headers, parameters, status, content type, and response meaning.
+
+### Inspect TLS Fingerprints
+
+Use `request_get` and read the `tlsFingerprint` object. It is present for HTTPS sessions where SunnyNet captured the client `ClientHello`; it is `null` for plain HTTP or records imported/captured before this field existed.
+
+Important fields:
+
+- `ja3Hash`, `ja3Text`, `ja3nHash`, `ja3nText`
+- `ja4`, `ja4o`, `ja4r`, `ja4ro`
+- `sni`, `alpn`, `legacyVersionText`, `highestVersionText`
+- `cipherSuites`, `extensions`, `supportedGroups`, `signatureAlgorithms`
+
+Example:
+
+```json
+{ "index": 5 }
+```
+
+Then summarize `tlsFingerprint` rather than recalculating it from headers or body data.
 
 ### Work with favorites and notes
 

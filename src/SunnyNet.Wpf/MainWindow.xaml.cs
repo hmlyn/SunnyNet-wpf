@@ -319,7 +319,8 @@ public partial class MainWindow : Window
             or nameof(SessionDetail.IsUdpSession)
             or nameof(SessionDetail.IsHttpSession)
             or nameof(SessionDetail.HasRequestXml)
-            or nameof(SessionDetail.HasResponseXml)))
+            or nameof(SessionDetail.HasResponseXml)
+            or nameof(SessionDetail.HasTlsFingerprint)))
         {
             return;
         }
@@ -336,10 +337,12 @@ public partial class MainWindow : Window
         bool isUdp = _viewModel.Detail.IsUdpSession;
         bool hasRequestXml = isHttp && _viewModel.Detail.HasRequestXml;
         bool hasResponseXml = isHttp && _viewModel.Detail.HasResponseXml;
+        bool hasTlsFingerprint = isHttp && _viewModel.Detail.HasTlsFingerprint;
 
         SetTabVisibility(isHttp || isWebSocket, RequestRawTab, RequestHeadersTab, RequestHexTab);
         SetTabVisibility(isHttp, RequestParamsTab, RequestBodyTab, RequestCookiesTab, RequestJsonTab);
         SetTabVisibility(hasRequestXml, RequestXmlTab);
+        SetTabVisibility(hasTlsFingerprint, RequestTlsFingerprintTab);
         SetTabVisibility(isWebSocket, RequestWebSocketTab);
         SetTabVisibility(isTcp, RequestTcpTab);
         SetTabVisibility(isUdp, RequestUdpTab);

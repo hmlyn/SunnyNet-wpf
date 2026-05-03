@@ -165,6 +165,7 @@ type ProxyRequest struct {
 	WinHttp       *GoWinHttp.WinHttp   //WinHTTP请求对象
 	Request       *http.Request        //要发送的请求体
 	Response      *http.Response       //HTTP响应体
+	ClientHello   *tls.ClientHelloMsg  //客户端TLS握手信息
 	TCP           public.TCP           //TCP收发数据
 	Websocket     *public.WebsocketMsg //Websocket会话
 	Proxy         *GoWinHttp.Proxy     //设置指定代理
@@ -902,6 +903,7 @@ func (s *ProxyRequest) transparentProcessing() {
 	//进行握手处理
 	msg, serverName, e := T.ClientHello()
 	if e == nil {
+		s.ClientHello = msg
 		//从握手信息中取出要连接的服务器域名
 		if serverName == public.NULL {
 			//如果没有取出 则按照连接地址处理
@@ -1220,6 +1222,7 @@ func (s *ProxyRequest) https() {
 			return
 		}
 		HelloMsg = msg
+		s.ClientHello = msg
 		//得到握手信息后 恢复30秒的读写超时
 		_ = tlsConn.SetDeadline(time.Now().Add(30 * time.Second))
 		serverName = _serverName
