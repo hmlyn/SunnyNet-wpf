@@ -11,6 +11,7 @@ public sealed class InterceptRuleItem : ViewModelBase
     private string _target = "URL";
     private string _operator = "包含";
     private string _value = "";
+    private string _note = "";
     private string _state = "未保存";
 
     public string Hash
@@ -85,6 +86,18 @@ public sealed class InterceptRuleItem : ViewModelBase
         set
         {
             if (SetProperty(ref _value, value ?? ""))
+            {
+                State = "未保存";
+            }
+        }
+    }
+
+    public string Note
+    {
+        get => _note;
+        set
+        {
+            if (SetProperty(ref _note, value ?? ""))
             {
                 State = "未保存";
             }

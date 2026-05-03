@@ -1145,7 +1145,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         SyncInterceptRulesText();
     }
 
-    public async Task ApplyInterceptRulesAsync()
+    public async Task ApplyInterceptRulesAsync(bool showNotification = true)
     {
         foreach (InterceptRuleItem item in InterceptRuleItems)
         {
@@ -1163,7 +1163,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
                 ["Direction"] = item.Direction,
                 ["Target"] = item.Target,
                 ["Operator"] = item.Operator,
-                ["Value"] = item.Value
+                ["Value"] = item.Value,
+                ["Note"] = item.Note
             }).ToArray()
         });
 
@@ -1173,8 +1174,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             item.State = ok ? "已保存" : "保存失败";
         }
 
-        StatusRight = ok ? "拦截规则已保存" : "拦截规则保存失败";
-        NotificationRequested?.Invoke(ok ? "提示" : "错误", ok ? "拦截规则已保存。" : "拦截规则保存失败，请检查规则。");
+        StatusRight = ok ? "请求断点已保存" : "请求断点保存失败";
+        if (showNotification)
+        {
+            NotificationRequested?.Invoke(ok ? "提示" : "错误", ok ? "请求断点已保存。" : "请求断点保存失败，请检查规则。");
+        }
     }
 
     public async Task<bool> ApplyRuleCenterConfigAsync(bool showNotification = false)
@@ -2740,6 +2744,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
                     Target = GetString(item, "Target", "URL"),
                     Operator = GetString(item, "Operator", "包含"),
                     Value = GetString(item, "Value"),
+                    Note = GetString(item, "Note"),
                     State = "已保存"
                 });
             }
@@ -3589,7 +3594,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
                 item.Direction,
                 item.Target,
                 item.Operator,
-                item.Value
+                item.Value,
+                item.Note
             }),
             JsonOptions);
     }

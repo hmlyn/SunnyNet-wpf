@@ -31,7 +31,6 @@ public partial class SettingsWindow : Window
             "MustTcp" => MustTcpSectionItem,
             "Proxy" => ProxySectionItem,
             "Hosts" => HostsSectionItem,
-            "Intercept" => InterceptSectionItem,
             "Script" => ScriptSectionItem,
             "Process" => ProcessSectionItem,
             "RequestCert" => RequestCertSectionItem,
@@ -61,7 +60,6 @@ public partial class SettingsWindow : Window
         ProxySectionPanel.Visibility = ToVisibility(sectionKey == "Proxy");
         HostsSectionPanel.Visibility = ToVisibility(sectionKey == "Hosts");
         ReplaceSectionPanel.Visibility = Visibility.Collapsed;
-        InterceptSectionPanel.Visibility = ToVisibility(sectionKey == "Intercept");
         ScriptSectionPanel.Visibility = ToVisibility(sectionKey == "Script");
         ProcessSectionPanel.Visibility = ToVisibility(sectionKey == "Process");
         RequestCertSectionPanel.Visibility = ToVisibility(sectionKey == "RequestCert");
@@ -73,7 +71,6 @@ public partial class SettingsWindow : Window
             "MustTcp" => ("强制走 TCP", "通过规则控制指定流量强制转为 TCP。"),
             "Proxy" => ("上游网关", "设置上游代理地址以及命中规则。"),
             "Hosts" => ("HOSTS 设置", "维护域名映射规则，命中后直接重定向。"),
-            "Intercept" => ("拦截规则", "命中条件后自动进入上行或下行断点编辑。"),
             "Script" => ("脚本编辑", "格式化、恢复默认并保存 Go 核心脚本。"),
             "Process" => ("进程拦截", "加载驱动、指定进程名或按PID精准捕获。"),
             "RequestCert" => ("请求证书", "管理按域名匹配的请求证书并即时载入。"),
@@ -103,7 +100,6 @@ public partial class SettingsWindow : Window
             "强制走TCP" or "强制走 TCP" => "MustTcp",
             "上游网关" => "Proxy",
             "HOSTS设置" or "HOSTS 设置" => "Hosts",
-            "拦截规则" => "Intercept",
             "脚本编辑" => "Script",
             "进程拦截" => "Process",
             "请求证书" => "RequestCert",
@@ -277,22 +273,6 @@ public partial class SettingsWindow : Window
     private async void ApplyReplace_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         await RunActionAsync(() => _viewModel.ApplyReplaceRulesAsync());
-    }
-
-    private void AddIntercept_Click(object sender, RoutedEventArgs routedEventArgs)
-    {
-        _viewModel.AddInterceptRule();
-        InterceptRulesGrid.SelectedItem = _viewModel.InterceptRuleItems.LastOrDefault();
-    }
-
-    private void RemoveIntercept_Click(object sender, RoutedEventArgs routedEventArgs)
-    {
-        _viewModel.RemoveInterceptRule(InterceptRulesGrid.SelectedItem as InterceptRuleItem);
-    }
-
-    private async void ApplyIntercept_Click(object sender, RoutedEventArgs routedEventArgs)
-    {
-        await RunActionAsync(() => _viewModel.ApplyInterceptRulesAsync());
     }
 
     private async void RestoreDefaultScript_Click(object sender, RoutedEventArgs routedEventArgs)

@@ -27,6 +27,7 @@ func InterceptRulesEvent(command string, args *JSON.SyJson) any {
 				Target:    args.GetData(prefix + "Target"),
 				Operator:  args.GetData(prefix + "Operator"),
 				Value:     args.GetData(prefix + "Value"),
+				Note:      args.GetData(prefix + "Note"),
 			}
 			if rule.Hash == "" {
 				rule.Hash = strconv.Itoa(i + 1)

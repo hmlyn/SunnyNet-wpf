@@ -725,6 +725,7 @@ type ConfigInterceptRule struct {
 	Target    string `json:"Target"`
 	Operator  string `json:"Operator"`
 	Value     string `json:"Value"`
+	Note      string `json:"Note"`
 }
 type ConfigRuleCenter struct {
 	BlockRules          []ConfigRequestBlockRule   `json:"BlockRules"`

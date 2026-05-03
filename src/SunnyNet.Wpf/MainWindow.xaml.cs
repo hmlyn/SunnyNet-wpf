@@ -833,44 +833,7 @@ public partial class MainWindow : Window
 
     private void RulesMenuButton_Click(object sender, RoutedEventArgs routedEventArgs)
     {
-        if (RulesMenuButton.ContextMenu is null)
-        {
-            return;
-        }
-
-        RulesMenuButton.ContextMenu.PlacementTarget = RulesMenuButton;
-        RulesMenuButton.ContextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
-        RulesMenuButton.ContextMenu.IsOpen = true;
-    }
-
-    private void RequestBlockRules_Click(object sender, RoutedEventArgs routedEventArgs)
-    {
-        OpenRulesCenter("HTTP屏蔽");
-    }
-
-    private void WebSocketBlockRules_Click(object sender, RoutedEventArgs routedEventArgs)
-    {
-        OpenRulesCenter("WebSocket屏蔽");
-    }
-
-    private void TcpBlockRules_Click(object sender, RoutedEventArgs routedEventArgs)
-    {
-        OpenRulesCenter("TCP屏蔽");
-    }
-
-    private void UdpBlockRules_Click(object sender, RoutedEventArgs routedEventArgs)
-    {
-        OpenRulesCenter("UDP屏蔽");
-    }
-
-    private void RequestRewriteRules_Click(object sender, RoutedEventArgs routedEventArgs)
-    {
-        OpenRulesCenter("请求重写");
-    }
-
-    private void RequestMappingRules_Click(object sender, RoutedEventArgs routedEventArgs)
-    {
-        OpenRulesCenter("请求映射");
+        OpenRulesCenter("请求断点");
     }
 
     private void OpenRulesCenter(string page)

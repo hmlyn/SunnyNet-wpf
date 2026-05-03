@@ -37,6 +37,13 @@ public partial class RuleEditorWindow : Window
         UpdateUrlMatchHint();
         Loaded += (_, _) =>
         {
+            if (InterceptPanel.Visibility == Visibility.Visible)
+            {
+                InterceptNameTextBox.Focus();
+                InterceptNameTextBox.SelectAll();
+                return;
+            }
+
             if (RewriteWorkbenchPanel.Visibility == Visibility.Visible)
             {
                 RewriteNameTextBox.Focus();
@@ -52,6 +59,7 @@ public partial class RuleEditorWindow : Window
 
     private void ApplyRuleType(string ruleType)
     {
+        bool intercept = ruleType is "请求断点" or "拦截规则";
         bool rewrite = ruleType == "请求重写";
         bool mapping = ruleType == "请求映射";
         bool webSocketBlock = ruleType == "WebSocket屏蔽";
@@ -60,12 +68,25 @@ public partial class RuleEditorWindow : Window
         bool block = (ruleType is "HTTP屏蔽" or "请求屏蔽") || webSocketBlock || tcpBlock || udpBlock;
         ConfigureRuleLayout(block, rewrite, mapping, webSocketBlock || udpBlock);
 
+        if (intercept)
+        {
+            Width = 760;
+            MinWidth = 680;
+            Height = 560;
+            MinHeight = 520;
+            EditorScrollViewer.Visibility = Visibility.Collapsed;
+            RewriteWorkbenchPanel.Visibility = Visibility.Collapsed;
+            InterceptPanel.Visibility = Visibility.Visible;
+            return;
+        }
+
         if (rewrite && DataContext is RequestRewriteRuleItem rewriteRule)
         {
             rewriteRule.EnsureOperations();
             SelectedRewriteOperation = rewriteRule.Operations.Count > 0 ? rewriteRule.Operations[0] : null;
         }
 
+        InterceptPanel.Visibility = Visibility.Collapsed;
         RewriteWorkbenchPanel.Visibility = rewrite ? Visibility.Visible : Visibility.Collapsed;
         EditorScrollViewer.Visibility = rewrite ? Visibility.Collapsed : Visibility.Visible;
 
@@ -427,6 +448,11 @@ public partial class RuleEditorWindow : Window
             rewriteRule.SyncOperationsJson();
         }
 
+        if (DataContext is InterceptRuleItem breakpointRule)
+        {
+            NormalizeBreakpointRule(breakpointRule);
+        }
+
         if (DataContext is RequestBlockRuleItem blockRule)
         {
             NormalizeBlockRule(blockRule);
@@ -599,6 +625,26 @@ public partial class RuleEditorWindow : Window
             "请求头" or "响应头" or "Header" => "协议头",
             _ => target?.Trim() ?? ""
         };
+    }
+
+    private static void NormalizeBreakpointRule(InterceptRuleItem rule)
+    {
+        rule.Name = string.IsNullOrWhiteSpace(rule.Name) ? "新请求断点" : rule.Name.Trim();
+        rule.Direction = rule.Direction?.Trim() switch
+        {
+            "下行" => "下行",
+            "上下行" or "双向" or "全部" => "上下行",
+            _ => "上行"
+        };
+        rule.Target = string.IsNullOrWhiteSpace(rule.Target) ? "URL" : rule.Target.Trim();
+        rule.Operator = rule.Operator?.Trim() switch
+        {
+            "等于" => "等于",
+            "正则" => "正则",
+            _ => "包含"
+        };
+        rule.Value = rule.Value.Trim();
+        rule.Note = rule.Note.Trim();
     }
 
     private static void NormalizeBlockRule(RequestBlockRuleItem rule)

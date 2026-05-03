@@ -256,26 +256,9 @@
                                     Style="{StaticResource ToolbarButtonStyle}"
                                     Click="RulesMenuButton_Click"
                                     ToolTip="请求规则">
-                                <Button.ContextMenu>
-                                    <ContextMenu>
-                                        <MenuItem Header="请求屏蔽">
-                                            <MenuItem Header="HTTP屏蔽" Click="RequestBlockRules_Click" />
-                                            <MenuItem Header="WebSocket屏蔽" Click="WebSocketBlockRules_Click" />
-                                            <MenuItem Header="TCP屏蔽" Click="TcpBlockRules_Click" />
-                                            <MenuItem Header="UDP屏蔽" Click="UdpBlockRules_Click" />
-                                        </MenuItem>
-                                        <MenuItem Header="请求重写" Click="RequestRewriteRules_Click" />
-                                        <MenuItem Header="请求映射" Click="RequestMappingRules_Click" />
-                                    </ContextMenu>
-                                </Button.ContextMenu>
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Style="{StaticResource GlyphTextStyle}" Text="&#xE9D9;" />
                                     <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="请求规则" />
-                                    <TextBlock Margin="4,1,0,0"
-                                               VerticalAlignment="Center"
-                                               FontFamily="Segoe UI Symbol"
-                                               FontSize="9"
-                                               Text="▼" />
                                 </StackPanel>
                             </Button>
                             <ToggleButton x:Name="AutoScrollToolbarButton"

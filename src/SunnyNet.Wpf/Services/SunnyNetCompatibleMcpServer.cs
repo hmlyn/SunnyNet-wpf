@@ -2212,7 +2212,8 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
                 ["Direction"] = item.Direction,
                 ["Target"] = item.Target,
                 ["Operator"] = item.Operator,
-                ["Value"] = item.Value
+                ["Value"] = item.Value,
+                ["Note"] = item.Note
             }).ToArray()
         });
         foreach (InterceptRuleItem item in _viewModel.InterceptRuleItems)
@@ -2228,7 +2229,8 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
             item.Direction,
             item.Target,
             item.Operator,
-            item.Value
+            item.Value,
+            item.Note
         }), JsonOptions);
     }
 

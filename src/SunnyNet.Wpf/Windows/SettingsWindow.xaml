@@ -19,29 +19,6 @@
             <sys:String>响应文件</sys:String>
         </x:Array>
 
-        <x:Array x:Key="InterceptRuleDirectionItems" Type="{x:Type sys:String}">
-            <sys:String>上行</sys:String>
-            <sys:String>下行</sys:String>
-            <sys:String>上下行</sys:String>
-        </x:Array>
-
-        <x:Array x:Key="InterceptRuleTargetItems" Type="{x:Type sys:String}">
-            <sys:String>URL</sys:String>
-            <sys:String>Host</sys:String>
-            <sys:String>Method</sys:String>
-            <sys:String>Header</sys:String>
-            <sys:String>Query</sys:String>
-            <sys:String>Cookie</sys:String>
-            <sys:String>Body</sys:String>
-            <sys:String>StatusCode</sys:String>
-        </x:Array>
-
-        <x:Array x:Key="InterceptRuleOperatorItems" Type="{x:Type sys:String}">
-            <sys:String>包含</sys:String>
-            <sys:String>等于</sys:String>
-            <sys:String>正则</sys:String>
-        </x:Array>
-
         <x:Array x:Key="RequestCertificateRuleItems" Type="{x:Type sys:String}">
             <sys:String>仅发送</sys:String>
             <sys:String>解析及发送</sys:String>
@@ -514,12 +491,6 @@
                             <TextBlock Margin="10,0,0,0" Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}" Text="HOSTS 设置" />
                         </StackPanel>
                     </ListBoxItem>
-                    <ListBoxItem x:Name="InterceptSectionItem" Tag="Intercept">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}" Text="&#xE814;" />
-                            <TextBlock Margin="10,0,0,0" Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}" Text="拦截规则" />
-                        </StackPanel>
-                    </ListBoxItem>
                     <ListBoxItem x:Name="ScriptSectionItem" Tag="Script">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}" Text="&#xE943;" />
@@ -877,48 +848,6 @@
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
                                     <DataGridTextColumn Header="状态" Binding="{Binding State}" Width="108" IsReadOnly="True" />
-                                </DataGrid.Columns>
-                            </DataGrid>
-                        </StackPanel>
-
-                        <StackPanel x:Name="InterceptSectionPanel" Visibility="Collapsed">
-                            <TextBlock Style="{StaticResource SettingsGroupTitleTextStyle}" Text="拦截规则" />
-                            <TextBlock Margin="0,6,0,0" Style="{StaticResource SettingsPageHintTextStyle}" Text="命中 URL、参数、协议头或包体后自动进入上行/下行断点编辑。" />
-                            <StackPanel Margin="0,12,0,0" Orientation="Horizontal">
-                                <Button Margin="0,0,10,0" Style="{StaticResource SettingsSmallActionButtonStyle}" Click="AddIntercept_Click" Content="新增规则" />
-                                <Button Margin="0,0,10,0" Style="{StaticResource SettingsSmallActionButtonStyle}" Click="RemoveIntercept_Click" Content="删除所选" />
-                                <Button Style="{StaticResource SettingsPrimaryActionButtonStyle}" Click="ApplyIntercept_Click" Content="保存规则" />
-                            </StackPanel>
-                            <DataGrid x:Name="InterceptRulesGrid"
-                                      Height="288"
-                                      ItemsSource="{Binding InterceptRuleItems}"
-                                      Style="{StaticResource SettingsDataGridStyle}">
-                                <DataGrid.Columns>
-                                    <DataGridCheckBoxColumn Header="启用" Binding="{Binding Enabled, UpdateSourceTrigger=PropertyChanged}" Width="62" />
-                                    <DataGridTextColumn Header="名称" Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="1.2*" />
-                                    <DataGridTemplateColumn Header="方向" Width="94">
-                                        <DataGridTemplateColumn.CellTemplate>
-                                            <DataTemplate>
-                                                <ComboBox ItemsSource="{StaticResource InterceptRuleDirectionItems}" SelectedItem="{Binding Direction, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource SettingsCompactComboBoxStyle}" />
-                                            </DataTemplate>
-                                        </DataGridTemplateColumn.CellTemplate>
-                                    </DataGridTemplateColumn>
-                                    <DataGridTemplateColumn Header="匹配范围" Width="112">
-                                        <DataGridTemplateColumn.CellTemplate>
-                                            <DataTemplate>
-                                                <ComboBox ItemsSource="{StaticResource InterceptRuleTargetItems}" SelectedItem="{Binding Target, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource SettingsCompactComboBoxStyle}" />
-                                            </DataTemplate>
-                                        </DataGridTemplateColumn.CellTemplate>
-                                    </DataGridTemplateColumn>
-                                    <DataGridTemplateColumn Header="匹配方式" Width="98">
-                                        <DataGridTemplateColumn.CellTemplate>
-                                            <DataTemplate>
-                                                <ComboBox ItemsSource="{StaticResource InterceptRuleOperatorItems}" SelectedItem="{Binding Operator, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource SettingsCompactComboBoxStyle}" />
-                                            </DataTemplate>
-                                        </DataGridTemplateColumn.CellTemplate>
-                                    </DataGridTemplateColumn>
-                                    <DataGridTextColumn Header="匹配值" Binding="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Width="2*" />
-                                    <DataGridTextColumn Header="状态" Binding="{Binding State}" Width="88" IsReadOnly="True" />
                                 </DataGrid.Columns>
                             </DataGrid>
                         </StackPanel>

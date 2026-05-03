@@ -1,6 +1,8 @@
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Data;
 using System.Windows.Threading;
 using SunnyNet.Wpf.Models;
 using SunnyNet.Wpf.ViewModels;
@@ -12,9 +14,10 @@ public partial class RulesCenterWindow : Window
     private readonly MainWindowViewModel _viewModel;
     private readonly string _initialPage;
     private readonly DispatcherTimer _alertTimer = new() { Interval = TimeSpan.FromSeconds(2.8) };
-    private string _currentPage = "请求重写";
+    private string _currentPage = "请求断点";
     private readonly Dictionary<string, RulePageInfo> _pages = new()
     {
+        ["请求断点"] = new RulePageInfo("请求断点", "命中 URL、参数、协议头或包体后自动进入上行/下行断点编辑。"),
         ["HTTP屏蔽"] = new RulePageInfo("HTTP屏蔽", "仅作用于 HTTP/HTTPS：命中后可断开请求或断开响应。"),
         ["WebSocket屏蔽"] = new RulePageInfo("WebSocket屏蔽", "仅作用于 WebSocket：命中后可断开连接或按方向丢弃帧。"),
         ["TCP屏蔽"] = new RulePageInfo("TCP屏蔽", "仅作用于 TCP/TLS-TCP：命中后可断开连接或按方向丢弃数据包。"),
@@ -23,11 +26,11 @@ public partial class RulesCenterWindow : Window
         ["请求映射"] = new RulePageInfo("请求映射", "把命中的请求映射到本地文件、固定内容或新的远程地址。")
     };
 
-    public RulesCenterWindow(MainWindowViewModel viewModel, string initialPage = "请求重写")
+    public RulesCenterWindow(MainWindowViewModel viewModel, string initialPage = "请求断点")
     {
         _viewModel = viewModel;
         initialPage = NormalizeRulePageKey(initialPage);
-        _initialPage = _pages.ContainsKey(initialPage) ? initialPage : "请求重写";
+        _initialPage = _pages.ContainsKey(initialPage) ? initialPage : "请求断点";
         InitializeComponent();
         DataContext = viewModel;
         _alertTimer.Tick += AlertTimer_Tick;
@@ -42,17 +45,27 @@ public partial class RulesCenterWindow : Window
         }
 
         _currentPage = key;
-        Title = page.Title;
-        RuleStatusTextBlock.Text = $"{GetRuleCount(key)} 条";
+        Title = $"规则中心 - {page.Title}";
+        PageTitleTextBlock.Text = page.Title;
+        PageSubtitleTextBlock.Text = page.Placeholder;
+        AddRuleButton.Content = key switch
+        {
+            "请求断点" => "添加断点",
+            "请求重写" => "添加重写",
+            "请求映射" => "添加映射",
+            _ => "添加屏蔽"
+        };
 
+        bool breakpointSelected = key == "请求断点";
         bool blockSelected = key == "HTTP屏蔽";
         bool webSocketBlockSelected = key == "WebSocket屏蔽";
         bool tcpBlockSelected = key == "TCP屏蔽";
         bool udpBlockSelected = key == "UDP屏蔽";
         bool rewriteSelected = key == "请求重写";
         bool mappingSelected = key == "请求映射";
-        bool implemented = blockSelected || webSocketBlockSelected || tcpBlockSelected || udpBlockSelected || rewriteSelected || mappingSelected;
+        bool implemented = breakpointSelected || blockSelected || webSocketBlockSelected || tcpBlockSelected || udpBlockSelected || rewriteSelected || mappingSelected;
 
+        BreakpointRulesGrid.Visibility = breakpointSelected ? Visibility.Visible : Visibility.Collapsed;
         BlockRulesGrid.Visibility = blockSelected ? Visibility.Visible : Visibility.Collapsed;
         WebSocketBlockRulesGrid.Visibility = webSocketBlockSelected ? Visibility.Visible : Visibility.Collapsed;
         TcpBlockRulesGrid.Visibility = tcpBlockSelected ? Visibility.Visible : Visibility.Collapsed;
@@ -63,12 +76,127 @@ public partial class RulesCenterWindow : Window
         PlaceholderTextBlock.Text = page.Placeholder;
 
         SelectFirstRuleIfNeeded();
+        UpdateNavSelection(key);
+        UpdateRuleCounts();
+        UpdateCurrentRuleFilter();
         AddRuleButton.IsEnabled = implemented;
         UpdateRuleActionButtons();
     }
 
+    private void NavigationButton_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        if (sender is FrameworkElement { Tag: string pageKey })
+        {
+            ApplyPage(pageKey);
+        }
+    }
+
+    private void UpdateNavSelection(string key)
+    {
+        RequestBreakpointNavButton.IsChecked = key == "请求断点";
+        HttpBlockNavButton.IsChecked = key == "HTTP屏蔽";
+        WebSocketBlockNavButton.IsChecked = key == "WebSocket屏蔽";
+        TcpBlockNavButton.IsChecked = key == "TCP屏蔽";
+        UdpBlockNavButton.IsChecked = key == "UDP屏蔽";
+        RequestRewriteNavButton.IsChecked = key == "请求重写";
+        RequestMappingNavButton.IsChecked = key == "请求映射";
+    }
+
+    private void UpdateRuleCounts()
+    {
+        RequestBreakpointCountTextBlock.Text = _viewModel.InterceptRuleItems.Count.ToString();
+        HttpBlockCountTextBlock.Text = _viewModel.RequestBlockRules.Count.ToString();
+        WebSocketBlockCountTextBlock.Text = _viewModel.WebSocketBlockRules.Count.ToString();
+        TcpBlockCountTextBlock.Text = _viewModel.TcpBlockRules.Count.ToString();
+        UdpBlockCountTextBlock.Text = _viewModel.UdpBlockRules.Count.ToString();
+        BlockTotalCountTextBlock.Text = (_viewModel.RequestBlockRules.Count
+            + _viewModel.WebSocketBlockRules.Count
+            + _viewModel.TcpBlockRules.Count
+            + _viewModel.UdpBlockRules.Count).ToString();
+        RequestRewriteCountTextBlock.Text = _viewModel.RequestRewriteRules.Count.ToString();
+        RequestMappingCountTextBlock.Text = _viewModel.RequestMappingRules.Count.ToString();
+
+        int total = GetRuleCount(_currentPage);
+        SummaryTotalTextBlock.Text = total.ToString();
+        SummaryEnabledTextBlock.Text = GetEnabledRuleCount(_currentPage).ToString();
+        SummaryDirtyTextBlock.Text = GetDirtyRuleCount(_currentPage).ToString();
+        RuleStatusTextBlock.Text = $"{total} 条";
+    }
+
+    private void RuleSearchTextBox_TextChanged(object sender, TextChangedEventArgs textChangedEventArgs)
+    {
+        UpdateCurrentRuleFilter();
+        UpdateRuleActionButtons();
+    }
+
+    private void UpdateCurrentRuleFilter()
+    {
+        if (RuleSearchTextBox is null)
+        {
+            return;
+        }
+
+        DataGrid? grid = GetCurrentRulesGrid();
+        if (grid?.ItemsSource is null)
+        {
+            return;
+        }
+
+        string keyword = RuleSearchTextBox.Text?.Trim() ?? "";
+        ICollectionView view = CollectionViewSource.GetDefaultView(grid.ItemsSource);
+        view.Filter = string.IsNullOrWhiteSpace(keyword)
+            ? null
+            : item => RuleMatchesSearch(item, keyword);
+        view.Refresh();
+    }
+
+    private DataGrid? GetCurrentRulesGrid()
+    {
+        return _currentPage switch
+        {
+            "请求断点" => BreakpointRulesGrid,
+            "HTTP屏蔽" => BlockRulesGrid,
+            "WebSocket屏蔽" => WebSocketBlockRulesGrid,
+            "TCP屏蔽" => TcpBlockRulesGrid,
+            "UDP屏蔽" => UdpBlockRulesGrid,
+            "请求重写" => RewriteRulesGrid,
+            "请求映射" => MappingRulesGrid,
+            _ => null
+        };
+    }
+
+    private static bool RuleMatchesSearch(object item, string keyword)
+    {
+        return item switch
+        {
+            InterceptRuleItem rule => ContainsAny(keyword, rule.Name, rule.Direction, rule.Target, rule.Operator, rule.Value, rule.Note, rule.State),
+            RequestRewriteRuleItem rule => ContainsAny(keyword, rule.Name, rule.Method, rule.UrlMatchType, rule.UrlPattern, rule.Direction, rule.Summary, rule.Note, rule.State),
+            RequestMappingRuleItem rule => ContainsAny(keyword, rule.Name, rule.Method, rule.UrlMatchType, rule.UrlPattern, rule.MappingType, rule.DisplayValueType, rule.TargetContent, rule.Note, rule.State),
+            RequestBlockRuleItem rule => ContainsAny(keyword, rule.Name, rule.Method, rule.UrlMatchType, rule.UrlPattern, rule.Action, rule.Note, rule.State),
+            WebSocketBlockRuleItem rule => ContainsAny(keyword, rule.Name, rule.UrlMatchType, rule.UrlPattern, rule.Action, rule.Note, rule.State),
+            TcpBlockRuleItem rule => ContainsAny(keyword, rule.Name, rule.Method, rule.UrlMatchType, rule.UrlPattern, rule.Action, rule.Note, rule.State),
+            UdpBlockRuleItem rule => ContainsAny(keyword, rule.Name, rule.UrlMatchType, rule.UrlPattern, rule.Action, rule.Note, rule.State),
+            _ => true
+        };
+    }
+
+    private static bool ContainsAny(string keyword, params string?[] values)
+    {
+        return values.Any(value => !string.IsNullOrWhiteSpace(value)
+            && value.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+    }
+
     private void SelectFirstRuleIfNeeded()
     {
+        if (_currentPage == "请求断点")
+        {
+            if (BreakpointRulesGrid.SelectedItem is null && _viewModel.InterceptRuleItems.Count > 0)
+            {
+                BreakpointRulesGrid.SelectedIndex = 0;
+            }
+            return;
+        }
+
         if (_currentPage == "HTTP屏蔽")
         {
             if (BlockRulesGrid.SelectedItem is null && _viewModel.RequestBlockRules.Count > 0)
@@ -128,6 +256,7 @@ public partial class RulesCenterWindow : Window
     {
         return key switch
         {
+            "请求断点" => _viewModel.InterceptRuleItems.Count,
             "HTTP屏蔽" => _viewModel.RequestBlockRules.Count,
             "WebSocket屏蔽" => _viewModel.WebSocketBlockRules.Count,
             "TCP屏蔽" => _viewModel.TcpBlockRules.Count,
@@ -142,6 +271,9 @@ public partial class RulesCenterWindow : Window
     {
         switch (_currentPage)
         {
+            case "请求断点":
+                await AddBreakpointRuleAsync();
+                break;
             case "HTTP屏蔽":
                 await AddBlockRuleAsync();
                 break;
@@ -197,6 +329,9 @@ public partial class RulesCenterWindow : Window
 
         switch (_currentPage)
         {
+            case "请求断点" when BreakpointRulesGrid.SelectedItem is InterceptRuleItem breakpointRule:
+                _viewModel.InterceptRuleItems.Remove(breakpointRule);
+                break;
             case "HTTP屏蔽" when BlockRulesGrid.SelectedItem is RequestBlockRuleItem blockRule:
                 _viewModel.RequestBlockRules.Remove(blockRule);
                 break;
@@ -220,7 +355,7 @@ public partial class RulesCenterWindow : Window
         }
 
         await SaveRulesAsync();
-        RuleStatusTextBlock.Text = $"{GetRuleCount(_currentPage)} 条";
+        UpdateRuleCounts();
         SelectFirstRuleIfNeeded();
         UpdateRuleActionButtons();
     }
@@ -228,6 +363,30 @@ public partial class RulesCenterWindow : Window
     private async void RuleEnableCheckBox_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         await SaveRulesAsync(showNotification: false);
+        UpdateRuleCounts();
+    }
+
+    private async Task AddBreakpointRuleAsync()
+    {
+        InterceptRuleItem item = new()
+        {
+            Name = "新请求断点",
+            Direction = "上行",
+            Target = "URL",
+            Operator = "包含",
+            Value = "",
+            State = "未保存"
+        };
+
+        if (ShowRuleEditor("请求断点", item) != true)
+        {
+            return;
+        }
+
+        _viewModel.InterceptRuleItems.Add(item);
+        BreakpointRulesGrid.SelectedItem = item;
+        await SaveRulesAsync();
+        UpdateRuleCounts();
     }
 
     private async Task AddBlockRuleAsync()
@@ -250,7 +409,7 @@ public partial class RulesCenterWindow : Window
         _viewModel.RequestBlockRules.Add(item);
         BlockRulesGrid.SelectedItem = item;
         await SaveRulesAsync();
-        RuleStatusTextBlock.Text = $"{_viewModel.RequestBlockRules.Count} 条";
+        UpdateRuleCounts();
     }
 
     private async Task AddWebSocketBlockRuleAsync()
@@ -273,7 +432,7 @@ public partial class RulesCenterWindow : Window
         _viewModel.WebSocketBlockRules.Add(item);
         WebSocketBlockRulesGrid.SelectedItem = item;
         await SaveRulesAsync();
-        RuleStatusTextBlock.Text = $"{_viewModel.WebSocketBlockRules.Count} 条";
+        UpdateRuleCounts();
     }
 
     private async Task AddTcpBlockRuleAsync()
@@ -296,7 +455,7 @@ public partial class RulesCenterWindow : Window
         _viewModel.TcpBlockRules.Add(item);
         TcpBlockRulesGrid.SelectedItem = item;
         await SaveRulesAsync();
-        RuleStatusTextBlock.Text = $"{_viewModel.TcpBlockRules.Count} 条";
+        UpdateRuleCounts();
     }
 
     private async Task AddUdpBlockRuleAsync()
@@ -319,7 +478,7 @@ public partial class RulesCenterWindow : Window
         _viewModel.UdpBlockRules.Add(item);
         UdpBlockRulesGrid.SelectedItem = item;
         await SaveRulesAsync();
-        RuleStatusTextBlock.Text = $"{_viewModel.UdpBlockRules.Count} 条";
+        UpdateRuleCounts();
     }
 
     private async Task AddRewriteRuleAsync()
@@ -346,7 +505,7 @@ public partial class RulesCenterWindow : Window
         _viewModel.RequestRewriteRules.Add(item);
         RewriteRulesGrid.SelectedItem = item;
         await SaveRulesAsync();
-        RuleStatusTextBlock.Text = $"{_viewModel.RequestRewriteRules.Count} 条";
+        UpdateRuleCounts();
     }
 
     private async Task AddMappingRuleAsync()
@@ -371,13 +530,26 @@ public partial class RulesCenterWindow : Window
         _viewModel.RequestMappingRules.Add(item);
         MappingRulesGrid.SelectedItem = item;
         await SaveRulesAsync();
-        RuleStatusTextBlock.Text = $"{_viewModel.RequestMappingRules.Count} 条";
+        UpdateRuleCounts();
     }
 
     private async Task EditSelectedRuleAsync()
     {
         switch (_currentPage)
         {
+            case "请求断点" when BreakpointRulesGrid.SelectedItem is InterceptRuleItem breakpointRule:
+            {
+                InterceptRuleItem editing = CloneBreakpointRule(breakpointRule);
+                if (ShowRuleEditor("请求断点", editing) != true)
+                {
+                    return;
+                }
+
+                ApplyBreakpointRule(breakpointRule, editing);
+                await SaveRulesAsync();
+                UpdateRuleCounts();
+                break;
+            }
             case "HTTP屏蔽" when BlockRulesGrid.SelectedItem is RequestBlockRuleItem blockRule:
             {
                 RequestBlockRuleItem editing = CloneBlockRule(blockRule);
@@ -388,7 +560,7 @@ public partial class RulesCenterWindow : Window
 
                 ApplyBlockRule(blockRule, editing);
                 await SaveRulesAsync();
-                RuleStatusTextBlock.Text = $"{_viewModel.RequestBlockRules.Count} 条";
+                UpdateRuleCounts();
                 break;
             }
             case "WebSocket屏蔽" when WebSocketBlockRulesGrid.SelectedItem is WebSocketBlockRuleItem webSocketBlockRule:
@@ -401,7 +573,7 @@ public partial class RulesCenterWindow : Window
 
                 ApplyWebSocketBlockRule(webSocketBlockRule, editing);
                 await SaveRulesAsync();
-                RuleStatusTextBlock.Text = $"{_viewModel.WebSocketBlockRules.Count} 条";
+                UpdateRuleCounts();
                 break;
             }
             case "TCP屏蔽" when TcpBlockRulesGrid.SelectedItem is TcpBlockRuleItem tcpBlockRule:
@@ -414,7 +586,7 @@ public partial class RulesCenterWindow : Window
 
                 ApplyTcpBlockRule(tcpBlockRule, editing);
                 await SaveRulesAsync();
-                RuleStatusTextBlock.Text = $"{_viewModel.TcpBlockRules.Count} 条";
+                UpdateRuleCounts();
                 break;
             }
             case "UDP屏蔽" when UdpBlockRulesGrid.SelectedItem is UdpBlockRuleItem udpBlockRule:
@@ -427,7 +599,7 @@ public partial class RulesCenterWindow : Window
 
                 ApplyUdpBlockRule(udpBlockRule, editing);
                 await SaveRulesAsync();
-                RuleStatusTextBlock.Text = $"{_viewModel.UdpBlockRules.Count} 条";
+                UpdateRuleCounts();
                 break;
             }
             case "请求重写" when RewriteRulesGrid.SelectedItem is RequestRewriteRuleItem rewriteRule:
@@ -440,7 +612,7 @@ public partial class RulesCenterWindow : Window
 
                 ApplyRewriteRule(rewriteRule, editing);
                 await SaveRulesAsync();
-                RuleStatusTextBlock.Text = $"{_viewModel.RequestRewriteRules.Count} 条";
+                UpdateRuleCounts();
                 break;
             }
             case "请求映射" when MappingRulesGrid.SelectedItem is RequestMappingRuleItem mappingRule:
@@ -453,16 +625,17 @@ public partial class RulesCenterWindow : Window
 
                 ApplyMappingRule(mappingRule, editing);
                 await SaveRulesAsync();
-                RuleStatusTextBlock.Text = $"{_viewModel.RequestMappingRules.Count} 条";
+                UpdateRuleCounts();
                 break;
             }
         }
     }
 
-    private TrafficRuleItemBase? GetSelectedRule()
+    private object? GetSelectedRule()
     {
         return _currentPage switch
         {
+            "请求断点" => BreakpointRulesGrid.SelectedItem,
             "HTTP屏蔽" => BlockRulesGrid.SelectedItem as TrafficRuleItemBase,
             "WebSocket屏蔽" => WebSocketBlockRulesGrid.SelectedItem as TrafficRuleItemBase,
             "TCP屏蔽" => TcpBlockRulesGrid.SelectedItem as TrafficRuleItemBase,
@@ -471,6 +644,41 @@ public partial class RulesCenterWindow : Window
             "请求映射" => MappingRulesGrid.SelectedItem as TrafficRuleItemBase,
             _ => null
         };
+    }
+
+    private int GetEnabledRuleCount(string key)
+    {
+        return key switch
+        {
+            "请求断点" => _viewModel.InterceptRuleItems.Count(static item => item.Enabled),
+            "HTTP屏蔽" => _viewModel.RequestBlockRules.Count(static item => item.Enabled),
+            "WebSocket屏蔽" => _viewModel.WebSocketBlockRules.Count(static item => item.Enabled),
+            "TCP屏蔽" => _viewModel.TcpBlockRules.Count(static item => item.Enabled),
+            "UDP屏蔽" => _viewModel.UdpBlockRules.Count(static item => item.Enabled),
+            "请求重写" => _viewModel.RequestRewriteRules.Count(static item => item.Enabled),
+            "请求映射" => _viewModel.RequestMappingRules.Count(static item => item.Enabled),
+            _ => 0
+        };
+    }
+
+    private int GetDirtyRuleCount(string key)
+    {
+        return key switch
+        {
+            "请求断点" => _viewModel.InterceptRuleItems.Count(static item => item.State is not "已保存"),
+            "HTTP屏蔽" => _viewModel.RequestBlockRules.Count(IsDirtyRule),
+            "WebSocket屏蔽" => _viewModel.WebSocketBlockRules.Count(IsDirtyRule),
+            "TCP屏蔽" => _viewModel.TcpBlockRules.Count(IsDirtyRule),
+            "UDP屏蔽" => _viewModel.UdpBlockRules.Count(IsDirtyRule),
+            "请求重写" => _viewModel.RequestRewriteRules.Count(IsDirtyRule),
+            "请求映射" => _viewModel.RequestMappingRules.Count(IsDirtyRule),
+            _ => 0
+        };
+    }
+
+    private static bool IsDirtyRule(TrafficRuleItemBase item)
+    {
+        return item.State is not "已保存" and not "兼容旧规则";
     }
 
     private void UpdateRuleActionButtons()
@@ -490,6 +698,11 @@ public partial class RulesCenterWindow : Window
 
     private string? ValidateRuleBeforeSave(object rule)
     {
+        if (rule is InterceptRuleItem breakpointRule)
+        {
+            return ValidateUniqueBreakpointRule(breakpointRule, _viewModel.InterceptRuleItems);
+        }
+
         if (rule is RequestBlockRuleItem blockRule)
         {
             return ValidateUniqueBlockRule(
@@ -522,6 +735,37 @@ public partial class RulesCenterWindow : Window
                 udpBlockRule,
                 _viewModel.UdpBlockRules,
                 "UDP屏蔽");
+        }
+
+        return null;
+    }
+
+    private static string? ValidateUniqueBreakpointRule(InterceptRuleItem rule, IEnumerable<InterceptRuleItem> rules)
+    {
+        if (rule is null)
+        {
+            return null;
+        }
+
+        string value = NormalizeRuleText(rule.Value);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "匹配值不能为空。";
+        }
+
+        string direction = NormalizeRuleText(rule.Direction);
+        string target = NormalizeRuleText(rule.Target);
+        string @operator = NormalizeRuleText(rule.Operator);
+        InterceptRuleItem? duplicate = rules.FirstOrDefault(existing =>
+            !string.Equals(existing.Hash, rule.Hash, StringComparison.Ordinal)
+            && string.Equals(NormalizeRuleText(existing.Direction), direction, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(NormalizeRuleText(existing.Target), target, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(NormalizeRuleText(existing.Operator), @operator, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(NormalizeRuleText(existing.Value), value, StringComparison.Ordinal));
+
+        if (duplicate is not null)
+        {
+            return $"已存在相同条件的请求断点：{duplicate.Name}";
         }
 
         return null;
@@ -564,13 +808,28 @@ public partial class RulesCenterWindow : Window
 
     private static string NormalizeRulePageKey(string? value)
     {
-        return value == "请求屏蔽" ? "HTTP屏蔽" : value ?? "";
+        return value switch
+        {
+            "请求屏蔽" => "HTTP屏蔽",
+            "拦截规则" => "请求断点",
+            _ => value ?? ""
+        };
     }
 
     private async Task SaveRulesAsync(bool showNotification = false)
     {
         try
         {
+            if (_currentPage == "请求断点")
+            {
+                await _viewModel.ApplyInterceptRulesAsync(showNotification);
+                if (_viewModel.InterceptRuleItems.Any(static item => item.State == "保存失败"))
+                {
+                    ShowRuleAlert("请求断点保存失败，请检查规则。");
+                }
+                return;
+            }
+
             bool saved = await _viewModel.ApplyRuleCenterConfigAsync(showNotification);
             if (!saved)
             {
@@ -589,6 +848,26 @@ public partial class RulesCenterWindow : Window
         RuleAlertBorder.Visibility = Visibility.Visible;
         _alertTimer.Stop();
         _alertTimer.Start();
+    }
+
+    private static InterceptRuleItem CloneBreakpointRule(InterceptRuleItem source)
+    {
+        InterceptRuleItem clone = new();
+        ApplyBreakpointRule(clone, source);
+        clone.State = source.State;
+        return clone;
+    }
+
+    private static void ApplyBreakpointRule(InterceptRuleItem target, InterceptRuleItem source)
+    {
+        target.Hash = source.Hash;
+        target.Enabled = source.Enabled;
+        target.Name = source.Name;
+        target.Direction = source.Direction;
+        target.Target = source.Target;
+        target.Operator = source.Operator;
+        target.Value = source.Value;
+        target.Note = source.Note;
     }
 
     private void HideRuleAlert()

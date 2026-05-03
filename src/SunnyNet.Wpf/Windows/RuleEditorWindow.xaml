@@ -94,6 +94,29 @@
             <sys:String>丢弃下行包</sys:String>
         </x:Array>
 
+        <x:Array x:Key="InterceptRuleDirectionItems" Type="{x:Type sys:String}">
+            <sys:String>上行</sys:String>
+            <sys:String>下行</sys:String>
+            <sys:String>上下行</sys:String>
+        </x:Array>
+
+        <x:Array x:Key="InterceptRuleTargetItems" Type="{x:Type sys:String}">
+            <sys:String>URL</sys:String>
+            <sys:String>Host</sys:String>
+            <sys:String>Method</sys:String>
+            <sys:String>Header</sys:String>
+            <sys:String>Query</sys:String>
+            <sys:String>Cookie</sys:String>
+            <sys:String>Body</sys:String>
+            <sys:String>StatusCode</sys:String>
+        </x:Array>
+
+        <x:Array x:Key="InterceptRuleOperatorItems" Type="{x:Type sys:String}">
+            <sys:String>包含</sys:String>
+            <sys:String>等于</sys:String>
+            <sys:String>正则</sys:String>
+        </x:Array>
+
         <Style x:Key="EditorLabelTextStyle" TargetType="{x:Type TextBlock}">
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="FontSize" Value="13" />
@@ -657,6 +680,122 @@
                          Style="{StaticResource EditorTextBoxStyle}" />
             </Grid>
         </ScrollViewer>
+
+        <Grid x:Name="InterceptPanel"
+              Grid.Row="1"
+              Visibility="Collapsed">
+            <Border Padding="14,12"
+                    Background="#FFFFFF"
+                    BorderBrush="#DDE6EF"
+                    BorderThickness="1"
+                    CornerRadius="9">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="12" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="12" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="12" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="12" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <DockPanel LastChildFill="False">
+                        <StackPanel DockPanel.Dock="Left">
+                            <TextBlock FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       Text="断点条件" />
+                            <TextBlock Margin="0,4,0,0"
+                                       FontSize="12"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       Text="命中后会选中会话，并进入上行或下行内容编辑。" />
+                        </StackPanel>
+                        <StackPanel DockPanel.Dock="Right"
+                                    VerticalAlignment="Center"
+                                    Orientation="Horizontal">
+                            <CheckBox VerticalAlignment="Center"
+                                      IsChecked="{Binding Enabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Margin="8,0,0,0"
+                                       VerticalAlignment="Center"
+                                       FontSize="12"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       Text="启用" />
+                        </StackPanel>
+                    </DockPanel>
+
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="170" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource RewriteWorkbenchFieldLabelStyle}" Text="规则名称" />
+                            <TextBox x:Name="InterceptNameTextBox"
+                                     Width="Auto"
+                                     HorizontalAlignment="Stretch"
+                                     Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource EditorTextBoxStyle}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Style="{StaticResource RewriteWorkbenchFieldLabelStyle}" Text="方向" />
+                            <ComboBox ItemsSource="{StaticResource InterceptRuleDirectionItems}"
+                                      SelectedItem="{Binding Direction, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      Style="{StaticResource EditorComboBoxStyle}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Grid.Row="4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource RewriteWorkbenchFieldLabelStyle}" Text="匹配范围" />
+                            <ComboBox ItemsSource="{StaticResource InterceptRuleTargetItems}"
+                                      SelectedItem="{Binding Target, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      Style="{StaticResource EditorComboBoxStyle}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Style="{StaticResource RewriteWorkbenchFieldLabelStyle}" Text="匹配方式" />
+                            <ComboBox ItemsSource="{StaticResource InterceptRuleOperatorItems}"
+                                      SelectedItem="{Binding Operator, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      Style="{StaticResource EditorComboBoxStyle}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <StackPanel Grid.Row="6">
+                        <TextBlock Style="{StaticResource RewriteWorkbenchFieldLabelStyle}" Text="匹配值" />
+                        <TextBox Height="104"
+                                 Width="Auto"
+                                 HorizontalAlignment="Stretch"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 VerticalContentAlignment="Top"
+                                 VerticalScrollBarVisibility="Auto"
+                                 Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource EditorTextBoxStyle}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="8">
+                        <TextBlock Style="{StaticResource RewriteWorkbenchFieldLabelStyle}" Text="备注" />
+                        <TextBox Height="62"
+                                 Width="Auto"
+                                 HorizontalAlignment="Stretch"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 VerticalContentAlignment="Top"
+                                 VerticalScrollBarVisibility="Auto"
+                                 Text="{Binding Note, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource EditorTextBoxStyle}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
 
         <Grid x:Name="RewriteWorkbenchPanel"
               Grid.Row="1"
