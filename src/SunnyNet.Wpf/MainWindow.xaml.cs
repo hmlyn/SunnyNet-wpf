@@ -191,6 +191,8 @@ public partial class MainWindow : Window
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs routedEventArgs)
     {
+        _ = Task.Run(NotepadTempFileService.CleanupExpiredFiles);
+
         if (_restoreWindowMaximized)
         {
             WindowState = WindowState.Maximized;
@@ -241,6 +243,7 @@ public partial class MainWindow : Window
         try
         {
             SaveLayoutSettings();
+            NotepadTempFileService.CleanupExpiredFiles();
             _viewModel.Mcp.PropertyChanged -= Mcp_PropertyChanged;
             _viewModel.ProcessCaptureSettingsChanged -= ViewModel_ProcessCaptureSettingsChanged;
             _viewModel.UpdateAvailableRequested -= ViewModel_UpdateAvailableRequested;
@@ -312,7 +315,9 @@ public partial class MainWindow : Window
             or nameof(SessionDetail.IsWebSocketSession)
             or nameof(SessionDetail.IsTcpSession)
             or nameof(SessionDetail.IsUdpSession)
-            or nameof(SessionDetail.IsHttpSession)))
+            or nameof(SessionDetail.IsHttpSession)
+            or nameof(SessionDetail.HasRequestXml)
+            or nameof(SessionDetail.HasResponseXml)))
         {
             return;
         }
@@ -327,14 +332,18 @@ public partial class MainWindow : Window
         bool isWebSocket = _viewModel.Detail.IsWebSocketSession;
         bool isTcp = _viewModel.Detail.IsTcpSession;
         bool isUdp = _viewModel.Detail.IsUdpSession;
+        bool hasRequestXml = isHttp && _viewModel.Detail.HasRequestXml;
+        bool hasResponseXml = isHttp && _viewModel.Detail.HasResponseXml;
 
         SetTabVisibility(isHttp || isWebSocket, RequestRawTab, RequestHeadersTab, RequestHexTab);
         SetTabVisibility(isHttp, RequestParamsTab, RequestBodyTab, RequestCookiesTab, RequestJsonTab);
+        SetTabVisibility(hasRequestXml, RequestXmlTab);
         SetTabVisibility(isWebSocket, RequestWebSocketTab);
         SetTabVisibility(isTcp, RequestTcpTab);
         SetTabVisibility(isUdp, RequestUdpTab);
 
         SetTabVisibility(isHttp, ResponseRawTab, ResponseHeadersTab, ResponseTextTab, ResponseImageTab, ResponseHtmlTab, ResponseHexTab, ResponseCookiesTab, ResponseJsonTab);
+        SetTabVisibility(hasResponseXml, ResponseXmlTab);
         SetTabVisibility(isWebSocket, ResponseWebSocketTab, ResponseWebSocketHexTab, ResponseWebSocketJsonTab, ResponseWebSocketProtobufTab, ResponseWebSocketReplayTab);
         SetTabVisibility(isTcp, ResponseTcpTab);
         SetTabVisibility(isUdp, ResponseUdpTab);
@@ -966,6 +975,12 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (string.Equals(selectedHeader, "XML视图", StringComparison.Ordinal))
+        {
+            RequestXmlViewer.MoveToNextMatch();
+            return;
+        }
+
         RequestRawViewer.MoveToNextMatch();
     }
 
@@ -981,6 +996,12 @@ public partial class MainWindow : Window
         if (string.Equals(selectedHeader, "响应文本", StringComparison.Ordinal))
         {
             ResponseTextViewer.MoveToNextMatch();
+            return;
+        }
+
+        if (string.Equals(selectedHeader, "XML视图", StringComparison.Ordinal))
+        {
+            ResponseXmlViewer.MoveToNextMatch();
             return;
         }
 

@@ -1,6 +1,3 @@
-using System.Diagnostics;
-using System.IO;
-using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -371,17 +368,7 @@ public sealed class HttpSyntaxTextBox : RichTextBox
 
         try
         {
-            string directory = Path.Combine(Path.GetTempPath(), "SunnyNetWpf");
-            Directory.CreateDirectory(directory);
-            string filePath = Path.Combine(directory, $"sunnynet-view-{DateTime.Now:yyyyMMdd-HHmmss-fff}.txt");
-            File.WriteAllText(filePath, text, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-
-            ProcessStartInfo startInfo = new("notepad.exe")
-            {
-                UseShellExecute = false
-            };
-            startInfo.ArgumentList.Add(filePath);
-            Process.Start(startInfo);
+            NotepadTempFileService.OpenText(text);
         }
         catch
         {

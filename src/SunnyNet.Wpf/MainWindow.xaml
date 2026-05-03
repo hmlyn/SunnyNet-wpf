@@ -1142,6 +1142,13 @@
                                             <TabItem x:Name="RequestJsonTab" Header="JSON视图">
                                                 <controls:JsonTreeViewControl JsonText="{Binding Detail.RequestJson}" />
                                             </TabItem>
+                                            <TabItem x:Name="RequestXmlTab" Header="XML视图">
+                                                <controls:HttpSyntaxTextBox x:Name="RequestXmlViewer"
+                                                                            SourceText="{Binding Detail.RequestXml}"
+                                                                            HighlightMode="Body"
+                                                                            SearchText="{Binding Detail.RequestSearchText}"
+                                                                            SearchIgnoreCase="{Binding Detail.DetailSearchIgnoreCase}" />
+                                            </TabItem>
                                             <TabItem x:Name="RequestWebSocketTab" Header="WebSocket">
                                                 <TabItem.Style>
                                                     <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
@@ -1370,6 +1377,13 @@
                                             </TabItem>
                                             <TabItem x:Name="ResponseHtmlTab" Header="HTML视图">
                                                 <controls:HtmlPreviewControl HtmlText="{Binding Detail.ResponseHtml}" />
+                                            </TabItem>
+                                            <TabItem x:Name="ResponseXmlTab" Header="XML视图">
+                                                <controls:HttpSyntaxTextBox x:Name="ResponseXmlViewer"
+                                                                            SourceText="{Binding Detail.ResponseXml}"
+                                                                            HighlightMode="Body"
+                                                                            SearchText="{Binding Detail.ResponseSearchText}"
+                                                                            SearchIgnoreCase="{Binding Detail.DetailSearchIgnoreCase}" />
                                             </TabItem>
                                             <TabItem x:Name="ResponseHexTab" Header="HEX视图">
                                                 <controls:HexViewControl Bytes="{Binding Detail.ResponseHexBytes}"

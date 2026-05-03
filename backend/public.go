@@ -39,8 +39,12 @@ type BuilderSendResult struct {
 
 func SetWorkingState(open bool) {
 	workLock.Lock()
-	defer workLock.Unlock()
+	changed := startWork != open
 	startWork = open
+	workLock.Unlock()
+	if changed && !open {
+		ClearPendingCaptureEvents()
+	}
 }
 func GetWorkingState() bool {
 	workLock.RLock()

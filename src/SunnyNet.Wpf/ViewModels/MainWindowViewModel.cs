@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Windows.Data;
 using System.Text;
 using System.Text.Json;
+using System.Xml;
 using System.Windows;
 using System.Windows.Threading;
 using SunnyNet.Wpf.Models;
@@ -98,6 +99,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     private bool _disposed;
     private int _breakpointMode;
     private int _selectedSessionLoadVersion;
+    private int _captureEventBypassDepth;
     private bool _processDriverLoaded;
     private bool _captureAllProcesses;
     private readonly HashSet<int> _activeProcessPids = new();
@@ -828,7 +830,16 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
     public async Task OpenCaptureFileAsync(string filePath)
     {
-        await _backend.InvokeAsync("打开记录文件", new { Path = filePath });
+        _captureEventBypassDepth++;
+        try
+        {
+            await _backend.InvokeAsync("打开记录文件", new { Path = filePath });
+            await Task.Delay(300);
+        }
+        finally
+        {
+            _captureEventBypassDepth = Math.Max(0, _captureEventBypassDepth - 1);
+        }
     }
 
     public async Task SaveCaptureFileAsync(string filePath, bool saveAll)
@@ -2155,24 +2166,31 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
                 HandleStartState(envelope.Args);
                 break;
             case "插入列表":
+                if (ShouldSuppressCaptureEvent()) return;
                 ApplyInsertList(envelope.Args);
                 break;
             case "更新列表":
+                if (ShouldSuppressCaptureEvent()) return;
                 ApplyUpdateList(envelope.Args);
                 break;
             case "更新响应长度":
+                if (ShouldSuppressCaptureEvent()) return;
                 ApplyResponseLength(envelope.Args);
                 break;
             case "更新响应":
+                if (ShouldSuppressCaptureEvent()) return;
                 ApplyResponseUpdate(envelope.Args);
                 break;
             case "更新Socket":
+                if (ShouldSuppressCaptureEvent()) return;
                 ApplySocketUpdate(envelope.Args);
                 break;
             case "更新ICO":
+                if (ShouldSuppressCaptureEvent()) return;
                 ApplyIconUpdate(envelope.Args);
                 break;
             case "规则命中":
+                if (ShouldSuppressCaptureEvent()) return;
                 ApplyRuleHit(envelope.Args);
                 break;
             case "加载配置":
@@ -2182,6 +2200,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
                 StatusRight = $"搜索进度:{ElementToText(envelope.Args)}%";
                 break;
         }
+    }
+
+    private bool ShouldSuppressCaptureEvent()
+    {
+        return !IsCapturing && _captureEventBypassDepth <= 0;
     }
 
     private void HandleStartState(JsonElement args)
@@ -2416,6 +2439,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         {
             Detail.ResponseBody = DecodePayloadElement(GetProperty(args, "Body"));
             Detail.ResponseText = Detail.ResponseBody;
+            Detail.ResponseXml = "";
             Detail.HasResponseDisplayBody = false;
             Detail.ResponseHex = ToHex(DecodePayloadBytes(GetProperty(args, "Body")));
             Detail.ResponseStateText = "error";
@@ -2455,12 +2479,13 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         string responseOriginalBody = WithPreviewNotice(BytesToPreviewText(responseBytes), responseBodyTruncated, responseBytes.Length, responseBodySize);
         Detail.ResponseRaw = $"HTTP {GetInt(args, "StateCode")} {GetString(args, "StateText")}\r\n{Detail.ResponseHeaders}\r\n\r\n{Detail.ResponseBody}".Trim();
         Detail.ResponseOriginalRaw = $"HTTP {GetInt(args, "StateCode")} {GetString(args, "StateText")}\r\n{Detail.ResponseHeaders}\r\n\r\n{responseOriginalBody}".Trim();
+        string responseContentType = GetHeaderValue(responseHeader, "Content-Type");
         Detail.ResponseJson = responseDisplayTruncated ? Detail.ResponseBody : BuildJsonViewText(responseDisplayBytes, Detail.ResponseBody);
+        Detail.ResponseXml = responseDisplayTruncated ? "" : BuildXmlViewText(responseDisplayBytes, Detail.ResponseBody, responseContentType);
         Detail.ResponseHtml = Detail.ResponseBody;
         Detail.ResponseCookies = ExtractCookies(responseHeader);
         Detail.ResponseStateText = GetString(args, "StateText");
         Detail.ResponseStateCode = GetInt(args, "StateCode");
-        string responseContentType = GetHeaderValue(responseHeader, "Content-Type");
         Detail.ResponseImageBytes = responseDisplayTruncated || responseDisplayBytes.Length > LargePayloadThresholdBytes ? Array.Empty<byte>() : TryGetImageBytes(responseContentType, responseDisplayBytes);
         Detail.ResponseImageType = ExtractImageType(responseContentType);
         (byte[] responseRawBytes, int responseHeaderLength) = BuildHttpBytes($"HTTP {GetInt(args, "StateCode")} {GetString(args, "StateText")}", Detail.ResponseHeaders, responseBytes);
@@ -3048,8 +3073,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         Detail.SocketProtocol = "";
         Detail.RequestHeaders = "正在读取请求数据...";
         Detail.RequestBody = "";
+        Detail.RequestXml = "";
         Detail.ResponseHeaders = "";
         Detail.ResponseBody = "";
+        Detail.ResponseXml = "";
         Detail.SocketEntries.ReplaceAll(Array.Empty<SocketEntry>());
         Detail.SelectedSocketEntry = null;
         Detail.RequestHeaderRows.Clear();
@@ -3755,7 +3782,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         string method = GetString(data, "Method", selected.Method);
         string url = GetString(data, "URL", selected.Url);
         string proto = GetString(data, "Proto", "HTTP/1.1");
-        string headers = FormatHeaders(GetProperty(data, "Header"));
+        JsonElement requestHeader = GetProperty(data, "Header");
+        string headers = FormatHeaders(requestHeader);
+        string requestContentType = GetHeaderValue(requestHeader, "Content-Type");
         await LoadHttpTextProgressivelyAsync(selected, loadVersion, "Request", kind, total, (text, loaded, complete) =>
         {
             if (!IsCurrentDetailLoad(selected, loadVersion))
@@ -3774,6 +3803,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             Detail.RequestJson = complete && loaded <= LargePayloadThresholdBytes
                 ? BuildJsonViewText(Encoding.UTF8.GetBytes(text), text)
                 : body;
+            Detail.RequestXml = complete
+                ? BuildXmlViewText(Encoding.UTF8.GetBytes(text), text, requestContentType)
+                : "";
             ApplyDetailTextSearch(selected);
         });
     }
@@ -3785,7 +3817,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             return;
         }
 
-        string headers = FormatHeaders(GetProperty(response, "Header"));
+        JsonElement responseHeader = GetProperty(response, "Header");
+        string headers = FormatHeaders(responseHeader);
+        string responseContentType = GetHeaderValue(responseHeader, "Content-Type");
         string statusLine = $"HTTP {GetInt(response, "StateCode", Detail.ResponseStateCode)} {GetString(response, "StateText", Detail.ResponseStateText)}";
         await LoadHttpTextProgressivelyAsync(selected, loadVersion, "Response", kind, total, (text, loaded, complete) =>
         {
@@ -3806,6 +3840,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             Detail.ResponseJson = complete && loaded <= LargePayloadThresholdBytes
                 ? BuildJsonViewText(Encoding.UTF8.GetBytes(text), text)
                 : body;
+            Detail.ResponseXml = complete
+                ? BuildXmlViewText(Encoding.UTF8.GetBytes(text), text, responseContentType)
+                : "";
             Detail.ResponseHtml = body;
             ApplyDetailTextSearch(selected);
         });
@@ -3881,6 +3918,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         Detail.RequestHexSource = null;
         Detail.RequestJson = BuildJsonViewText(requestDisplayBytes, requestBody);
         string requestContentType = GetHeaderValue(requestHeader, "Content-Type");
+        Detail.RequestXml = BuildXmlViewText(requestDisplayBytes, requestBody, requestContentType);
         Detail.RequestImageBytes = TryGetImageBytes(requestContentType, requestDisplayBytes);
         Detail.RequestImageType = ExtractImageType(requestContentType);
         (byte[] requestRawBytes, int requestHeaderLength) = BuildHttpBytes($"{method} {url} {proto}", requestHeadersText, requestBodyBytes);
@@ -3903,6 +3941,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         Detail.ResponseJson = BuildJsonViewText(responseDisplayBytes, responseBody);
         Detail.ResponseHtml = responseBody;
         string responseContentType = GetHeaderValue(responseHeader, "Content-Type");
+        Detail.ResponseXml = BuildXmlViewText(responseDisplayBytes, responseBody, responseContentType);
         Detail.ResponseImageBytes = TryGetImageBytes(responseContentType, responseDisplayBytes);
         Detail.ResponseImageType = ExtractImageType(responseContentType);
         (byte[] responseRawBytes, int responseHeaderLength) = BuildHttpBytes($"HTTP {Detail.ResponseStateCode} {Detail.ResponseStateText}", responseHeadersText, responseBodyBytes);
@@ -3974,6 +4013,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         Detail.RequestHex = ToHex(requestBodyBytes);
         Detail.RequestCookies = ExtractCookies(requestHeader);
         Detail.RequestJson = requestDisplayTruncated ? Detail.RequestBody : BuildJsonViewText(requestDisplayBytes, Detail.RequestBody);
+        Detail.RequestXml = requestDisplayTruncated ? "" : BuildXmlViewText(requestDisplayBytes, Detail.RequestBody, requestContentType);
         Detail.RequestImageBytes = requestDisplayTruncated || requestDisplayBytes.Length > LargePayloadThresholdBytes ? Array.Empty<byte>() : TryGetImageBytes(requestContentType, requestDisplayBytes);
         Detail.RequestImageType = ExtractImageType(requestContentType);
         (byte[] requestRawBytes, int requestHeaderLength) = BuildHttpBytes($"{method} {url} {proto}", requestHeadersText, requestBodyBytes);
@@ -4008,6 +4048,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             Detail.ResponseHex = responseBodyBytes.Length > LargePayloadThresholdBytes ? "" : ToHex(responseBodyBytes);
             Detail.ResponseCookies = ExtractCookies(responseHeader);
             Detail.ResponseJson = responseDisplayTruncated ? Detail.ResponseBody : BuildJsonViewText(responseDisplayBytes, Detail.ResponseBody);
+            Detail.ResponseXml = responseDisplayTruncated ? "" : BuildXmlViewText(responseDisplayBytes, Detail.ResponseBody, responseContentType);
             Detail.ResponseHtml = Detail.ResponseBody;
             Detail.ResponseImageBytes = responseDisplayTruncated || responseDisplayBytes.Length > LargePayloadThresholdBytes ? Array.Empty<byte>() : TryGetImageBytes(responseContentType, responseDisplayBytes);
             Detail.ResponseImageType = ExtractImageType(responseContentType);
@@ -4028,6 +4069,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             Detail.ResponseImageType = "";
             Detail.HasResponseDisplayBody = false;
             Detail.ResponseOriginalRaw = "";
+            Detail.ResponseXml = "";
             Detail.ResponseHexSource = null;
         }
 
@@ -4423,6 +4465,41 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             : TryFormatJson(displayText);
     }
 
+    private static string BuildXmlViewText(byte[] bytes, string displayText, string contentType)
+    {
+        if (bytes.Length == 0 || bytes.Length > LargePayloadThresholdBytes || LooksBinary(bytes))
+        {
+            return "";
+        }
+
+        if (contentType.Contains("html", StringComparison.OrdinalIgnoreCase))
+        {
+            return "";
+        }
+
+        string text = displayText.Trim();
+        if (text.Length == 0)
+        {
+            return "";
+        }
+
+        string probe = text.TrimStart('\uFEFF');
+        if (probe.StartsWith("<!doctype html", StringComparison.OrdinalIgnoreCase) ||
+            probe.StartsWith("<html", StringComparison.OrdinalIgnoreCase))
+        {
+            return "";
+        }
+
+        bool contentTypeLooksXml = contentType.Contains("xml", StringComparison.OrdinalIgnoreCase) ||
+                                   contentType.Contains("soap", StringComparison.OrdinalIgnoreCase);
+        if (!contentTypeLooksXml && !probe.StartsWith("<", StringComparison.Ordinal))
+        {
+            return "";
+        }
+
+        return TryFormatXml(text);
+    }
+
     private static bool LooksBinary(byte[] bytes)
     {
         int inspected = Math.Min(bytes.Length, 512);
@@ -4474,6 +4551,51 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         catch
         {
             return text;
+        }
+    }
+
+    private static string TryFormatXml(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return "";
+        }
+
+        try
+        {
+            XmlReaderSettings readerSettings = new()
+            {
+                DtdProcessing = DtdProcessing.Ignore,
+                XmlResolver = null,
+                IgnoreWhitespace = true
+            };
+
+            using StringReader stringReader = new(text);
+            using XmlReader reader = XmlReader.Create(stringReader, readerSettings);
+            XmlDocument document = new()
+            {
+                PreserveWhitespace = false,
+                XmlResolver = null
+            };
+            document.Load(reader);
+
+            StringBuilder builder = new();
+            XmlWriterSettings writerSettings = new()
+            {
+                Indent = true,
+                IndentChars = "  ",
+                NewLineChars = "\r\n",
+                NewLineHandling = NewLineHandling.Replace,
+                OmitXmlDeclaration = document.FirstChild?.NodeType != XmlNodeType.XmlDeclaration
+            };
+
+            using XmlWriter writer = XmlWriter.Create(builder, writerSettings);
+            document.Save(writer);
+            return builder.ToString();
+        }
+        catch
+        {
+            return "";
         }
     }
 

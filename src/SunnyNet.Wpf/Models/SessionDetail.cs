@@ -21,6 +21,7 @@ public sealed class SessionDetail : ViewModelBase
     private string _requestHex = "";
     private string _requestCookies = "";
     private string _requestJson = "";
+    private string _requestXml = "";
     private string _requestImageText = "暂无图片请求";
     private bool _hasRequestBodyRows;
     private byte[] _requestHexBytes = Array.Empty<byte>();
@@ -36,6 +37,7 @@ public sealed class SessionDetail : ViewModelBase
     private string _responseHex = "";
     private string _responseCookies = "";
     private string _responseJson = "";
+    private string _responseXml = "";
     private string _responseHtml = "";
     private string _responseImageText = "暂无图片响应";
     private byte[] _responseHexBytes = Array.Empty<byte>();
@@ -134,6 +136,20 @@ public sealed class SessionDetail : ViewModelBase
         get => _requestJson;
         set => SetProperty(ref _requestJson, value);
     }
+
+    public string RequestXml
+    {
+        get => _requestXml;
+        set
+        {
+            if (SetProperty(ref _requestXml, value ?? ""))
+            {
+                OnPropertyChanged(nameof(HasRequestXml));
+            }
+        }
+    }
+
+    public bool HasRequestXml => !string.IsNullOrWhiteSpace(RequestXml);
 
     public string RequestImageText
     {
@@ -239,6 +255,20 @@ public sealed class SessionDetail : ViewModelBase
         get => _responseJson;
         set => SetProperty(ref _responseJson, value);
     }
+
+    public string ResponseXml
+    {
+        get => _responseXml;
+        set
+        {
+            if (SetProperty(ref _responseXml, value ?? ""))
+            {
+                OnPropertyChanged(nameof(HasResponseXml));
+            }
+        }
+    }
+
+    public bool HasResponseXml => !string.IsNullOrWhiteSpace(ResponseXml);
 
     public string ResponseHtml
     {
@@ -447,6 +477,7 @@ public sealed class SessionDetail : ViewModelBase
         RequestHex = "";
         RequestCookies = "";
         RequestJson = "";
+        RequestXml = "";
         RequestImageText = "暂无图片请求";
         HasRequestBodyRows = false;
         RequestHexBytes = Array.Empty<byte>();
@@ -462,6 +493,7 @@ public sealed class SessionDetail : ViewModelBase
         ResponseHex = "";
         ResponseCookies = "";
         ResponseJson = "";
+        ResponseXml = "";
         ResponseHtml = "";
         ResponseImageText = "暂无图片响应";
         ResponseHexBytes = Array.Empty<byte>();

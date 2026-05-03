@@ -146,6 +146,15 @@ func AddInsertList(list *ListInfo) {
 	}
 	Insert.Unlock()
 }
+func ClearPendingCaptureEvents() {
+	Insert.Lock()
+	InsertData = make([]any, 0)
+	InsertDataMapTag = make(map[int]bool)
+	UpdateData = make([]any, 0)
+	UpdateListICO = make([]any, 0)
+	SocketData = make([]any, 0)
+	Insert.Unlock()
+}
 func InsertList() {
 	for {
 		time.Sleep(100 * time.Millisecond)
@@ -402,9 +411,15 @@ func HttpCallback(Conn *SunnyNet.HttpConn) {
 				Conn.Close()
 			}
 		}
-		if !(GetWorkingState()) && Conn.Type == public.HttpSendRequest {
-			//执行发起请求脚本
-			RunHTTPRequestScriptCode(Conn)
+		if !(GetWorkingState()) {
+			if Conn.Type == public.HttpSendRequest {
+				//隐藏捕获时仍允许脚本修改流量，但不再推送列表显示。
+				RunHTTPRequestScriptCode(Conn)
+			} else if Conn.Type == public.HttpResponseOK {
+				RunHTTPResponseScriptCode(Conn)
+			} else if Conn.Type == public.HttpRequestFail {
+				RunHTTPErrorScriptCode(Conn)
+			}
 			return
 		}
 	}
@@ -869,7 +884,9 @@ func TcpCallback(Conn *SunnyNet.TcpConn) {
 				}
 				h.PID = _tmp.PID
 				h.ClientIP = Conn.LocalAddr
-				AddInsertList(_tmp)
+				if GetWorkingState() {
+					AddInsertList(_tmp)
+				}
 				if block.Close || block.Drop {
 					Conn.DropMessage()
 				}
