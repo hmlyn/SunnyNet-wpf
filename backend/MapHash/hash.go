@@ -69,17 +69,17 @@ type Request struct {
 	Body           []byte      `json:"Body"`
 	BodyRef        BodyRef     `json:"-"`
 	Display        bool        `json:"Display"` //是否需要显示到列表
-	DisplayBody    []byte      `json:"-"`
+	DisplayBody    []byte      `json:"DisplayBody,omitempty"`
 	DisplayBodyRef BodyRef     `json:"-"`
-	HasDisplayBody bool        `json:"-"`
+	HasDisplayBody bool        `json:"HasDisplayBody,omitempty"`
 	Response       struct {
 		Conn           *SunnyNet.HttpConn `json:"-"`
 		Header         http.Header        `json:"Header"`
 		Body           []byte             `json:"Body"`
 		BodyRef        BodyRef            `json:"-"`
-		DisplayBody    []byte             `json:"-"`
+		DisplayBody    []byte             `json:"DisplayBody,omitempty"`
 		DisplayBodyRef BodyRef            `json:"-"`
-		HasDisplayBody bool               `json:"-"`
+		HasDisplayBody bool               `json:"HasDisplayBody,omitempty"`
 		StateCode      int                `json:"StateCode"`
 		Error          bool               `json:"Error"`
 	} `json:"Response"`

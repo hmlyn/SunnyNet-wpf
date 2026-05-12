@@ -229,7 +229,7 @@
                                                        Text="▼" />
                                         </StackPanel>
                                     </MenuItem.Header>
-                                    <MenuItem Header="清除所有" Tag="All" Click="ClearSessionsByRule_Click" />
+                                    <MenuItem Header="清除所有" InputGestureText="Ctrl+X" Tag="All" Click="ClearSessionsByRule_Click" />
                                     <MenuItem Header="清除资源" Tag="Resources" Click="ClearSessionsByRule_Click" />
                                     <MenuItem Header="清除无响应" Tag="NoResponse" Click="ClearSessionsByRule_Click" />
                                     <MenuItem Header="清除失败请求" Tag="Failed" Click="ClearSessionsByRule_Click" />

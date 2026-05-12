@@ -401,6 +401,43 @@ func SetHTTPDisplayBody(theology int, request bool, body []byte) bool {
 	}
 	return HashMap.SetResponseDisplayBody(theology, body)
 }
+
+func RunHTTPDisplayScriptForStoredRequest(theology int, h *MapHash.Request) {
+	defer func() {
+		_ = recover()
+	}()
+	if theology < 1 || h == nil || h.URL == "" {
+		return
+	}
+	if h.Way != "" && !strings.EqualFold(h.Way, "HTTP") {
+		return
+	}
+	lock.Lock()
+	_Call := httpFunc
+	lock.Unlock()
+	if _Call == nil {
+		return
+	}
+
+	noAgent := func(string) bool { return false }
+	cloneHeader := func(header http.Header) http.Header {
+		if header == nil {
+			return make(http.Header)
+		}
+		return header.Clone()
+	}
+	cloneBytes := func(data []byte) []byte {
+		if len(data) == 0 {
+			return nil
+		}
+		return append([]byte(nil), data...)
+	}
+
+	_Call(theology, 1, 0, h.URL, h.Method, cloneHeader(h.Header), cloneBytes(h.Body), noAgent, make(http.Header), nil, 0, h.Display)
+	if h.Response.Header != nil || len(h.Response.Body) > 0 || h.Response.StateCode > 0 {
+		_Call(theology, 2, 0, h.URL, h.Method, cloneHeader(h.Header), cloneBytes(h.Body), noAgent, cloneHeader(h.Response.Header), cloneBytes(h.Response.Body), h.Response.StateCode, h.Display)
+	}
+}
 func RunCodeLog() (Str string) {
 	defer func() {
 		if p := recover(); p != nil {

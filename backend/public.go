@@ -137,6 +137,7 @@ func importCaptureFile(path string) (int, error) {
 		SetStatusText("正在导入记录:" + strconv.Itoa(index) + "/" + max)
 		Theology := HashMap.CreateUniqueID()
 		HashMap.SetRequest(Theology, v)
+		RunHTTPDisplayScriptForStoredRequest(Theology, v)
 		State := strconv.Itoa(v.Response.StateCode)
 		if !strings.Contains(strings.ToUpper(v.URL), "HTTP") {
 			State = "已断开"
@@ -676,8 +677,17 @@ func event(command string, args *JSON.SyJson) any {
 	case "保存Go脚本代码":
 		r1 := args.GetData("code")
 		r2 := Resource.Bs64ToBs(r1)
+		oldCode := append([]byte(nil), GlobalConfig.GoScriptCode...)
 		GlobalConfig.GoScriptCode = r2
-		return RunCode()
+		if msg := RunCode(); msg != "" {
+			GlobalConfig.GoScriptCode = oldCode
+			_ = RunCode()
+			return msg
+		}
+		if err := GlobalConfig.saveToFile(); err != nil {
+			return err.Error()
+		}
+		return ""
 	case "获取脚本日志":
 		return RunCodeLog()
 	case "HTTP请求获取":
