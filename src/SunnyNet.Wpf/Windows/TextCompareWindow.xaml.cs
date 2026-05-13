@@ -40,6 +40,16 @@ public partial class TextCompareWindow : Window
         CompareAndHighlight();
     }
 
+    private void CompareEditor_SizeChanged(object sender, SizeChangedEventArgs sizeChangedEventArgs)
+    {
+        if (sender is not RichTextBox editor || editor.Document is null)
+        {
+            return;
+        }
+
+        ApplyEditorPageWidth(editor);
+    }
+
     private void ClearAll_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         _isRendering = true;
@@ -244,7 +254,24 @@ public partial class TextCompareWindow : Window
         if (offset < text.Length) paragraph.Inlines.Add(CreateRun(text[offset..], false));
         document.Blocks.Add(paragraph);
         editor.Document = document;
+        ApplyEditorPageWidth(editor);
         RestoreCaretOffset(editor, Math.Min(caretOffset, text.Length));
+    }
+
+    private static void ApplyEditorPageWidth(RichTextBox editor)
+    {
+        if (editor.Document is null)
+        {
+            return;
+        }
+
+        double viewportWidth = editor.ViewportWidth;
+        if (viewportWidth <= 0)
+        {
+            return;
+        }
+
+        editor.Document.PageWidth = Math.Max(0, viewportWidth - 4);
     }
 
     private static Run CreateRun(string text, bool isDiff)

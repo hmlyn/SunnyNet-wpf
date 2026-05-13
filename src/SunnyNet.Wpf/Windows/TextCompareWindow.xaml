@@ -59,11 +59,11 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <Border Style="{StaticResource CardBorderStyle}">
-                            <TextBox x:Name="CodecInputTextBox" Margin="12" AcceptsReturn="True" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" FontFamily="Consolas, Microsoft YaHei UI" TextWrapping="NoWrap" />
+                            <TextBox x:Name="CodecInputTextBox" Margin="12" AcceptsReturn="True" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" FontFamily="Consolas, Microsoft YaHei UI" TextWrapping="Wrap" />
                         </Border>
                         <GridSplitter Grid.Column="1" Width="12" HorizontalAlignment="Stretch" />
                         <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}">
-                            <TextBox x:Name="CodecOutputTextBox" Margin="12" AcceptsReturn="True" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" FontFamily="Consolas, Microsoft YaHei UI" TextWrapping="NoWrap" />
+                            <TextBox x:Name="CodecOutputTextBox" Margin="12" AcceptsReturn="True" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" FontFamily="Consolas, Microsoft YaHei UI" TextWrapping="Wrap" />
                         </Border>
                     </Grid>
                 </Grid>
@@ -94,11 +94,11 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <Border Style="{StaticResource CardBorderStyle}">
-                            <TextBox x:Name="CompressInputTextBox" Margin="12" AcceptsReturn="True" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" FontFamily="Consolas, Microsoft YaHei UI" TextWrapping="NoWrap" />
+                            <TextBox x:Name="CompressInputTextBox" Margin="12" AcceptsReturn="True" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" FontFamily="Consolas, Microsoft YaHei UI" TextWrapping="Wrap" />
                         </Border>
                         <GridSplitter Grid.Column="1" Width="12" HorizontalAlignment="Stretch" />
                         <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}">
-                            <TextBox x:Name="CompressOutputTextBox" Margin="12" AcceptsReturn="True" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" FontFamily="Consolas, Microsoft YaHei UI" TextWrapping="NoWrap" />
+                            <TextBox x:Name="CompressOutputTextBox" Margin="12" AcceptsReturn="True" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" FontFamily="Consolas, Microsoft YaHei UI" TextWrapping="Wrap" />
                         </Border>
                     </Grid>
                 </Grid>
@@ -122,7 +122,7 @@
                                     <Border Background="{StaticResource SurfaceAltBrush}" BorderBrush="{StaticResource DividerBrush}" BorderThickness="0,0,0,1" CornerRadius="8,8,0,0">
                                         <TextBlock x:Name="LeftTitleTextBlock" Margin="16,0" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="左侧文本" />
                                     </Border>
-                                    <RichTextBox x:Name="LeftEditor" Grid.Row="1" Margin="12" AcceptsTab="True" FontFamily="Consolas, Microsoft YaHei UI" FontSize="12" HorizontalScrollBarVisibility="Auto" TextChanged="Editor_TextChanged" VerticalScrollBarVisibility="Auto" />
+                                    <RichTextBox x:Name="LeftEditor" Grid.Row="1" Margin="12" AcceptsTab="True" FontFamily="Consolas, Microsoft YaHei UI" FontSize="12" HorizontalScrollBarVisibility="Disabled" SizeChanged="CompareEditor_SizeChanged" TextChanged="Editor_TextChanged" VerticalScrollBarVisibility="Auto" />
                                 </Grid>
                             </Border>
                             <GridSplitter Grid.Column="1" Width="12" HorizontalAlignment="Stretch" />
@@ -135,7 +135,7 @@
                                     <Border Background="{StaticResource SurfaceAltBrush}" BorderBrush="{StaticResource DividerBrush}" BorderThickness="0,0,0,1" CornerRadius="8,8,0,0">
                                         <TextBlock x:Name="RightTitleTextBlock" Margin="16,0" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="右侧文本" />
                                     </Border>
-                                    <RichTextBox x:Name="RightEditor" Grid.Row="1" Margin="12" AcceptsTab="True" FontFamily="Consolas, Microsoft YaHei UI" FontSize="12" HorizontalScrollBarVisibility="Auto" TextChanged="Editor_TextChanged" VerticalScrollBarVisibility="Auto" />
+                                    <RichTextBox x:Name="RightEditor" Grid.Row="1" Margin="12" AcceptsTab="True" FontFamily="Consolas, Microsoft YaHei UI" FontSize="12" HorizontalScrollBarVisibility="Disabled" SizeChanged="CompareEditor_SizeChanged" TextChanged="Editor_TextChanged" VerticalScrollBarVisibility="Auto" />
                                 </Grid>
                             </Border>
                         </Grid>
@@ -165,7 +165,7 @@
                                             <RowDefinition Height="*" />
                                         </Grid.RowDefinitions>
                                         <TextBlock Margin="12,0" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="原始数据" />
-                                        <TextBox x:Name="DistinctLeftTextBox" Grid.Row="1" Margin="12" AcceptsReturn="True" Background="White" Foreground="{StaticResource TextPrimaryBrush}" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" FontFamily="Consolas, Microsoft YaHei UI" TextWrapping="NoWrap" />
+                                        <TextBox x:Name="DistinctLeftTextBox" Grid.Row="1" Margin="12" AcceptsReturn="True" Background="White" Foreground="{StaticResource TextPrimaryBrush}" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" FontFamily="Consolas, Microsoft YaHei UI" TextWrapping="Wrap" />
                                     </Grid>
                                 </Border>
                                 <GridSplitter Grid.Column="1" Width="12" HorizontalAlignment="Stretch" />
@@ -176,7 +176,7 @@
                                             <RowDefinition Height="*" />
                                         </Grid.RowDefinitions>
                                         <TextBlock Margin="12,0" VerticalAlignment="Center" Style="{StaticResource SectionTitleTextStyle}" Text="去重结果" />
-                                        <TextBox x:Name="DistinctOutputTextBox" Grid.Row="1" Margin="12" AcceptsReturn="True" Background="White" Foreground="{StaticResource TextPrimaryBrush}" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" FontFamily="Consolas, Microsoft YaHei UI" TextWrapping="NoWrap" />
+                                        <TextBox x:Name="DistinctOutputTextBox" Grid.Row="1" Margin="12" AcceptsReturn="True" Background="White" Foreground="{StaticResource TextPrimaryBrush}" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" FontFamily="Consolas, Microsoft YaHei UI" TextWrapping="Wrap" />
                                     </Grid>
                                 </Border>
                             </Grid>
@@ -205,7 +205,7 @@
                             </Border>
                             <GridSplitter Grid.Column="1" Width="12" HorizontalAlignment="Stretch" />
                             <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}">
-                                <TextBox x:Name="TimestampOutputTextBox" Margin="12" AcceptsReturn="True" IsReadOnly="True" Background="White" Foreground="{StaticResource TextPrimaryBrush}" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" FontFamily="Consolas, Microsoft YaHei UI" TextWrapping="NoWrap" />
+                                <TextBox x:Name="TimestampOutputTextBox" Margin="12" AcceptsReturn="True" IsReadOnly="True" Background="White" Foreground="{StaticResource TextPrimaryBrush}" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" FontFamily="Consolas, Microsoft YaHei UI" TextWrapping="Wrap" />
                             </Border>
                         </Grid>
                     </TabItem>
@@ -230,11 +230,11 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <Border Style="{StaticResource CardBorderStyle}">
-                                    <TextBox x:Name="CaseInputTextBox" Margin="12" AcceptsReturn="True" Background="White" Foreground="{StaticResource TextPrimaryBrush}" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" FontFamily="Consolas, Microsoft YaHei UI" TextWrapping="NoWrap" />
+                                    <TextBox x:Name="CaseInputTextBox" Margin="12" AcceptsReturn="True" Background="White" Foreground="{StaticResource TextPrimaryBrush}" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" FontFamily="Consolas, Microsoft YaHei UI" TextWrapping="Wrap" />
                                 </Border>
                                 <GridSplitter Grid.Column="1" Width="12" HorizontalAlignment="Stretch" />
                                 <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}">
-                                    <TextBox x:Name="CaseOutputTextBox" Margin="12" AcceptsReturn="True" Background="White" Foreground="{StaticResource TextPrimaryBrush}" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" FontFamily="Consolas, Microsoft YaHei UI" TextWrapping="NoWrap" />
+                                    <TextBox x:Name="CaseOutputTextBox" Margin="12" AcceptsReturn="True" Background="White" Foreground="{StaticResource TextPrimaryBrush}" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" FontFamily="Consolas, Microsoft YaHei UI" TextWrapping="Wrap" />
                                 </Border>
                             </Grid>
                         </Grid>
