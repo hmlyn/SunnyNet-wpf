@@ -42,6 +42,7 @@ public partial class MainWindow : Window
     private string? _mainAlertActionUrl;
     private SessionCompareWindow? _sessionCompareWindow;
     private Point? _sessionsDragStartPoint;
+    private CaptureEntry? _sessionsDragEntry;
 
     public MainWindow()
     {
@@ -104,13 +105,13 @@ public partial class MainWindow : Window
 
         try
         {
-            ClipboardService.SetText(ip);
+            WinApiClipboard.SetText(ip);
             _viewModel.StatusRight = $"已复制内网 IP：{ip}";
             LanIpPopup.IsOpen = false;
         }
         catch (Exception exception)
         {
-            _viewModel.StatusRight = ClipboardService.GetFriendlyErrorMessage(exception);
+            _viewModel.StatusRight = WinApiClipboard.GetFriendlyErrorMessage(exception);
         }
     }
 
@@ -1538,7 +1539,30 @@ public partial class MainWindow : Window
 
     private void SessionsGrid_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs mouseButtonEventArgs)
     {
+        if (FindVisualParent<ScrollBar>(mouseButtonEventArgs.OriginalSource as DependencyObject) is not null
+            || FindVisualParent<Thumb>(mouseButtonEventArgs.OriginalSource as DependencyObject) is not null
+            || FindVisualParent<DataGridColumnHeader>(mouseButtonEventArgs.OriginalSource as DependencyObject) is not null)
+        {
+            _sessionsDragStartPoint = null;
+            _sessionsDragEntry = null;
+            return;
+        }
+
+        if (FindVisualParent<DataGridRow>(mouseButtonEventArgs.OriginalSource as DependencyObject) is not { Item: CaptureEntry entry })
+        {
+            _sessionsDragStartPoint = null;
+            _sessionsDragEntry = null;
+            return;
+        }
+
         _sessionsDragStartPoint = mouseButtonEventArgs.GetPosition(null);
+        _sessionsDragEntry = entry;
+    }
+
+    private void SessionsGrid_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs mouseButtonEventArgs)
+    {
+        _sessionsDragStartPoint = null;
+        _sessionsDragEntry = null;
     }
 
     private void SessionsGrid_MouseMove(object sender, MouseEventArgs mouseEventArgs)
@@ -1555,8 +1579,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        CaptureEntry? entry = FindVisualParent<DataGridRow>(mouseEventArgs.OriginalSource as DependencyObject)?.Item as CaptureEntry
-                              ?? _viewModel.SelectedSession;
+        CaptureEntry? entry = _sessionsDragEntry;
         if (entry is null)
         {
             return;
@@ -1565,6 +1588,7 @@ public partial class MainWindow : Window
         DataObject data = new();
         data.SetData(typeof(CaptureEntry), entry);
         _sessionsDragStartPoint = null;
+        _sessionsDragEntry = null;
         DragDrop.DoDragDrop(SessionsGrid, data, DragDropEffects.Copy);
     }
 
@@ -2173,12 +2197,12 @@ public partial class MainWindow : Window
 
         try
         {
-            ClipboardService.SetText(text);
+            WinApiClipboard.SetText(text);
             _viewModel.StatusRight = statusText;
         }
         catch (Exception exception)
         {
-            ViewModel_NotificationRequested("错误", ClipboardService.GetFriendlyErrorMessage(exception));
+            ViewModel_NotificationRequested("错误", WinApiClipboard.GetFriendlyErrorMessage(exception));
         }
     }
 

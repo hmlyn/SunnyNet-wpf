@@ -15,6 +15,18 @@
                 CornerRadius="8">
             <StackPanel>
                 <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="图片信息" />
+                <ComboBox x:Name="FormatBox"
+                          Margin="0,10,0,0"
+                          SelectionChanged="FormatBox_SelectionChanged">
+                    <ComboBoxItem Content="自动识别" Tag="Auto" IsSelected="True" />
+                    <ComboBoxItem Content="JPEG" Tag="Jpeg" />
+                    <ComboBoxItem Content="PNG" Tag="Png" />
+                    <ComboBoxItem Content="GIF" Tag="Gif" />
+                    <ComboBoxItem Content="BMP" Tag="Bmp" />
+                    <ComboBoxItem Content="WebP" Tag="Webp" />
+                    <ComboBoxItem Content="ICO" Tag="Ico" />
+                    <ComboBoxItem Content="TIFF" Tag="Tiff" />
+                </ComboBox>
                 <Border Margin="0,12,0,0"
                         Padding="10,8"
                         Background="{StaticResource SurfaceBrush}"

@@ -644,11 +644,21 @@
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="60" />
                                                 <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="10" />
+                                                <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Style="{StaticResource SettingsMetaLabelTextStyle}" Text="入口" />
-                                            <TextBlock Grid.Column="1"
-                                                       Style="{StaticResource SettingsMetaValueTextStyle}"
-                                                       Text="{Binding Mcp.EndpointUrl}" />
+                                            <TextBlock VerticalAlignment="Center"
+                                                       Style="{StaticResource SettingsMetaLabelTextStyle}"
+                                                       Text="MCP入库" />
+                                            <TextBox Grid.Column="1"
+                                                     VerticalContentAlignment="Center"
+                                                     IsReadOnly="True"
+                                                     Style="{StaticResource SettingsReadOnlyMonospaceTextBoxStyle}"
+                                                     Text="{Binding Mcp.EndpointUrl, Mode=OneWay}" />
+                                            <Button Grid.Column="3"
+                                                    Style="{StaticResource SettingsSmallActionButtonStyle}"
+                                                    Click="CopyMcpEndpoint_Click"
+                                                    Content="复制" />
                                         </Grid>
                                     </Border>
 

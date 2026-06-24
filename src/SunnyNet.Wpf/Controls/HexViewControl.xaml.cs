@@ -1153,7 +1153,7 @@ public partial class HexViewControl : UserControl
 
         try
         {
-            await ClipboardService.SetTextAsync(text);
+            await WinApiClipboard.SetTextAsync(text);
             return true;
         }
         catch

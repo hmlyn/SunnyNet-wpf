@@ -955,7 +955,7 @@ public partial class PacketMessagesControl : UserControl
             return;
         }
 
-        ClipboardService.SetText($"{entry.CompactIndex}\t{entry.TimeLabel}\t{entry.DirectionLabel}\t{entry.LengthLabel}\t{entry.PreviewText}");
+        WinApiClipboard.SetText($"{entry.CompactIndex}\t{entry.TimeLabel}\t{entry.DirectionLabel}\t{entry.LengthLabel}\t{entry.PreviewText}");
     }
 
     private async void CopyPacketText_Click(object sender, RoutedEventArgs routedEventArgs)
@@ -963,7 +963,7 @@ public partial class PacketMessagesControl : UserControl
         PacketPayloadSnapshot? snapshot = await GetSelectedPayloadAsync();
         if (snapshot is not null)
         {
-            ClipboardService.SetText(string.IsNullOrEmpty(snapshot.RawText) ? snapshot.DisplayText : snapshot.RawText);
+            WinApiClipboard.SetText(string.IsNullOrEmpty(snapshot.RawText) ? snapshot.DisplayText : snapshot.RawText);
         }
     }
 
@@ -972,7 +972,7 @@ public partial class PacketMessagesControl : UserControl
         PacketPayloadSnapshot? snapshot = await GetSelectedPayloadAsync();
         if (snapshot is not null)
         {
-            ClipboardService.SetText(Convert.ToHexString(snapshot.Bytes));
+            WinApiClipboard.SetText(Convert.ToHexString(snapshot.Bytes));
         }
     }
 
@@ -981,7 +981,7 @@ public partial class PacketMessagesControl : UserControl
         PacketPayloadSnapshot? snapshot = await GetSelectedPayloadAsync();
         if (snapshot is not null)
         {
-            ClipboardService.SetText(Convert.ToBase64String(snapshot.Bytes));
+            WinApiClipboard.SetText(Convert.ToBase64String(snapshot.Bytes));
         }
     }
 

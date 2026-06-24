@@ -352,7 +352,7 @@ public sealed class HttpSyntaxTextBox : RichTextBox
 
         try
         {
-            await ClipboardService.SetTextAsync(text);
+            await WinApiClipboard.SetTextAsync(text);
         }
         catch
         {

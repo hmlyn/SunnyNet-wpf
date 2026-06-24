@@ -4,6 +4,7 @@
 package CommAnd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -47,5 +48,5 @@ func GetWayArray() []string {
 	return nil
 }
 func ClipboardText(text string) error {
-	return clipboard.WriteAll(text)
+	return fmt.Errorf("clipboard is only supported on Windows")
 }

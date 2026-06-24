@@ -500,7 +500,7 @@ public partial class JsonTreeViewControl : UserControl
 
         try
         {
-            ClipboardService.SetText(text);
+            WinApiClipboard.SetText(text);
         }
         catch
         {

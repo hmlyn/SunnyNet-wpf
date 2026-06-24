@@ -5,9 +5,7 @@ go 1.24.0
 require (
 	github.com/Trisia/gosysproxy v1.0.0
 	github.com/andybalholm/brotli v1.0.5
-	github.com/atotto/clipboard v0.1.4
 	github.com/jhump/protoreflect v1.18.0
-	github.com/lwch/rdesktop v1.2.2
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/qtgolang/SunnyNet v1.0.3
 	github.com/traefik/yaegi v0.15.1

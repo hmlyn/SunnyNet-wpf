@@ -37,7 +37,7 @@ public partial class OpenSourceWindow : Window
 
     private void CopyProject_Click(object sender, RoutedEventArgs routedEventArgs)
     {
-        ClipboardService.SetText(ProjectUrl);
+        WinApiClipboard.SetText(ProjectUrl);
     }
 
     private void OpenCore_Click(object sender, RoutedEventArgs routedEventArgs)

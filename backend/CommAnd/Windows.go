@@ -6,8 +6,8 @@ package CommAnd
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"github.com/Trisia/gosysproxy"
-	"github.com/atotto/clipboard"
 	gops "github.com/mitchellh/go-ps"
 	"github.com/qtgolang/SunnyNet/public"
 	"golang.org/x/text/encoding/simplifiedchinese"
@@ -20,6 +20,8 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"unicode/utf16"
+	"unsafe"
 )
 
 var UserSelectPath = ""
@@ -132,5 +134,73 @@ func GetWayArray() []string {
 	return ipArray
 }
 func ClipboardText(text string) error {
-	return clipboard.WriteAll(text)
+	return setClipboardTextByWinAPI(text)
+}
+
+const (
+	cfUnicodeText = 13
+	gmemMoveable  = 0x0002
+	gmemZeroInit  = 0x0040
+)
+
+var (
+	user32             = syscall.NewLazyDLL("user32.dll")
+	kernel32           = syscall.NewLazyDLL("kernel32.dll")
+	procOpenClipboard  = user32.NewProc("OpenClipboard")
+	procEmptyClipboard = user32.NewProc("EmptyClipboard")
+	procSetClipboard   = user32.NewProc("SetClipboardData")
+	procCloseClipboard = user32.NewProc("CloseClipboard")
+	procGlobalAlloc    = kernel32.NewProc("GlobalAlloc")
+	procGlobalLock     = kernel32.NewProc("GlobalLock")
+	procGlobalUnlock   = kernel32.NewProc("GlobalUnlock")
+	procGlobalFree     = kernel32.NewProc("GlobalFree")
+)
+
+func setClipboardTextByWinAPI(text string) error {
+	ok, _, openErr := procOpenClipboard.Call(0)
+	if ok == 0 {
+		return winAPICallError("OpenClipboard", openErr)
+	}
+
+	var memory uintptr
+	transferred := false
+	defer func() {
+		procCloseClipboard.Call()
+		if !transferred && memory != 0 {
+			procGlobalFree.Call(memory)
+		}
+	}()
+
+	ok, _, emptyErr := procEmptyClipboard.Call()
+	if ok == 0 {
+		return winAPICallError("EmptyClipboard", emptyErr)
+	}
+
+	utf16Text := utf16.Encode([]rune(text + "\x00"))
+	size := uintptr(len(utf16Text) * 2)
+	memory, _, allocErr := procGlobalAlloc.Call(gmemMoveable|gmemZeroInit, size)
+	if memory == 0 {
+		return winAPICallError("GlobalAlloc", allocErr)
+	}
+
+	pointer, _, lockErr := procGlobalLock.Call(memory)
+	if pointer == 0 {
+		return winAPICallError("GlobalLock", lockErr)
+	}
+	copy(unsafe.Slice((*uint16)(unsafe.Pointer(pointer)), len(utf16Text)), utf16Text)
+	procGlobalUnlock.Call(memory)
+
+	result, _, setErr := procSetClipboard.Call(cfUnicodeText, memory)
+	if result == 0 {
+		return winAPICallError("SetClipboardData", setErr)
+	}
+	transferred = true
+	return nil
+}
+
+func winAPICallError(apiName string, err error) error {
+	if err == syscall.Errno(0) {
+		return fmt.Errorf("%s 失败", apiName)
+	}
+	return fmt.Errorf("%s 失败: %w", apiName, err)
 }

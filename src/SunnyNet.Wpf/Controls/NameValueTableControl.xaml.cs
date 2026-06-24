@@ -113,7 +113,7 @@ public partial class NameValueTableControl : UserControl
 
         try
         {
-            ClipboardService.SetText(text);
+            WinApiClipboard.SetText(text);
         }
         catch
         {
@@ -175,7 +175,7 @@ public partial class NameValueTableControl : UserControl
 
         try
         {
-            ClipboardService.SetText(text);
+            WinApiClipboard.SetText(text);
         }
         catch
         {

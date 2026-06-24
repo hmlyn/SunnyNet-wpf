@@ -2191,7 +2191,7 @@ public partial class WebSocketMessagesControl : UserControl
 
         try
         {
-            ClipboardService.SetText(text);
+            WinApiClipboard.SetText(text);
             return true;
         }
         catch

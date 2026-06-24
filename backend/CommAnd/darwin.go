@@ -4,7 +4,7 @@
 package CommAnd
 
 import (
-	"github.com/lwch/rdesktop/clipboard"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -65,5 +65,5 @@ func GetWayArray() []string {
 	return ipArray
 }
 func ClipboardText(text string) error {
-	return clipboard.Set(text)
+	return fmt.Errorf("clipboard is only supported on Windows")
 }

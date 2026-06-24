@@ -144,15 +144,20 @@ public partial class SettingsWindow : Window
         CopyText(_viewModel.Mcp.ClientConfigText, "已复制 MCP 客户端配置。");
     }
 
-    private static void CopyText(string text, string message)
+    private void CopyMcpEndpoint_Click(object sender, RoutedEventArgs routedEventArgs)
+    {
+        CopyText(_viewModel.Mcp.EndpointUrl, "已复制 MCP 入库地址。");
+    }
+
+    private void CopyText(string text, string message)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
             return;
         }
 
-        ClipboardService.SetText(text);
-        MessageBox.Show(message, "MCP", MessageBoxButton.OK, MessageBoxImage.Information);
+        WinApiClipboard.SetText(text);
+        _viewModel.StatusRight = message;
     }
 
     private async void ApplyMustTcp_Click(object sender, RoutedEventArgs routedEventArgs)
@@ -436,12 +441,12 @@ public partial class SettingsWindow : Window
 
         try
         {
-            await ClipboardService.SetTextAsync(processName);
+            await WinApiClipboard.SetTextAsync(processName);
             _viewModel.StatusRight = $"已复制进程名：{processName}";
         }
         catch (Exception exception)
         {
-            _viewModel.StatusRight = ClipboardService.GetFriendlyErrorMessage(exception);
+            _viewModel.StatusRight = WinApiClipboard.GetFriendlyErrorMessage(exception);
         }
     }
 

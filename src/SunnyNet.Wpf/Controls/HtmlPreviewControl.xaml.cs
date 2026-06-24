@@ -81,7 +81,7 @@ public partial class HtmlPreviewControl : UserControl
 
         try
         {
-            ClipboardService.SetText(HtmlText);
+            WinApiClipboard.SetText(HtmlText);
         }
         catch
         {

@@ -700,6 +700,7 @@
                                       VirtualizingPanel.VirtualizationMode="Recycling"
                                       ScrollViewer.CanContentScroll="True"
                                       PreviewMouseLeftButtonDown="SessionsGrid_PreviewMouseLeftButtonDown"
+                                      PreviewMouseLeftButtonUp="SessionsGrid_PreviewMouseLeftButtonUp"
                                       MouseMove="SessionsGrid_MouseMove"
                                       PreviewMouseRightButtonDown="SessionsGrid_PreviewMouseRightButtonDown"
                                       CellEditEnding="SessionsGrid_CellEditEnding">
