@@ -34,6 +34,11 @@ type Map struct {
 	pendingRuleHits    map[int][]TrafficRuleHit
 }
 
+// ReplayMarkerHeader 是重放请求携带的内部识别头。
+// resendHttp 打上该头，HttpCallback 检测到后会剔除并放行“隐藏捕获”状态下的列表推送。
+// 该头不会转发到真实服务器。
+const ReplayMarkerHeader = "X-SunnyNet-Replay"
+
 type WaitGroup struct {
 	lock      sync.Mutex
 	waitGroup sync.WaitGroup
@@ -929,6 +934,9 @@ func (m *Map) resendHttp(r *Request, mode, SunnyNetServerPort int) {
 		return
 	}
 	h.Header = r.Header.Clone()
+	// 打上重放标记，便于 HttpCallback 在“隐藏捕获”状态下识别并放行该流量。
+	// 该标记会在 HttpCallback 入口被剔除，不会随请求转发到真实服务器。
+	h.Header.Set(ReplayMarkerHeader, "1")
 	if mode > 0 {
 		m.RegisterHTTPReplayAction(r.Method, r.URL, r.Body, mode)
 	}

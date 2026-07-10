@@ -699,6 +699,8 @@
                                       VirtualizingPanel.IsVirtualizing="True"
                                       VirtualizingPanel.VirtualizationMode="Recycling"
                                       ScrollViewer.CanContentScroll="True"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                      Sorting="SessionsGrid_Sorting"
                                       PreviewMouseLeftButtonDown="SessionsGrid_PreviewMouseLeftButtonDown"
                                       MouseMove="SessionsGrid_MouseMove"
                                       PreviewMouseRightButtonDown="SessionsGrid_PreviewMouseRightButtonDown"
@@ -805,6 +807,8 @@
                                         <Separator />
                                         <MenuItem x:Name="ResendSelectedSessionsMenuItem" Header="重放">
                                             <MenuItem Header="普通重放" Tag="3" Click="ResendSelectedSessions_Click" />
+                                            <MenuItem Header="多次重放" Click="MultiResendSelectedSessions_Click" />
+                                            <Separator />
                                             <MenuItem Header="重放并拦截上行" Tag="1" Click="ResendSelectedSessions_Click" />
                                             <MenuItem Header="重放并拦截下行" Tag="2" Click="ResendSelectedSessions_Click" />
                                             <Separator />
@@ -1260,10 +1264,12 @@
                                                 <Button Margin="0,0,8,0"
                                                         Style="{StaticResource DetailBreakpointWarningButtonStyle}"
                                                         Command="{Binding ResendSelectedCommand}"
+                                                        Click="SyncJsonEditBeforeRelease_Click"
                                                         Content="放行当前" />
                                                 <Button Margin="0,0,8,0"
                                                         Style="{StaticResource DetailBreakpointSuccessButtonStyle}"
                                                         Command="{Binding ReleaseCurrentCommand}"
+                                                        Click="SyncJsonEditBeforeRelease_Click"
                                                         Content="运行到结束" />
                                                 <Button Style="{StaticResource DetailBreakpointDangerButtonStyle}"
                                                         Command="{Binding CloseSessionCommand}"
@@ -1331,35 +1337,17 @@
                                                         <controls:HttpSyntaxTextBox.Style>
                                                             <Style TargetType="{x:Type controls:HttpSyntaxTextBox}">
                                                                 <Setter Property="Visibility" Value="Visible" />
+                                                                <Setter Property="IsReadOnly" Value="True" />
+                                                                <Setter Property="IsReadOnlyCaretVisible" Value="False" />
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding Detail.IsResponseInlineEditing}" Value="True">
-                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                        <Setter Property="IsReadOnly" Value="False" />
+                                                                        <Setter Property="IsReadOnlyCaretVisible" Value="True" />
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>
                                                         </controls:HttpSyntaxTextBox.Style>
                                                     </controls:HttpSyntaxTextBox>
-                                                    <TextBox AcceptsReturn="True"
-                                                             AcceptsTab="True"
-                                                             FontFamily="Consolas, Microsoft YaHei UI"
-                                                             FontSize="11.5"
-                                                             HorizontalScrollBarVisibility="Auto"
-                                                             Text="{Binding Detail.EditableResponseRaw, UpdateSourceTrigger=PropertyChanged}"
-                                                             TextWrapping="NoWrap"
-                                                             VerticalScrollBarVisibility="Auto">
-                                                        <TextBox.Style>
-                                                            <Style TargetType="{x:Type TextBox}" BasedOn="{StaticResource {x:Type TextBox}}">
-                                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                                <Setter Property="Padding" Value="10" />
-                                                                <Setter Property="BorderThickness" Value="0" />
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding Detail.IsResponseInlineEditing}" Value="True">
-                                                                        <Setter Property="Visibility" Value="Visible" />
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </TextBox.Style>
-                                                    </TextBox>
                                                 </Grid>
                                             </TabItem>
                                             <TabItem x:Name="ResponseHeadersTab" Header="协议头">
@@ -1511,7 +1499,11 @@
                                                                                EmptyText="无响应 Cookies" />
                                             </TabItem>
                                             <TabItem x:Name="ResponseJsonTab" Header="JSON视图">
-                                                <controls:JsonTreeViewControl JsonText="{Binding Detail.ResponseJson}" />
+                                                <controls:JsonTreeViewControl JsonText="{Binding Detail.ResponseJson}"
+                                                                              SearchText="{Binding Detail.ResponseSearchText}"
+                                                                              SearchIgnoreCase="{Binding Detail.DetailSearchIgnoreCase}"
+                                                                              IsEditable="{Binding Detail.IsResponseInlineEditing}"
+                                                                              EditableBodyText="{Binding Detail.EditableResponseBody, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                             </TabItem>
                                         </TabControl>
 

@@ -191,7 +191,9 @@
                 <controls:HttpSyntaxTextBox x:Name="FallbackViewer"
                                             Visibility="Collapsed"
                                             SourceText="{Binding JsonText, RelativeSource={RelativeSource AncestorType=controls:JsonTreeViewControl}}"
-                                            HighlightMode="Json">
+                                            HighlightMode="Json"
+                                            SearchText="{Binding SearchText, RelativeSource={RelativeSource AncestorType=controls:JsonTreeViewControl}}"
+                                            SearchIgnoreCase="{Binding SearchIgnoreCase, RelativeSource={RelativeSource AncestorType=controls:JsonTreeViewControl}}">
                     <controls:HttpSyntaxTextBox.ContextMenu>
                         <ContextMenu>
                             <MenuItem Header="复制 JSON" Click="CopyJson_Click" />

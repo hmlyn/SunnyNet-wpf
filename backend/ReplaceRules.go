@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"changeme/MapHash"
 	"encoding/base64"
 	"encoding/json"
@@ -29,11 +30,14 @@ type ReplaceRules struct {
 var _ReplaceRules []ReplaceRules
 
 type requestRewriteOperation struct {
-	Target    string `json:"Target"`
-	Operation string `json:"Operation"`
-	Key       string `json:"Key"`
-	Value     string `json:"Value"`
-	ValueType string `json:"ValueType"`
+	Target       string `json:"Target"`
+	Operation    string `json:"Operation"`
+	Key          string `json:"Key"`
+	Value        string `json:"Value"`
+	ValueType    string `json:"ValueType"`
+	ReplaceFind  string `json:"ReplaceFind"`
+	ReplaceValue string `json:"ReplaceValue"`
+	ReplaceMode  string `json:"ReplaceMode"`
 }
 
 func ReplaceRulesEvent(command string, args *JSON.SyJson) any {
@@ -596,8 +600,7 @@ func applyRequestRewriteOperation(rewriteOperation requestRewriteOperation, meth
 	target := strings.TrimSpace(rewriteOperation.Target)
 	operation := strings.TrimSpace(rewriteOperation.Operation)
 	key := strings.TrimSpace(rewriteOperation.Key)
-	value := strings.ReplaceAll(rewriteOperation.Value, "\\\\", "\\")
-	value = strings.ReplaceAll(value, "\\\"", "\"")
+	value := unescapeRewriteValue(rewriteOperation.Value)
 
 	switch target {
 	case "请求方法", "Method":
@@ -638,13 +641,7 @@ func applyRequestRewriteOperation(rewriteOperation requestRewriteOperation, meth
 	case "协议头", "请求头", "Header":
 		applyHeaderRewrite(header, operation, key, value)
 	case "Body", "请求体":
-		if isDeleteOperation(operation) {
-			body = nil
-			break
-		}
-		if decoded, err := decodeMappingBody(value, rewriteOperation.ValueType); err == nil {
-			body = decoded
-		}
+		body = applyBodyRewriteOperation(body, rewriteOperation, value)
 	}
 
 	return method, u, body
@@ -654,8 +651,7 @@ func applyResponseRewriteOperation(rewriteOperation requestRewriteOperation, res
 	target := strings.TrimSpace(rewriteOperation.Target)
 	operation := strings.TrimSpace(rewriteOperation.Operation)
 	key := strings.TrimSpace(rewriteOperation.Key)
-	value := strings.ReplaceAll(rewriteOperation.Value, "\\\\", "\\")
-	value = strings.ReplaceAll(value, "\\\"", "\"")
+	value := unescapeRewriteValue(rewriteOperation.Value)
 
 	switch target {
 	case "状态码", "StatusCode":
@@ -674,11 +670,7 @@ func applyResponseRewriteOperation(rewriteOperation requestRewriteOperation, res
 	case "协议头", "响应头", "Header":
 		applyHeaderRewrite(response.Header, operation, key, value)
 	case "Body", "响应体":
-		if isDeleteOperation(operation) {
-			body = nil
-		} else if decoded, err := decodeMappingBody(value, rewriteOperation.ValueType); err == nil {
-			body = decoded
-		}
+		body = applyBodyRewriteOperation(body, rewriteOperation, value)
 		if response.Header != nil {
 			delete(response.Header, "Content-Encoding")
 			delete(response.Header, "content-encoding")
@@ -754,6 +746,37 @@ func applyHeaderRewrite(header http.Header, operation string, key string, value 
 	header.Set(key, value)
 }
 
+func applyBodyRewriteOperation(body []byte, rewriteOperation requestRewriteOperation, value string) []byte {
+	operation := strings.TrimSpace(rewriteOperation.Operation)
+	if isDeleteOperation(operation) {
+		return nil
+	}
+	if isReplaceOperation(operation) {
+		find, err := decodeMappingBody(unescapeRewriteValue(rewriteOperation.ReplaceFind), rewriteOperation.ValueType)
+		if err != nil || len(find) == 0 {
+			return body
+		}
+		replacement, err := decodeMappingBody(unescapeRewriteValue(rewriteOperation.ReplaceValue), rewriteOperation.ValueType)
+		if err != nil {
+			return body
+		}
+		count := -1
+		if strings.TrimSpace(rewriteOperation.ReplaceMode) == "仅替换首次出现" {
+			count = 1
+		}
+		return bytes.Replace(body, find, replacement, count)
+	}
+	if decoded, err := decodeMappingBody(value, rewriteOperation.ValueType); err == nil {
+		return decoded
+	}
+	return body
+}
+
+func unescapeRewriteValue(value string) string {
+	value = strings.ReplaceAll(value, "\\\\", "\\")
+	return strings.ReplaceAll(value, "\\\"", "\"")
+}
+
 func buildRewriteAction(operations []requestRewriteOperation) string {
 	if len(operations) > 1 {
 		return "动作链×" + strconv.Itoa(len(operations))
@@ -813,6 +836,10 @@ func isDeleteOperation(operation string) bool {
 
 func isAddOperation(operation string) bool {
 	return strings.TrimSpace(operation) == "添加"
+}
+
+func isReplaceOperation(operation string) bool {
+	return strings.TrimSpace(operation) == "替换"
 }
 
 func cloneURL(u *url.URL) *url.URL {

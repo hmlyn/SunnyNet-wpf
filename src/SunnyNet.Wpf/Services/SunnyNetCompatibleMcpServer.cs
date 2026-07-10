@@ -2897,7 +2897,10 @@ public sealed class SunnyNetCompatibleMcpServer : IAsyncDisposable
                     operation.Operation,
                     operation.Key,
                     operation.Value,
-                    operation.ValueType
+                    operation.ValueType,
+                    operation.ReplaceFind,
+                    operation.ReplaceValue,
+                    operation.ReplaceMode
                 }).ToArray()
             },
             _ => null

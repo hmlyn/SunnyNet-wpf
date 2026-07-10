@@ -1,0 +1,51 @@
+<Window x:Class="SunnyNet.Wpf.Windows.RepeatCountWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="多次重放"
+        Width="380"
+        Height="200"
+        SizeToContent="Height"
+        ResizeMode="CanResize"
+        Background="{StaticResource WindowBackgroundBrush}"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        WindowStartupLocation="CenterOwner"
+        PreviewKeyDown="Window_PreviewKeyDown">
+    <Border Margin="14" Style="{StaticResource CardBorderStyle}">
+        <Grid Margin="16,14">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Margin="0,0,0,10"
+                       Style="{StaticResource DialogSubtitleTextStyle}"
+                       Text="输入重放次数（1-9999）：" />
+
+            <TextBox x:Name="CountTextBox"
+                     Grid.Row="1"
+                     Height="32"
+                     Padding="10,5"
+                     FontSize="13"
+                     VerticalContentAlignment="Center"
+                     BorderBrush="{StaticResource BorderBrush}"
+                     BorderThickness="1"
+                     Text="1" />
+
+            <DockPanel Grid.Row="2"
+                       Margin="0,10,0,0"
+                       LastChildFill="False">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button Margin="0,0,8,0"
+                            Padding="12,6"
+                            Click="Confirm_Click"
+                            Content="确定"
+                            Style="{StaticResource PrimaryButtonStyle}" />
+                    <Button Padding="12,6"
+                            Click="Cancel_Click"
+                            Content="取消" />
+                </StackPanel>
+            </DockPanel>
+        </Grid>
+    </Border>
+</Window>

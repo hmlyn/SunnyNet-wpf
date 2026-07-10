@@ -1126,9 +1126,10 @@
                                        Text="复杂 Body、HEX、Base64 都在这里编辑。" />
                         </StackPanel>
 
-                        <StackPanel Grid.Row="1"
-                                    Margin="0,13,0,0"
-                                    DataContext="{Binding SelectedRewriteOperation, RelativeSource={RelativeSource AncestorType=Window}}">
+                        <ScrollViewer Grid.Row="1"
+                                      Margin="0,13,0,0"
+                                      VerticalScrollBarVisibility="Auto">
+                            <StackPanel DataContext="{Binding SelectedRewriteOperation, RelativeSource={RelativeSource AncestorType=Window}}">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -1178,6 +1179,46 @@
                                          Style="{StaticResource RewriteWorkbenchTextBoxStyle}" />
                             </StackPanel>
 
+                            <StackPanel Margin="0,10,0,0"
+                                        Visibility="{Binding ShowsReplaceEditor, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Style="{StaticResource RewriteWorkbenchFieldLabelStyle}" Text="替换方式" />
+                                <Border Padding="2"
+                                        HorizontalAlignment="Left"
+                                        Background="{StaticResource SurfaceAltBrush}"
+                                        BorderBrush="{StaticResource DividerBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="8">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ToggleButton Style="{StaticResource SegmentedToggleButtonStyle}"
+                                                      IsChecked="{Binding IsReplaceAll, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                      Content="全部替换" />
+                                        <ToggleButton Style="{StaticResource SegmentedToggleButtonStyle}"
+                                                      IsChecked="{Binding IsReplaceFirst, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                      Content="仅替换首次出现" />
+                                    </StackPanel>
+                                </Border>
+
+                                <TextBlock Margin="0,10,0,4"
+                                           Style="{StaticResource RewriteWorkbenchFieldLabelStyle}"
+                                           Text="查找内容" />
+                                <TextBox Height="62"
+                                         AcceptsReturn="True"
+                                         TextWrapping="Wrap"
+                                         VerticalScrollBarVisibility="Auto"
+                                         Text="{Binding ReplaceFind, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource RewriteWorkbenchTextBoxStyle}" />
+
+                                <TextBlock Margin="0,10,0,4"
+                                           Style="{StaticResource RewriteWorkbenchFieldLabelStyle}"
+                                           Text="替换内容" />
+                                <TextBox Height="62"
+                                         AcceptsReturn="True"
+                                         TextWrapping="Wrap"
+                                         VerticalScrollBarVisibility="Auto"
+                                         Text="{Binding ReplaceValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource RewriteWorkbenchTextBoxStyle}" />
+                            </StackPanel>
+
                             <Border Margin="0,12,0,0"
                                     Padding="10,8"
                                     Background="#F7FAFD"
@@ -1190,6 +1231,7 @@
                                            TextWrapping="Wrap" />
                             </Border>
                         </StackPanel>
+                        </ScrollViewer>
 
                         <StackPanel Grid.Row="2"
                                     Margin="0,12,0,0">

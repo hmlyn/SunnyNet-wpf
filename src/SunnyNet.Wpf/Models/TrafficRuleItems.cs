@@ -295,7 +295,10 @@ public sealed class RequestRewriteRuleItem : TrafficRuleItemBase
                 item.Operation,
                 item.Key,
                 item.Value,
-                item.ValueType
+                item.ValueType,
+                item.ReplaceFind,
+                item.ReplaceValue,
+                item.ReplaceMode
             }),
             JsonOptions);
         OnPropertyChanged(nameof(OperationsJson));
@@ -497,6 +500,7 @@ public sealed class RequestRewriteOperationItem : ViewModelBase
 {
     private static readonly string[] SetOnlyOperations = { "设置" };
     private static readonly string[] SetDeleteOperations = { "设置", "删除" };
+    private static readonly string[] BodyOperations = { "设置", "删除", "替换" };
     private static readonly string[] KeyValueOperations = { "设置", "添加", "删除" };
 
     private int _displayIndex;
@@ -506,6 +510,9 @@ public sealed class RequestRewriteOperationItem : ViewModelBase
     private string _key = "";
     private string _value = "";
     private string _valueType = "String(UTF8)";
+    private string _replaceFind = "";
+    private string _replaceValue = "";
+    private string _replaceMode = "全部替换";
     private string _validationMessage = "";
 
     public RequestRewriteOperationItem()
@@ -595,11 +602,78 @@ public sealed class RequestRewriteOperationItem : ViewModelBase
         set => SetProperty(ref _valueType, string.IsNullOrWhiteSpace(value) ? "String(UTF8)" : value);
     }
 
+    public string ReplaceFind
+    {
+        get => _replaceFind;
+        set => SetProperty(ref _replaceFind, value ?? "");
+    }
+
+    public string ReplaceValue
+    {
+        get => _replaceValue;
+        set => SetProperty(ref _replaceValue, value ?? "");
+    }
+
+    public string ReplaceMode
+    {
+        get => _replaceMode;
+        set
+        {
+            string normalized = string.Equals(value?.Trim(), "仅替换首次出现", StringComparison.Ordinal)
+                ? "仅替换首次出现"
+                : "全部替换";
+            if (SetProperty(ref _replaceMode, normalized))
+            {
+                OnPropertyChanged(nameof(IsReplaceAll));
+                OnPropertyChanged(nameof(IsReplaceFirst));
+                OnPropertyChanged(nameof(Summary));
+                OnPropertyChanged(nameof(EditorHint));
+                OnPropertyChanged(nameof(DisplayHint));
+            }
+        }
+    }
+
+    [JsonIgnore]
+    public bool IsReplaceAll
+    {
+        get => string.Equals(ReplaceMode, "全部替换", StringComparison.Ordinal);
+        set
+        {
+            if (value)
+            {
+                ReplaceMode = "全部替换";
+            }
+            else
+            {
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    [JsonIgnore]
+    public bool IsReplaceFirst
+    {
+        get => string.Equals(ReplaceMode, "仅替换首次出现", StringComparison.Ordinal);
+        set
+        {
+            if (value)
+            {
+                ReplaceMode = "仅替换首次出现";
+            }
+            else
+            {
+                OnPropertyChanged();
+            }
+        }
+    }
+
     public bool ShowsKey => IsKeyTarget(Target);
 
-    public bool ShowsValue => !IsDeleteOperation(Operation);
+    public bool ShowsValue => !IsDeleteOperation(Operation) && !IsReplaceOperation(Operation);
 
-    public bool ShowsValueType => ShowsValue && IsBodyTarget(Target);
+    public bool ShowsValueType => IsBodyTarget(Target) && !IsDeleteOperation(Operation);
+
+    public bool ShowsReplaceEditor => IsBodyTarget(Target) && IsReplaceOperation(Operation);
 
     public bool UsesMultilineValue => ShowsValue && IsBodyTarget(Target);
 
@@ -640,6 +714,10 @@ public sealed class RequestRewriteOperationItem : ViewModelBase
             {
                 return IsKeyTarget(Target) ? "删除时只需要填写键名。" : "删除该目标内容，不需要填写值。";
             }
+            if (IsBodyTarget(Target) && IsReplaceOperation(Operation))
+            {
+                return $"{ReplaceMode}，查找内容和替换内容会按当前值格式解析。";
+            }
 
             return Target switch
             {
@@ -678,9 +756,16 @@ public sealed class RequestRewriteOperationItem : ViewModelBase
     [JsonIgnore]
     public string DisplayHint => HasValidationWarning ? ValidationMessage : EditorHint;
 
-    public string Summary => ShowsKey && !string.IsNullOrWhiteSpace(Key)
-        ? $"{Operation}{Target} · {Key}"
-        : $"{Operation}{Target}";
+    public string Summary
+    {
+        get
+        {
+            string summary = ShowsKey && !string.IsNullOrWhiteSpace(Key)
+                ? $"{Operation}{Target} · {Key}"
+                : $"{Operation}{Target}";
+            return ShowsReplaceEditor ? $"{summary} · {ReplaceMode}" : summary;
+        }
+    }
 
     public void Normalize()
     {
@@ -696,6 +781,13 @@ public sealed class RequestRewriteOperationItem : ViewModelBase
             Value = "";
         }
 
+        if (!ShowsReplaceEditor)
+        {
+            ReplaceFind = "";
+            ReplaceValue = "";
+            ReplaceMode = "全部替换";
+        }
+
         if (!ShowsValueType)
         {
             ValueType = "String(UTF8)";
@@ -709,6 +801,7 @@ public sealed class RequestRewriteOperationItem : ViewModelBase
         OnPropertyChanged(nameof(ShowsKey));
         OnPropertyChanged(nameof(ShowsValue));
         OnPropertyChanged(nameof(ShowsValueType));
+        OnPropertyChanged(nameof(ShowsReplaceEditor));
         OnPropertyChanged(nameof(UsesMultilineValue));
         OnPropertyChanged(nameof(ValueBoxHeight));
         OnPropertyChanged(nameof(ValueBoxWidth));
@@ -739,6 +832,11 @@ public sealed class RequestRewriteOperationItem : ViewModelBase
         return string.Equals(operation?.Trim(), "删除", StringComparison.Ordinal);
     }
 
+    private static bool IsReplaceOperation(string operation)
+    {
+        return string.Equals(operation?.Trim(), "替换", StringComparison.Ordinal);
+    }
+
     private static bool IsKeyTarget(string target)
     {
         return target?.Trim() is "参数" or "URL参数" or "Query" or "协议头" or "请求头" or "响应头" or "Header";
@@ -754,7 +852,8 @@ public sealed class RequestRewriteOperationItem : ViewModelBase
         return target?.Trim() switch
         {
             "参数" or "URL参数" or "Query" or "协议头" or "请求头" or "响应头" or "Header" => KeyValueOperations,
-            "Path" or "路径" or "Body" or "请求体" or "响应体" => SetDeleteOperations,
+            "Body" or "请求体" or "响应体" => BodyOperations,
+            "Path" or "路径" => SetDeleteOperations,
             _ => SetOnlyOperations
         };
     }

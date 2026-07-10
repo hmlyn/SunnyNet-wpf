@@ -66,8 +66,8 @@ public sealed class HttpSyntaxTextBox : RichTextBox
 
     public HttpSyntaxTextBox()
     {
-        IsReadOnly = true;
-        IsReadOnlyCaretVisible = false;
+        SetCurrentValue(IsReadOnlyProperty, true);
+        SetCurrentValue(IsReadOnlyCaretVisibleProperty, false);
         BorderThickness = new Thickness(0);
         Background = Brushes.Transparent;
         Foreground = TextBrush;
@@ -111,6 +111,13 @@ public sealed class HttpSyntaxTextBox : RichTextBox
         set => SetValue(SearchIgnoreCaseProperty, value);
     }
 
+    /// <summary>读取 RichTextBox 当前纯文本内容（含用户编辑后的内容）。</summary>
+    public string GetDocumentText()
+    {
+        TextRange range = new(Document.ContentStart, Document.ContentEnd);
+        return range.Text;
+    }
+
     private static void OnSourceChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs args)
     {
         if (dependencyObject is HttpSyntaxTextBox viewer)
@@ -152,9 +159,12 @@ public sealed class HttpSyntaxTextBox : RichTextBox
 
     private void HttpSyntaxTextBox_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs args)
     {
-        if (IsReadyToRender() && _renderPending)
+        if (IsReadyToRender())
         {
-            QueueRender();
+            if (_renderPending || !string.IsNullOrWhiteSpace(SearchText))
+            {
+                QueueRender();
+            }
         }
     }
 
@@ -374,6 +384,8 @@ public sealed class HttpSyntaxTextBox : RichTextBox
         {
         }
     }
+
+    public void RefreshSearchHighlight() => QueueRender();
 
     private void QueueRender()
     {

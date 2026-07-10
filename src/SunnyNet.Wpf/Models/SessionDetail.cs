@@ -236,7 +236,37 @@ public sealed class SessionDetail : ViewModelBase
     public string EditableResponseRaw
     {
         get => _editableResponseRaw;
-        set => SetProperty(ref _editableResponseRaw, value ?? "");
+        set
+        {
+            if (SetProperty(ref _editableResponseRaw, value ?? ""))
+            {
+                OnPropertyChanged(nameof(EditableResponseBody));
+            }
+        }
+    }
+
+    /// <summary>拦截编辑时，从 EditableResponseRaw 提取/替换纯 Body 文本。</summary>
+    public string EditableResponseBody
+    {
+        get
+        {
+            string raw = EditableResponseRaw;
+            int bodyStart = raw.IndexOf("\r\n\r\n", StringComparison.Ordinal);
+            return bodyStart >= 0 ? raw[(bodyStart + 4)..] : raw;
+        }
+        set
+        {
+            string raw = EditableResponseRaw;
+            int bodyStart = raw.IndexOf("\r\n\r\n", StringComparison.Ordinal);
+            if (bodyStart >= 0)
+            {
+                EditableResponseRaw = raw[..(bodyStart + 4)] + (value ?? "");
+            }
+            else
+            {
+                EditableResponseRaw = value ?? "";
+            }
+        }
     }
 
     public string ResponseText

@@ -138,6 +138,33 @@ var StatusText = "SunnyNetStatusText"
 var breakpoint = 0
 var SearchPercentage = -1
 
+// replayTheologies 记录由“重发请求”产生的会话 Theology。
+// 在“隐藏捕获”(GetWorkingState()==false) 状态下，仅这些会话会被推送到列表，
+// 普通流量依旧在 HttpCallback 入口处被拦截，不进入列表显示。
+var replayTheologies = make(map[int]bool)
+var replayLock sync.RWMutex
+
+// RegisterReplay 登记一个重放会话。
+func RegisterReplay(theology int) {
+	replayLock.Lock()
+	replayTheologies[theology] = true
+	replayLock.Unlock()
+}
+
+// IsReplay 判断该会话是否由重放产生。
+func IsReplay(theology int) bool {
+	replayLock.RLock()
+	defer replayLock.RUnlock()
+	return replayTheologies[theology]
+}
+
+// UnregisterReplay 在会话终结（响应完成/失败）时清理登记，避免 map 无限增长。
+func UnregisterReplay(theology int) {
+	replayLock.Lock()
+	delete(replayTheologies, theology)
+	replayLock.Unlock()
+}
+
 func AddInsertList(list *ListInfo) {
 	Insert.Lock()
 	if InsertDataMapTag[list.Theology] == false {
@@ -285,6 +312,17 @@ func HttpCallback(Conn *SunnyNet.HttpConn) {
 	if Conn.Request.Header == nil {
 		return
 	}
+	// 识别重放请求：resendHttp 会打上 ReplayMarkerHeader。
+	// 在请求处理前剔除该头，避免随请求转发到真实服务器；同时登记该会话为重放。
+	// 对响应完成/失败两类终态事件，函数返回时统一注销登记，防止 map 泄漏。
+	if Conn.Type == public.HttpSendRequest {
+		if Conn.Request.Header.Get(MapHash.ReplayMarkerHeader) != "" {
+			Conn.Request.Header.Del(MapHash.ReplayMarkerHeader)
+			RegisterReplay(Conn.Theology)
+		}
+	} else if Conn.Type == public.HttpResponseOK || Conn.Type == public.HttpRequestFail {
+		defer UnregisterReplay(Conn.Theology)
+	}
 	{
 		if Conn.Type == public.HttpSendRequest {
 			HostsRulesUrl(Conn.Request.URL)
@@ -412,15 +450,19 @@ func HttpCallback(Conn *SunnyNet.HttpConn) {
 			}
 		}
 		if !(GetWorkingState()) {
-			if Conn.Type == public.HttpSendRequest {
-				//隐藏捕获时仍允许脚本修改流量，但不再推送列表显示。
-				RunHTTPRequestScriptCode(Conn)
-			} else if Conn.Type == public.HttpResponseOK {
-				RunHTTPResponseScriptCode(Conn)
-			} else if Conn.Type == public.HttpRequestFail {
-				RunHTTPErrorScriptCode(Conn)
+			// 隐藏捕获状态下：重放产生的会话仍需推送到列表，落到下方正常流程；
+			// 普通流量则仅执行脚本修改，不再推送列表显示。
+			if !IsReplay(Conn.Theology) {
+				if Conn.Type == public.HttpSendRequest {
+					//隐藏捕获时仍允许脚本修改流量，但不再推送列表显示。
+					RunHTTPRequestScriptCode(Conn)
+				} else if Conn.Type == public.HttpResponseOK {
+					RunHTTPResponseScriptCode(Conn)
+				} else if Conn.Type == public.HttpRequestFail {
+					RunHTTPErrorScriptCode(Conn)
+				}
+				return
 			}
-			return
 		}
 	}
 	if Conn.Type == public.HttpSendRequest {

@@ -690,10 +690,12 @@ public partial class RulesCenterWindow : Window
 
     private bool? ShowRuleEditor(string ruleType, object rule)
     {
-        return new RuleEditorWindow(ruleType, rule, ValidateRuleBeforeSave)
+        var result = new RuleEditorWindow(ruleType, rule, ValidateRuleBeforeSave)
         {
             Owner = this
         }.ShowDialog();
+        Owner?.Activate();
+        return result;
     }
 
     private string? ValidateRuleBeforeSave(object rule)

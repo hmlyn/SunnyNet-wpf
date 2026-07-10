@@ -542,6 +542,27 @@ public partial class RuleEditorWindow : Window
                     return $"动作 {operation.DisplayIndexText}: {bodyFormatMessage}";
                 }
             }
+
+            if (IsRewriteBodyTarget(operation.Target)
+                && IsRewriteReplaceOperation(operation.Operation))
+            {
+                if (string.IsNullOrWhiteSpace(operation.ReplaceFind))
+                {
+                    return $"动作 {operation.DisplayIndexText}: 请填写查找内容。";
+                }
+
+                string? findFormatMessage = ValidateRewriteBodyFormat(operation.ReplaceFind, operation.ValueType);
+                if (!string.IsNullOrWhiteSpace(findFormatMessage))
+                {
+                    return $"动作 {operation.DisplayIndexText}: 查找内容 {findFormatMessage}";
+                }
+
+                string? replaceFormatMessage = ValidateRewriteBodyFormat(operation.ReplaceValue, operation.ValueType);
+                if (!string.IsNullOrWhiteSpace(replaceFormatMessage))
+                {
+                    return $"动作 {operation.DisplayIndexText}: 替换内容 {replaceFormatMessage}";
+                }
+            }
         }
 
         var duplicateKeyOperation = rule.Operations
@@ -610,6 +631,11 @@ public partial class RuleEditorWindow : Window
     private static bool IsRewriteBodyTarget(string target)
     {
         return target?.Trim() is "Body" or "请求体" or "响应体";
+    }
+
+    private static bool IsRewriteReplaceOperation(string operation)
+    {
+        return string.Equals(operation?.Trim(), "替换", StringComparison.Ordinal);
     }
 
     private static bool IsRewriteStatusCodeTarget(string target)

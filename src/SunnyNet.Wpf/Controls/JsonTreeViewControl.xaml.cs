@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using SunnyNet.Wpf.Services;
@@ -16,6 +17,18 @@ public partial class JsonTreeViewControl : UserControl
 
     public static readonly DependencyProperty JsonTextProperty =
         DependencyProperty.Register(nameof(JsonText), typeof(string), typeof(JsonTreeViewControl), new PropertyMetadata("", OnJsonChanged));
+
+    public static readonly DependencyProperty SearchTextProperty =
+        DependencyProperty.Register(nameof(SearchText), typeof(string), typeof(JsonTreeViewControl), new PropertyMetadata("", OnSearchChanged));
+
+    public static readonly DependencyProperty SearchIgnoreCaseProperty =
+        DependencyProperty.Register(nameof(SearchIgnoreCase), typeof(bool), typeof(JsonTreeViewControl), new PropertyMetadata(true, OnSearchChanged));
+
+    public static readonly DependencyProperty IsEditableProperty =
+        DependencyProperty.Register(nameof(IsEditable), typeof(bool), typeof(JsonTreeViewControl), new PropertyMetadata(false, OnEditableChanged));
+
+    public static readonly DependencyProperty EditableBodyTextProperty =
+        DependencyProperty.Register(nameof(EditableBodyText), typeof(string), typeof(JsonTreeViewControl), new PropertyMetadata(""));
 
     private static readonly Brush KeyBrush = CreateBrush(0x00, 0x00, 0x00);
     private static readonly Brush StringBrush = CreateBrush(0x0F, 0x7B, 0x63);
@@ -73,11 +86,91 @@ public partial class JsonTreeViewControl : UserControl
         set => SetValue(JsonTextProperty, value);
     }
 
+    public string SearchText
+    {
+        get => (string)GetValue(SearchTextProperty);
+        set => SetValue(SearchTextProperty, value);
+    }
+
+    public bool SearchIgnoreCase
+    {
+        get => (bool)GetValue(SearchIgnoreCaseProperty);
+        set => SetValue(SearchIgnoreCaseProperty, value);
+    }
+
+    public bool IsEditable
+    {
+        get => (bool)GetValue(IsEditableProperty);
+        set => SetValue(IsEditableProperty, value);
+    }
+
+    public string EditableBodyText
+    {
+        get => (string)GetValue(EditableBodyTextProperty);
+        set => SetValue(EditableBodyTextProperty, value);
+    }
+
+    /// <summary>读取原文视图中当前可编辑文本（含用户修改）。</summary>
+    public string GetRawViewText()
+    {
+        if (FallbackViewer is not null && FallbackViewer.Visibility == Visibility.Visible)
+        {
+            return FallbackViewer.GetDocumentText();
+        }
+        return JsonText;
+    }
+
     private static void OnJsonChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs args)
     {
         if (dependencyObject is JsonTreeViewControl control)
         {
             control.QueueRenderJson();
+        }
+    }
+
+    private static void OnSearchChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs args)
+    {
+        if (dependencyObject is JsonTreeViewControl control && control.IsLoaded)
+        {
+            if (!string.IsNullOrWhiteSpace(control.SearchText))
+            {
+                // 有搜索词时切换到原文模式，利用 HttpSyntaxTextBox 的搜索高亮
+                control.ApplyMode(false, force: true);
+            }
+        }
+    }
+
+    private static void OnEditableChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs args)
+    {
+        if (dependencyObject is JsonTreeViewControl control && control.IsLoaded)
+        {
+            bool editable = (bool)args.NewValue;
+            if (editable)
+            {
+                // 进入编辑模式：切换到原文视图，允许直接编辑（搜索高亮仍保留）
+                control.ApplyMode(false, force: true);
+            }
+            if (control.FallbackViewer is not null)
+            {
+                control.FallbackViewer.IsReadOnly = !editable;
+                control.FallbackViewer.IsReadOnlyCaretVisible = !editable;
+                // 编辑模式下绑定到可编辑文本，只读模式下绑定到显示文本
+                Binding binding = new(nameof(EditableBodyText))
+                {
+                    Source = control,
+                    Mode = editable ? BindingMode.TwoWay : BindingMode.OneWay,
+                    UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
+                };
+                if (!editable)
+                {
+                    binding = new Binding(nameof(JsonText))
+                    {
+                        Source = control,
+                        Mode = BindingMode.OneWay
+                    };
+                }
+                control.FallbackViewer.SetBinding(HttpSyntaxTextBox.SourceTextProperty, binding);
+            }
         }
     }
 
@@ -123,6 +216,15 @@ public partial class JsonTreeViewControl : UserControl
             return;
         }
 
+        // 数据较大时跳过树视图渲染，直接显示原文，避免 UI 卡顿
+        if (JsonText.Length > 256 * 1024)
+        {
+            _isJson = false;
+            UpdateToolbarState($"数据较大（{JsonText.Length / 1024} KB），切换到「原文」标签查看");
+            ShowFallback();
+            return;
+        }
+
         try
         {
             _document = JsonDocument.Parse(JsonText);
@@ -144,7 +246,12 @@ public partial class JsonTreeViewControl : UserControl
             });
             JsonTree.Visibility = Visibility.Visible;
             FallbackViewer.Visibility = Visibility.Collapsed;
-            ApplyMode(true, force: true);
+            ApplyMode(!IsEditable && string.IsNullOrWhiteSpace(SearchText), force: true);
+            // 切换到原文模式后强制刷新搜索高亮
+            if (FallbackViewer.Visibility == Visibility.Visible && !string.IsNullOrWhiteSpace(SearchText))
+            {
+                FallbackViewer.RefreshSearchHighlight();
+            }
         }
         catch
         {
