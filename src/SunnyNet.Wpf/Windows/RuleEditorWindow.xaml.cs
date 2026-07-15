@@ -19,6 +19,8 @@ public partial class RuleEditorWindow : Window
     private readonly Func<object, string?>? _validateRule;
     private RequestMappingRuleItem? _mappingRule;
 
+    public event EventHandler? RuleAccepted;
+
     public RequestRewriteOperationItem? SelectedRewriteOperation
     {
         get => (RequestRewriteOperationItem?)GetValue(SelectedRewriteOperationProperty);
@@ -480,7 +482,8 @@ public partial class RuleEditorWindow : Window
             return;
         }
 
-        DialogResult = true;
+        RuleAccepted?.Invoke(this, EventArgs.Empty);
+        Close();
     }
 
     private static bool CanAddRewriteTarget(RequestRewriteRuleItem rule, string target)
@@ -494,6 +497,8 @@ public partial class RuleEditorWindow : Window
             "协议头" => rule.CanAddHeader,
             "Body" => rule.CanAddBody,
             "状态码" => rule.CanAddStatusCode,
+            "JSON键值" => rule.CanAddJsonValue,
+            "JSON" => rule.CanAddJsonValue,
             _ => true
         };
     }
@@ -604,6 +609,11 @@ public partial class RuleEditorWindow : Window
 
     private static bool IsRewriteKeyTarget(string target)
     {
+        if (IsRewriteJsonTarget(target))
+        {
+            return true;
+        }
+
         return target?.Trim() is "参数" or "URL参数" or "Query" or "协议头" or "请求头" or "响应头" or "Header";
     }
 
@@ -617,12 +627,18 @@ public partial class RuleEditorWindow : Window
         return target?.Trim() is "状态码" or "StatusCode";
     }
 
+    private static bool IsRewriteJsonTarget(string target)
+    {
+        return target?.Trim() is "JSON" or "JSON键值" or "JSONPath" or "JSON Path";
+    }
+
     private static string NormalizeRewriteTarget(string target)
     {
         return target?.Trim() switch
         {
             "URL参数" or "Query" => "参数",
             "请求头" or "响应头" or "Header" => "协议头",
+            "JSON" or "JSON键值" or "JSONPath" or "JSON Path" => "JSON",
             _ => target?.Trim() ?? ""
         };
     }
@@ -705,6 +721,6 @@ public partial class RuleEditorWindow : Window
 
     private void Cancel_Click(object sender, RoutedEventArgs routedEventArgs)
     {
-        DialogResult = false;
+        Close();
     }
 }

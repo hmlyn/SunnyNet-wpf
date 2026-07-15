@@ -236,6 +236,8 @@ public sealed class RequestRewriteRuleItem : TrafficRuleItemBase
 
     private bool IsResponseDirection => string.Equals(Direction, "响应", StringComparison.Ordinal);
 
+    public bool CanAddJsonValue => IsResponseDirection;
+
     public override string Summary
     {
         get
@@ -476,6 +478,7 @@ public sealed class RequestRewriteRuleItem : TrafficRuleItemBase
         OnPropertyChanged(nameof(CanAddHeader));
         OnPropertyChanged(nameof(CanAddBody));
         OnPropertyChanged(nameof(CanAddStatusCode));
+        OnPropertyChanged(nameof(CanAddJsonValue));
         OnPropertyChanged(nameof(Summary));
     }
 
@@ -613,14 +616,14 @@ public sealed class RequestRewriteOperationItem : ViewModelBase
         _ => 260
     };
 
-    public string KeyLabel => Target switch
+    public string KeyLabel => IsJsonTarget(Target) ? "JSON路径" : Target switch
     {
         "参数" or "URL参数" or "Query" => "参数名",
         "协议头" or "请求头" or "响应头" or "Header" => "头名称",
         _ => "键名"
     };
 
-    public string ValueLabel => Target switch
+    public string ValueLabel => IsJsonTarget(Target) ? "JSON值" : Target switch
     {
         "请求方法" or "Method" => "方法",
         "URL" or "完整URL" => "新URL",
@@ -639,6 +642,11 @@ public sealed class RequestRewriteOperationItem : ViewModelBase
             if (IsDeleteOperation(Operation))
             {
                 return IsKeyTarget(Target) ? "删除时只需要填写键名。" : "删除该目标内容，不需要填写值。";
+            }
+
+            if (IsJsonTarget(Target))
+            {
+                return "填写 JSON 路径，例如 Data.User.IsInsider；值支持 true、7、null 或 \"文本\"。";
             }
 
             return Target switch
@@ -741,6 +749,11 @@ public sealed class RequestRewriteOperationItem : ViewModelBase
 
     private static bool IsKeyTarget(string target)
     {
+        if (IsJsonTarget(target))
+        {
+            return true;
+        }
+
         return target?.Trim() is "参数" or "URL参数" or "Query" or "协议头" or "请求头" or "响应头" or "Header";
     }
 
@@ -749,8 +762,18 @@ public sealed class RequestRewriteOperationItem : ViewModelBase
         return target?.Trim() is "Body" or "请求体" or "响应体";
     }
 
+    private static bool IsJsonTarget(string target)
+    {
+        return target?.Trim() is "JSON" or "JSON键值" or "JSONPath" or "JSON Path";
+    }
+
     private static string[] GetAllowedOperations(string target)
     {
+        if (IsJsonTarget(target))
+        {
+            return SetDeleteOperations;
+        }
+
         return target?.Trim() switch
         {
             "参数" or "URL参数" or "Query" or "协议头" or "请求头" or "响应头" or "Header" => KeyValueOperations,
@@ -762,6 +785,12 @@ public sealed class RequestRewriteOperationItem : ViewModelBase
     private static bool IsTargetAllowed(string target, string direction)
     {
         string normalizedDirection = string.IsNullOrWhiteSpace(direction) ? "请求" : direction.Trim();
+        if (IsJsonTarget(target))
+        {
+            return string.Equals(normalizedDirection, "响应", StringComparison.Ordinal)
+                || string.Equals(normalizedDirection, "Response", StringComparison.OrdinalIgnoreCase);
+        }
+
         return normalizedDirection switch
         {
             "响应" => target?.Trim() is "状态码" or "StatusCode" or "协议头" or "请求头" or "响应头" or "Header" or "Body" or "请求体" or "响应体",

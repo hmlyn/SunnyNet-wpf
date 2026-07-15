@@ -679,14 +679,31 @@ func applyResponseRewriteOperation(rewriteOperation requestRewriteOperation, res
 		} else if decoded, err := decodeMappingBody(value, rewriteOperation.ValueType); err == nil {
 			body = decoded
 		}
-		if response.Header != nil {
-			delete(response.Header, "Content-Encoding")
-			delete(response.Header, "content-encoding")
-			delete(response.Header, "Transfer-Encoding")
+		cleanupRewrittenResponseHeaders(response)
+	case "JSON", "JSON键值", "JSONPath", "JSON Path":
+		if rewritten, changed := applyJSONBodyRewrite(body, operation, key, value); changed {
+			body = rewritten
+			cleanupRewrittenResponseHeaders(response)
 		}
 	}
 
 	return body
+}
+
+func cleanupRewrittenResponseHeaders(response *http.Response) {
+	if response == nil {
+		return
+	}
+
+	response.ContentLength = -1
+	response.TransferEncoding = nil
+	if response.Header == nil {
+		return
+	}
+
+	response.Header.Del("Content-Encoding")
+	response.Header.Del("Content-Length")
+	response.Header.Del("Transfer-Encoding")
 }
 
 func getRewriteOperations(rule ConfigRequestRewriteRule) []requestRewriteOperation {

@@ -267,52 +267,52 @@ public partial class RulesCenterWindow : Window
         };
     }
 
-    private async void AddCurrentRule_Click(object sender, RoutedEventArgs routedEventArgs)
+    private void AddCurrentRule_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         switch (_currentPage)
         {
             case "请求断点":
-                await AddBreakpointRuleAsync();
+                AddBreakpointRule();
                 break;
             case "HTTP屏蔽":
-                await AddBlockRuleAsync();
+                AddBlockRule();
                 break;
             case "WebSocket屏蔽":
-                await AddWebSocketBlockRuleAsync();
+                AddWebSocketBlockRule();
                 break;
             case "TCP屏蔽":
-                await AddTcpBlockRuleAsync();
+                AddTcpBlockRule();
                 break;
             case "UDP屏蔽":
-                await AddUdpBlockRuleAsync();
+                AddUdpBlockRule();
                 break;
             case "请求重写":
-                await AddRewriteRuleAsync();
+                AddRewriteRule();
                 break;
             case "请求映射":
-                await AddMappingRuleAsync();
+                AddMappingRule();
                 break;
         }
     }
 
-    private async void EditSelectedRule_Click(object sender, RoutedEventArgs routedEventArgs)
+    private void EditSelectedRule_Click(object sender, RoutedEventArgs routedEventArgs)
     {
         if (GetSelectedRule() is null)
         {
             return;
         }
 
-        await EditSelectedRuleAsync();
+        EditSelectedRule();
     }
 
-    private async void RulesGrid_MouseDoubleClick(object sender, MouseButtonEventArgs mouseButtonEventArgs)
+    private void RulesGrid_MouseDoubleClick(object sender, MouseButtonEventArgs mouseButtonEventArgs)
     {
         if (GetSelectedRule() is null)
         {
             return;
         }
 
-        await EditSelectedRuleAsync();
+        EditSelectedRule();
     }
 
     private void RulesGrid_SelectionChanged(object sender, SelectionChangedEventArgs selectionChangedEventArgs)
@@ -366,7 +366,7 @@ public partial class RulesCenterWindow : Window
         UpdateRuleCounts();
     }
 
-    private async Task AddBreakpointRuleAsync()
+    private void AddBreakpointRule()
     {
         InterceptRuleItem item = new()
         {
@@ -378,18 +378,17 @@ public partial class RulesCenterWindow : Window
             State = "未保存"
         };
 
-        if (ShowRuleEditor("请求断点", item) != true)
+        ShowRuleEditor("请求断点", item, async () =>
         {
-            return;
-        }
-
-        _viewModel.InterceptRuleItems.Add(item);
-        BreakpointRulesGrid.SelectedItem = item;
-        await SaveRulesAsync();
-        UpdateRuleCounts();
+            _viewModel.InterceptRuleItems.Add(item);
+            BreakpointRulesGrid.SelectedItem = item;
+            await SaveRulesAsync();
+            UpdateRuleCounts();
+            UpdateRuleActionButtons();
+        });
     }
 
-    private async Task AddBlockRuleAsync()
+    private void AddBlockRule()
     {
         RequestBlockRuleItem item = new()
         {
@@ -401,18 +400,17 @@ public partial class RulesCenterWindow : Window
             State = "未保存"
         };
 
-        if (ShowRuleEditor("HTTP屏蔽", item) != true)
+        ShowRuleEditor("HTTP屏蔽", item, async () =>
         {
-            return;
-        }
-
-        _viewModel.RequestBlockRules.Add(item);
-        BlockRulesGrid.SelectedItem = item;
-        await SaveRulesAsync();
-        UpdateRuleCounts();
+            _viewModel.RequestBlockRules.Add(item);
+            BlockRulesGrid.SelectedItem = item;
+            await SaveRulesAsync();
+            UpdateRuleCounts();
+            UpdateRuleActionButtons();
+        });
     }
 
-    private async Task AddWebSocketBlockRuleAsync()
+    private void AddWebSocketBlockRule()
     {
         WebSocketBlockRuleItem item = new()
         {
@@ -424,18 +422,17 @@ public partial class RulesCenterWindow : Window
             State = "未保存"
         };
 
-        if (ShowRuleEditor("WebSocket屏蔽", item) != true)
+        ShowRuleEditor("WebSocket屏蔽", item, async () =>
         {
-            return;
-        }
-
-        _viewModel.WebSocketBlockRules.Add(item);
-        WebSocketBlockRulesGrid.SelectedItem = item;
-        await SaveRulesAsync();
-        UpdateRuleCounts();
+            _viewModel.WebSocketBlockRules.Add(item);
+            WebSocketBlockRulesGrid.SelectedItem = item;
+            await SaveRulesAsync();
+            UpdateRuleCounts();
+            UpdateRuleActionButtons();
+        });
     }
 
-    private async Task AddTcpBlockRuleAsync()
+    private void AddTcpBlockRule()
     {
         TcpBlockRuleItem item = new()
         {
@@ -447,18 +444,17 @@ public partial class RulesCenterWindow : Window
             State = "未保存"
         };
 
-        if (ShowRuleEditor("TCP屏蔽", item) != true)
+        ShowRuleEditor("TCP屏蔽", item, async () =>
         {
-            return;
-        }
-
-        _viewModel.TcpBlockRules.Add(item);
-        TcpBlockRulesGrid.SelectedItem = item;
-        await SaveRulesAsync();
-        UpdateRuleCounts();
+            _viewModel.TcpBlockRules.Add(item);
+            TcpBlockRulesGrid.SelectedItem = item;
+            await SaveRulesAsync();
+            UpdateRuleCounts();
+            UpdateRuleActionButtons();
+        });
     }
 
-    private async Task AddUdpBlockRuleAsync()
+    private void AddUdpBlockRule()
     {
         UdpBlockRuleItem item = new()
         {
@@ -470,18 +466,17 @@ public partial class RulesCenterWindow : Window
             State = "未保存"
         };
 
-        if (ShowRuleEditor("UDP屏蔽", item) != true)
+        ShowRuleEditor("UDP屏蔽", item, async () =>
         {
-            return;
-        }
-
-        _viewModel.UdpBlockRules.Add(item);
-        UdpBlockRulesGrid.SelectedItem = item;
-        await SaveRulesAsync();
-        UpdateRuleCounts();
+            _viewModel.UdpBlockRules.Add(item);
+            UdpBlockRulesGrid.SelectedItem = item;
+            await SaveRulesAsync();
+            UpdateRuleCounts();
+            UpdateRuleActionButtons();
+        });
     }
 
-    private async Task AddRewriteRuleAsync()
+    private void AddRewriteRule()
     {
         RequestRewriteRuleItem item = new()
         {
@@ -497,18 +492,17 @@ public partial class RulesCenterWindow : Window
             State = "未保存"
         };
 
-        if (ShowRuleEditor("请求重写", item) != true)
+        ShowRuleEditor("请求重写", item, async () =>
         {
-            return;
-        }
-
-        _viewModel.RequestRewriteRules.Add(item);
-        RewriteRulesGrid.SelectedItem = item;
-        await SaveRulesAsync();
-        UpdateRuleCounts();
+            _viewModel.RequestRewriteRules.Add(item);
+            RewriteRulesGrid.SelectedItem = item;
+            await SaveRulesAsync();
+            UpdateRuleCounts();
+            UpdateRuleActionButtons();
+        });
     }
 
-    private async Task AddMappingRuleAsync()
+    private void AddMappingRule()
     {
         RequestMappingRuleItem item = new()
         {
@@ -522,110 +516,102 @@ public partial class RulesCenterWindow : Window
             State = "未保存"
         };
 
-        if (ShowRuleEditor("请求映射", item) != true)
+        ShowRuleEditor("请求映射", item, async () =>
         {
-            return;
-        }
-
-        _viewModel.RequestMappingRules.Add(item);
-        MappingRulesGrid.SelectedItem = item;
-        await SaveRulesAsync();
-        UpdateRuleCounts();
+            _viewModel.RequestMappingRules.Add(item);
+            MappingRulesGrid.SelectedItem = item;
+            await SaveRulesAsync();
+            UpdateRuleCounts();
+            UpdateRuleActionButtons();
+        });
     }
 
-    private async Task EditSelectedRuleAsync()
+    private void EditSelectedRule()
     {
         switch (_currentPage)
         {
             case "请求断点" when BreakpointRulesGrid.SelectedItem is InterceptRuleItem breakpointRule:
             {
                 InterceptRuleItem editing = CloneBreakpointRule(breakpointRule);
-                if (ShowRuleEditor("请求断点", editing) != true)
+                ShowRuleEditor("请求断点", editing, async () =>
                 {
-                    return;
-                }
-
-                ApplyBreakpointRule(breakpointRule, editing);
-                await SaveRulesAsync();
-                UpdateRuleCounts();
+                    ApplyBreakpointRule(breakpointRule, editing);
+                    await SaveRulesAsync();
+                    UpdateRuleCounts();
+                    UpdateRuleActionButtons();
+                });
                 break;
             }
             case "HTTP屏蔽" when BlockRulesGrid.SelectedItem is RequestBlockRuleItem blockRule:
             {
                 RequestBlockRuleItem editing = CloneBlockRule(blockRule);
-                if (ShowRuleEditor("HTTP屏蔽", editing) != true)
+                ShowRuleEditor("HTTP屏蔽", editing, async () =>
                 {
-                    return;
-                }
-
-                ApplyBlockRule(blockRule, editing);
-                await SaveRulesAsync();
-                UpdateRuleCounts();
+                    ApplyBlockRule(blockRule, editing);
+                    await SaveRulesAsync();
+                    UpdateRuleCounts();
+                    UpdateRuleActionButtons();
+                });
                 break;
             }
             case "WebSocket屏蔽" when WebSocketBlockRulesGrid.SelectedItem is WebSocketBlockRuleItem webSocketBlockRule:
             {
                 WebSocketBlockRuleItem editing = CloneWebSocketBlockRule(webSocketBlockRule);
-                if (ShowRuleEditor("WebSocket屏蔽", editing) != true)
+                ShowRuleEditor("WebSocket屏蔽", editing, async () =>
                 {
-                    return;
-                }
-
-                ApplyWebSocketBlockRule(webSocketBlockRule, editing);
-                await SaveRulesAsync();
-                UpdateRuleCounts();
+                    ApplyWebSocketBlockRule(webSocketBlockRule, editing);
+                    await SaveRulesAsync();
+                    UpdateRuleCounts();
+                    UpdateRuleActionButtons();
+                });
                 break;
             }
             case "TCP屏蔽" when TcpBlockRulesGrid.SelectedItem is TcpBlockRuleItem tcpBlockRule:
             {
                 TcpBlockRuleItem editing = CloneTcpBlockRule(tcpBlockRule);
-                if (ShowRuleEditor("TCP屏蔽", editing) != true)
+                ShowRuleEditor("TCP屏蔽", editing, async () =>
                 {
-                    return;
-                }
-
-                ApplyTcpBlockRule(tcpBlockRule, editing);
-                await SaveRulesAsync();
-                UpdateRuleCounts();
+                    ApplyTcpBlockRule(tcpBlockRule, editing);
+                    await SaveRulesAsync();
+                    UpdateRuleCounts();
+                    UpdateRuleActionButtons();
+                });
                 break;
             }
             case "UDP屏蔽" when UdpBlockRulesGrid.SelectedItem is UdpBlockRuleItem udpBlockRule:
             {
                 UdpBlockRuleItem editing = CloneUdpBlockRule(udpBlockRule);
-                if (ShowRuleEditor("UDP屏蔽", editing) != true)
+                ShowRuleEditor("UDP屏蔽", editing, async () =>
                 {
-                    return;
-                }
-
-                ApplyUdpBlockRule(udpBlockRule, editing);
-                await SaveRulesAsync();
-                UpdateRuleCounts();
+                    ApplyUdpBlockRule(udpBlockRule, editing);
+                    await SaveRulesAsync();
+                    UpdateRuleCounts();
+                    UpdateRuleActionButtons();
+                });
                 break;
             }
             case "请求重写" when RewriteRulesGrid.SelectedItem is RequestRewriteRuleItem rewriteRule:
             {
                 RequestRewriteRuleItem editing = CloneRewriteRule(rewriteRule);
-                if (ShowRuleEditor("请求重写", editing) != true)
+                ShowRuleEditor("请求重写", editing, async () =>
                 {
-                    return;
-                }
-
-                ApplyRewriteRule(rewriteRule, editing);
-                await SaveRulesAsync();
-                UpdateRuleCounts();
+                    ApplyRewriteRule(rewriteRule, editing);
+                    await SaveRulesAsync();
+                    UpdateRuleCounts();
+                    UpdateRuleActionButtons();
+                });
                 break;
             }
             case "请求映射" when MappingRulesGrid.SelectedItem is RequestMappingRuleItem mappingRule:
             {
                 RequestMappingRuleItem editing = CloneMappingRule(mappingRule);
-                if (ShowRuleEditor("请求映射", editing) != true)
+                ShowRuleEditor("请求映射", editing, async () =>
                 {
-                    return;
-                }
-
-                ApplyMappingRule(mappingRule, editing);
-                await SaveRulesAsync();
-                UpdateRuleCounts();
+                    ApplyMappingRule(mappingRule, editing);
+                    await SaveRulesAsync();
+                    UpdateRuleCounts();
+                    UpdateRuleActionButtons();
+                });
                 break;
             }
         }
@@ -688,12 +674,25 @@ public partial class RulesCenterWindow : Window
         EditRuleButton.IsEnabled = hasSelection;
     }
 
-    private bool? ShowRuleEditor(string ruleType, object rule)
+    private void ShowRuleEditor(string ruleType, object rule, Func<Task> onAccepted)
     {
-        return new RuleEditorWindow(ruleType, rule, ValidateRuleBeforeSave)
+        RuleEditorWindow editor = new(ruleType, rule, ValidateRuleBeforeSave)
         {
             Owner = this
-        }.ShowDialog();
+        };
+        editor.RuleAccepted += async (_, _) =>
+        {
+            try
+            {
+                await onAccepted();
+            }
+            catch (Exception exception)
+            {
+                ShowRuleAlert(exception.Message);
+            }
+        };
+        editor.Show();
+        editor.Activate();
     }
 
     private string? ValidateRuleBeforeSave(object rule)
