@@ -42,9 +42,10 @@ SunnyNet WPF 是基于 SunnyNet Go 核心的 Windows 抓包分析工具。项目
 
 ```text
 SunnyNet-wpf-v0.1.7-win-x64.zip
+SunnyNet-wpf-v0.1.7-win-x64-self-contained.zip
 ```
 
-Release 包含 Windows x64 可运行程序、WPF 主程序、Go 后端 DLL、随程序运行所需资源，以及可选 MCP 桥接程序。
+Release 包含 Windows x64 可运行程序、WPF 主程序、Go 后端 DLL、随程序运行所需资源，以及可选 MCP 桥接程序。普通包需要本机安装 .NET Desktop Runtime；自包含包内置运行时，不依赖用户机器上的 .NET 版本。
 
 ## 本次核心更新
 
@@ -82,6 +83,11 @@ Release 包含 Windows x64 可运行程序、WPF 主程序、Go 后端 DLL、随
 可选环境：
 
 - `sunnymcptool`，用于打包 MCP 桥接程序。
+
+运行环境：
+
+- 普通发布包 `SunnyNet-wpf-v*-win-x64.zip` 需要安装 .NET Desktop Runtime 8.0 或更高主版本。程序已启用 `RollForward=LatestMajor`，如果本机没有 .NET 8 Desktop Runtime，但存在兼容的更高主版本 Desktop Runtime，也允许继续启动。
+- 自包含发布包 `SunnyNet-wpf-v*-win-x64-self-contained.zip` 已内置 .NET Desktop Runtime，用户无需单独安装 .NET，适合直接分发给普通用户。
 
 ## SunnyNet 核心分发说明
 
@@ -209,17 +215,21 @@ mcp/sunnynet-mcp.exe
 build-release.bat
 ```
 
-然后将下面目录压缩为 zip：
+脚本会生成两个输出目录：
 
 ```text
 artifacts/Release/
+artifacts/Release-self-contained/
 ```
 
-推荐命名：
+并自动生成两个 zip：
 
 ```text
 SunnyNet-wpf-v0.1.7-win-x64.zip
+SunnyNet-wpf-v0.1.7-win-x64-self-contained.zip
 ```
+
+普通包体积小，但依赖本机 .NET Desktop Runtime；自包含包体积更大，但不受用户机器已安装 .NET 版本影响。
 
 ## 常见问题
 
