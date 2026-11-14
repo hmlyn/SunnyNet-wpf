@@ -9,5 +9,6 @@ public enum ImagePreviewFormat
     Bmp,
     Webp,
     Ico,
-    Tiff
+    Tiff,
+    Svg
 }

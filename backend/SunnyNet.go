@@ -8,6 +8,7 @@ import (
 	"compress/gzip"
 	"fmt"
 	"github.com/andybalholm/brotli"
+	"github.com/klauspost/compress/zstd"
 	"github.com/qtgolang/SunnyNet/SunnyNet"
 	"github.com/qtgolang/SunnyNet/public"
 	"github.com/qtgolang/SunnyNet/src/protobuf/JSON"
@@ -376,6 +377,16 @@ func HttpCallback(Conn *SunnyNet.HttpConn) {
 						if err == nil {
 							Conn.Response.Body = io.NopCloser(bytes.NewBuffer(br))
 							isOk = true
+						}
+					} else if Encoding == "zstd" {
+						decoder, err := zstd.NewReader(nil, zstd.WithDecoderConcurrency(1))
+						if err == nil {
+							decoded, decodeErr := decoder.DecodeAll(Body, nil)
+							decoder.Close()
+							if decodeErr == nil {
+								Conn.Response.Body = io.NopCloser(bytes.NewBuffer(decoded))
+								isOk = true
+							}
 						}
 					} else if Encoding == "deflate" {
 						zr := flate.NewReader(io.NopCloser(bytes.NewBuffer(Body)))

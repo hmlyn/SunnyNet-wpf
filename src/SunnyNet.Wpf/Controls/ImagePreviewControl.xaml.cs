@@ -5,6 +5,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 using SunnyNet.Wpf.Models;
+using SunnyNet.Wpf.Services;
 
 namespace SunnyNet.Wpf.Controls;
 
@@ -82,7 +83,7 @@ public partial class ImagePreviewControl : UserControl
     {
         byte[] bytes = ImageBytes ?? Array.Empty<byte>();
         EmptyTextBlock.Text = EmptyText;
-        TypeValueTextBlock.Text = NormalizeType(GetEffectiveFormatLabel());
+        TypeValueTextBlock.Text = GetEffectiveFormatLabel();
         LengthValueTextBlock.Text = $"{bytes.Length:N0} Bytes";
         SizeValueTextBlock.Text = "-";
         SaveButton.IsEnabled = bytes.Length > 0;
@@ -97,17 +98,12 @@ public partial class ImagePreviewControl : UserControl
 
         try
         {
-            byte[] imageBytes = ResolveImageBytes(bytes, PreviewFormat, ImageType);
-            BitmapImage image = new();
-            using MemoryStream stream = new(imageBytes);
-            image.BeginInit();
-            image.CacheOption = BitmapCacheOption.OnLoad;
-            image.StreamSource = stream;
-            image.EndInit();
-            image.Freeze();
+            ImageSource image = ImagePreviewDecoder.Decode(bytes, PreviewFormat, ImageType ?? "");
 
             PreviewImage.Source = image;
-            SizeValueTextBlock.Text = $"{image.PixelWidth} × {image.PixelHeight}";
+            SizeValueTextBlock.Text = image is BitmapSource bitmap
+                ? $"{bitmap.PixelWidth} × {bitmap.PixelHeight}"
+                : $"{image.Width:0.##} × {image.Height:0.##}";
             InfoTextBlock.Text = "已加载图片预览，可切换显示方式或保存原图。";
             EmptyTextBlock.Visibility = Visibility.Collapsed;
             ImageScrollViewer.Visibility = Visibility.Visible;
@@ -218,111 +214,35 @@ public partial class ImagePreviewControl : UserControl
             return "unknown";
         }
 
-        return type.Replace("image/", "", StringComparison.OrdinalIgnoreCase);
+        string normalized = type.Split(';', 2)[0].Trim().Replace("image/", "", StringComparison.OrdinalIgnoreCase).ToLowerInvariant();
+        return normalized == "svg+xml" ? "svg" : normalized;
     }
 
     private string GetEffectiveFormatLabel()
-    {
-        return PreviewFormat == ImagePreviewFormat.Auto
-            ? NormalizeType(ImageType)
-            : PreviewFormat.ToString().ToLowerInvariant();
-    }
-
-    private static byte[] ResolveImageBytes(byte[] bytes, ImagePreviewFormat previewFormat, string imageType)
-    {
-        if (bytes.Length == 0)
-        {
-            return Array.Empty<byte>();
-        }
-
-        if (previewFormat == ImagePreviewFormat.Auto)
-        {
-            if (TryDecodeFromKnownMagic(bytes, imageType, out byte[] decoded))
-            {
-                return decoded;
-            }
-
-            return bytes;
-        }
-
-        if (TryDecodeByFormat(bytes, previewFormat, out byte[] resolved))
-        {
-            return resolved;
-        }
-
-        return bytes;
-    }
-
-    private static bool TryDecodeByFormat(byte[] bytes, ImagePreviewFormat previewFormat, out byte[] resolved)
-    {
-        resolved = bytes;
-        string header = Convert.ToHexString(bytes.AsSpan(0, Math.Min(bytes.Length, 12)));
-        return previewFormat switch
-        {
-            ImagePreviewFormat.Jpeg => header.StartsWith("FFD8FF", StringComparison.OrdinalIgnoreCase),
-            ImagePreviewFormat.Png => header.StartsWith("89504E470D0A1A0A", StringComparison.OrdinalIgnoreCase),
-            ImagePreviewFormat.Gif => header.StartsWith("47494638", StringComparison.OrdinalIgnoreCase),
-            ImagePreviewFormat.Bmp => header.StartsWith("424D", StringComparison.OrdinalIgnoreCase),
-            ImagePreviewFormat.Webp => header.StartsWith("52494646", StringComparison.OrdinalIgnoreCase) && bytes.Length >= 12,
-            ImagePreviewFormat.Ico => header.StartsWith("00000100", StringComparison.OrdinalIgnoreCase),
-            ImagePreviewFormat.Tiff => header.StartsWith("49492A00", StringComparison.OrdinalIgnoreCase) || header.StartsWith("4D4D002A", StringComparison.OrdinalIgnoreCase),
-            _ => false
-        };
-    }
-
-    private static bool TryDecodeFromKnownMagic(byte[] bytes, string imageType, out byte[] resolved)
-    {
-        resolved = bytes;
-        if (!string.IsNullOrWhiteSpace(imageType) && imageType.Contains("jpeg", StringComparison.OrdinalIgnoreCase))
-        {
-            return bytes.Length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF;
-        }
-
-        if (bytes.Length >= 8 && bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47)
-        {
-            return true;
-        }
-
-        if (bytes.Length >= 6 && bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x38)
-        {
-            return true;
-        }
-
-        if (bytes.Length >= 2 && bytes[0] == 0x42 && bytes[1] == 0x4D)
-        {
-            return true;
-        }
-
-        if (bytes.Length >= 12
-            && bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46
-            && bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50)
-        {
-            return true;
-        }
-
-        if (bytes.Length >= 4 && ((bytes[0] == 0x00 && bytes[1] == 0x00 && bytes[2] == 0x01 && bytes[3] == 0x00) ||
-                                  (bytes[0] == 0x00 && bytes[1] == 0x00 && bytes[2] == 0x02 && bytes[3] == 0x00)))
-        {
-            return true;
-        }
-
-        if (bytes.Length >= 4 && ((bytes[0] == 0x49 && bytes[1] == 0x49 && bytes[2] == 0x2A && bytes[3] == 0x00) ||
-                                  (bytes[0] == 0x4D && bytes[1] == 0x4D && bytes[2] == 0x00 && bytes[3] == 0x2A)))
-        {
-            return true;
-        }
-
-        return false;
-    }
-
-    private string GetSaveExtension()
     {
         if (PreviewFormat != ImagePreviewFormat.Auto)
         {
             return PreviewFormat.ToString().ToLowerInvariant();
         }
 
-        string extension = NormalizeType(ImageType);
+        string type = NormalizeType(ImageType);
+        if (type != "unknown")
+        {
+            return type;
+        }
+
+        byte[] bytes = ImageBytes ?? Array.Empty<byte>();
+        if (ImagePreviewDecoder.IsWebp(bytes))
+        {
+            return "webp";
+        }
+
+        return ImagePreviewDecoder.IsSvg(bytes) ? "svg" : type;
+    }
+
+    private string GetSaveExtension()
+    {
+        string extension = GetEffectiveFormatLabel();
         return string.IsNullOrWhiteSpace(extension) ? "bin" : extension;
     }
 }

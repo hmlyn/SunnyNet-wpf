@@ -19,6 +19,7 @@ SunnyNet WPF 是基于 SunnyNet Go 核心的 Windows 抓包分析工具。项目
 - 支持进程筛选、域名筛选、会话收藏、备注、标记颜色、列宽记忆和窗口布局记忆。
 - 支持会话比较视图，可拖入两条会话对比请求/响应差异，并显示哈希摘要。
 - 支持请求/响应 XML 视图，内容匹配 XML 时自动显示，避免无关视图占用空间。
+- 支持 ZSTD 压缩响应自动解压，以及 WebP、SVG 等响应图片预览和原图保存。
 - 支持 TLS 指纹视图，可查看 JA3、JA3N、JA4、JA4-R、Akamai 等指纹信息。
 - 支持断点拦截、普通重发、运行到结束、断开连接，以及请求/响应内容修改。
 - 支持请求规则中心，包括请求断点、HTTP/WebSocket/TCP/UDP 屏蔽、请求重写、请求映射。
@@ -36,23 +37,23 @@ SunnyNet WPF 是基于 SunnyNet Go 核心的 Windows 抓包分析工具。项目
 
 ## 最新版本
 
-当前发布版本：`v0.1.7`
+当前发布版本：`v0.1.8`
 
 发布包命名：
 
 ```text
-SunnyNet-wpf-v0.1.7-win-x64.zip
-SunnyNet-wpf-v0.1.7-win-x64-self-contained.zip
+SunnyNet-wpf-v0.1.8-win-x64.zip
+SunnyNet-wpf-v0.1.8-win-x64-self-contained.zip
 ```
 
 Release 包含 Windows x64 可运行程序、WPF 主程序、Go 后端 DLL、随程序运行所需资源，以及可选 MCP 桥接程序。普通包需要本机安装 .NET Desktop Runtime；自包含包内置运行时，不依赖用户机器上的 .NET 版本。
 
 ## 本次核心更新
 
-- 请求重写新增响应 JSON 键值改写，支持按路径设置或删除嵌套字段，例如 `Data.User.IsInsider=true`、`Data.Membership.Role=7`。
-- JSON 响应重写采用路径级替换，尽量保留原始响应结构，并自动修正响应长度、压缩等相关协议头。
-- 规则中心新增/编辑规则窗口改为普通窗口模式，编辑规则时可继续点击主窗口或其它工具窗口查看上下文。
-- 请求规则继续保留请求断点、HTTP/WebSocket/TCP/UDP 屏蔽、请求重写、请求映射等能力。
+- 自动解压 `Content-Encoding: zstd` 响应，修复 JSON 响应被显示为二进制的问题；解压失败时保留原始响应。
+- 修复 WebP 图片无法预览的问题，支持有损、无损 WebP 和透明通道。
+- 新增 SVG 矢量预览、格式选择和原图保存，正确处理图片尺寸、`viewBox` 与透明留白。
+- 补充压缩响应和图片预览回归测试，覆盖无 MIME 类型、损坏数据和原始字节保留等场景。
 
 ## 目录结构
 
@@ -225,8 +226,8 @@ artifacts/Release-self-contained/
 并自动生成两个 zip：
 
 ```text
-SunnyNet-wpf-v0.1.7-win-x64.zip
-SunnyNet-wpf-v0.1.7-win-x64-self-contained.zip
+SunnyNet-wpf-v0.1.8-win-x64.zip
+SunnyNet-wpf-v0.1.8-win-x64-self-contained.zip
 ```
 
 普通包体积小，但依赖本机 .NET Desktop Runtime；自包含包体积更大，但不受用户机器已安装 .NET 版本影响。

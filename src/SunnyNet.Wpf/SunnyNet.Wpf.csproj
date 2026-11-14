@@ -12,10 +12,10 @@
     <Product>SunnyNet</Product>
     <Company>SunnyNet</Company>
     <Description>SunnyNet Windows 抓包分析工具</Description>
-    <Version>0.1.7</Version>
-    <AssemblyVersion>0.1.7.0</AssemblyVersion>
-    <FileVersion>0.1.7.0</FileVersion>
-    <InformationalVersion>0.1.7</InformationalVersion>
+    <Version>0.1.8</Version>
+    <AssemblyVersion>0.1.8.0</AssemblyVersion>
+    <FileVersion>0.1.8.0</FileVersion>
+    <InformationalVersion>0.1.8</InformationalVersion>
     <ApplicationIcon>Resources\AppIcon.ico</ApplicationIcon>
   </PropertyGroup>
 
@@ -49,6 +49,11 @@
     </ItemGroup>
     <Delete Files="@(LegacyOutput)" TreatErrorsAsWarnings="true" />
   </Target>
+
+  <ItemGroup>
+    <PackageReference Include="SharpVectors.Wpf" Version="1.8.5" />
+    <PackageReference Include="SkiaSharp" Version="3.119.4" />
+  </ItemGroup>
 
   <ItemGroup>
     <Resource Include="Resources\AppIcon.ico" />

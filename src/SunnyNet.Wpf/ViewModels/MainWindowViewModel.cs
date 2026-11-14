@@ -5190,7 +5190,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             return true;
         }
 
-        return false;
+        return ImagePreviewDecoder.IsSvg(bytes);
     }
 
     private static string ResolveSocketProtocol(CaptureEntry selected, JsonElement socketData)

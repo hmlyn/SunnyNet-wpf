@@ -24,6 +24,7 @@
                     <ComboBoxItem Content="GIF" Tag="Gif" />
                     <ComboBoxItem Content="BMP" Tag="Bmp" />
                     <ComboBoxItem Content="WebP" Tag="Webp" />
+                    <ComboBoxItem Content="SVG" Tag="Svg" />
                     <ComboBoxItem Content="ICO" Tag="Ico" />
                     <ComboBoxItem Content="TIFF" Tag="Tiff" />
                 </ComboBox>
